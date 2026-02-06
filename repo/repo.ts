@@ -8,7 +8,7 @@ import { getHeadCommit } from "../index/lib/discovery";
 import { EMBEDDING_MODEL, EMBEDDING_DIM } from "../index/lib/search-config";
 import { runIndex } from "../index/lib/engine";
 import { ensureEmbedded } from "../index/lib/embed";
-import { startWatcher } from "../index/lib/watcher";
+import { startWatcher, stopWatcher } from "../index/lib/watcher";
 
 // --- Types ---
 
@@ -43,6 +43,21 @@ interface ListResponse {
   repos: RepoRow[];
 }
 
+// --- Helpers ---
+
+async function indexAndEmbed(repoId: string, name: string, rootPath: string) {
+  try {
+    console.log(`[RLM] Starting indexing for ${name}...`);
+    await runIndex(repoId);
+    console.log(`[RLM] Index complete, starting embeddings...`);
+    await ensureEmbedded(repoId);
+    console.log(`[RLM] Embeddings complete for ${name}`);
+    startWatcher(repoId, rootPath);
+  } catch (err) {
+    console.error(`[RLM] Indexing failed for ${name}:`, err);
+  }
+}
+
 // --- Endpoints ---
 
 export const register = api(
@@ -64,15 +79,8 @@ export const register = api(
     if (!row) throw APIError.internal("failed to upsert repo");
 
     if (row.created) {
-      // Run indexing synchronously so CLI gets completion confirmation
-      try {
-        await runIndex(row.id);
-        await ensureEmbedded(row.id);
-      } catch {
-        // Log but don't fail registration — indexing can be retried
-      }
-      // Watcher is fire-and-forget (returns object, not Promise)
-      startWatcher(row.id, params.root_path);
+      // Fire-and-forget — CLI polls /repo/:id/status for progress
+      indexAndEmbed(row.id, name, params.root_path);
     }
 
     return {
@@ -169,7 +177,10 @@ interface DeleteResponse {
 export const remove = api(
   { expose: true, method: "DELETE", path: "/repo/:id" },
   async ({ id }: DeleteParams): Promise<DeleteResponse> => {
-    // Count before delete (FK CASCADE handles actual removal)
+    // Stop watcher first to prevent writes during deletion
+    await stopWatcher(id);
+
+    // Count before delete
     const counts = await db.queryRow<{
       chunks: number;
       summaries: number;
@@ -181,9 +192,33 @@ export const remove = api(
         (SELECT count(*)::int FROM traces WHERE repo_id = ${id}) AS traces
     `;
 
+    // Delete explicitly in batches to avoid slow CASCADE with pgvector
+    // Order: traces → summaries → chunks → repo (respects FK dependencies)
+    await db.exec`DELETE FROM traces WHERE repo_id = ${id}`;
+    await db.exec`DELETE FROM summaries WHERE repo_id = ${id}`;
+
+    // Chunks with embeddings — delete in batches to avoid pgvector bottleneck
+    let totalDeleted = 0;
+    while (true) {
+      const res = await db.queryRow<{ remaining: number }>`
+        SELECT count(*)::int AS remaining FROM chunks WHERE repo_id = ${id} LIMIT 1001
+      `;
+      const remaining = res?.remaining ?? 0;
+      if (remaining === 0) break;
+
+      await db.exec`
+        DELETE FROM chunks
+        WHERE repo_id = ${id}
+        AND id IN (
+          SELECT id FROM chunks WHERE repo_id = ${id} LIMIT 1000
+        )
+      `;
+      totalDeleted += Math.min(remaining, 1000);
+    }
+
+    // Finally delete the repo row
     const result = await db.queryRow<{ deleted: boolean }>`
-      WITH d AS (DELETE FROM repos WHERE id = ${id} RETURNING 1)
-      SELECT count(*) > 0 AS deleted FROM d
+      DELETE FROM repos WHERE id = ${id} RETURNING true AS deleted
     `;
 
     if (!result?.deleted) throw APIError.notFound("repo not found");
