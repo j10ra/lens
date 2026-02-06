@@ -4,6 +4,7 @@ import { registerCommand } from "./commands/register.js";
 import { taskCommand } from "./commands/task.js";
 import { searchCommand } from "./commands/search.js";
 import { readCommand } from "./commands/read.js";
+import { indexCommand } from "./commands/index.js";
 import { error } from "./util/format.js";
 
 const program = new Command()
@@ -34,6 +35,15 @@ program
   .option("--mode <mode>", "Search mode: grep|semantic|hybrid")
   .option("--limit <n>", "Max results")
   .action((query, opts) => run(() => searchCommand(query, opts)));
+
+// rlm index
+program
+  .command("index")
+  .description("Index the current repo")
+  .option("--json", "Output as JSON", false)
+  .option("--force", "Force full re-index", false)
+  .option("--status", "Show index status", false)
+  .action((opts) => run(() => indexCommand(opts)));
 
 // rlm read <path> [start] [end]
 program

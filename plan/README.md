@@ -59,7 +59,7 @@ RLM/
 |-------|-----------------------------|------------------------|-------------|
 | 0     | Foundations                 | [phase-0.md](phase-0.md) | [x] Done    |
 | 1     | CLI Bridge                  | [phase-1.md](phase-1.md) | [x] Done    |
-| 2     | Indexing + Chunking         | [phase-2.md](phase-2.md) | [ ] Pending |
+| 2     | Indexing + Chunking         | [phase-2.md](phase-2.md) | [x] Done    |
 | 3     | Embeddings + Vector Search  | [phase-3.md](phase-3.md) | [ ] Pending |
 | 4     | Summaries + Repo Memory     | [phase-4.md](phase-4.md) | [ ] Pending |
 | 5     | Context Pack Builder        | [phase-5.md](phase-5.md) | [ ] Pending |

@@ -2,7 +2,7 @@
 
 **Goal:** Turn repo files into searchable chunk records in Postgres. Indexing is on-demand, diff-aware, and idempotent.
 
-**Status:** [ ] Pending
+**Status:** [x] Done
 
 **Depends on:** Phase 0, Phase 1
 
