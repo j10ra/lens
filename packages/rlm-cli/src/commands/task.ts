@@ -4,10 +4,22 @@ import { output } from "../util/format.js";
 
 interface TaskResponse {
   context_pack: string;
-  plan?: unknown;
+  analysis: {
+    keywords: string[];
+    scope: string;
+    task_type: string;
+  };
+  stats: {
+    files_in_context: number;
+    index_fresh: boolean;
+    duration_ms: number;
+  };
 }
 
-export async function taskCommand(goal: string, opts: { json: boolean }): Promise<void> {
+export async function taskCommand(
+  goal: string,
+  opts: { json: boolean },
+): Promise<void> {
   const { repo_id } = await ensureRepo();
   const res = await post<TaskResponse>("/task", { repo_id, goal });
 

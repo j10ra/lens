@@ -5,7 +5,27 @@
       "Bash(node /Volumes/Drive/__x/RLM/packages/rlm-cli/dist/index.js repo register:*)",
       "Bash(echo:*)",
       "Bash(node -e:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\n\\(feat\\): phase 0-2 indexing + chunking + CLI bridge\n\n- Diff-aware indexing engine with chunk_hash tracking\n- Boundary-aware file chunker \\(150-line target, 10-line overlap\\)\n- File discovery via git ls-files / git diff\n- ensureIndexed\\(\\) lazy trigger wired into search + task\n- Grep-based search on chunks table \\(ILIKE\\)\n- CLI: rlm index, rlm index --force, rlm index --status\n- Migration 002: chunks table with pgvector column, repo index state\nEOF\n\\)\")",
+      "Bash(pkill:*)",
+      "WebFetch(domain:docs.z.ai)",
+      "Bash(for model in \"embedding-2\" \"embedding-3\" \"text-embedding-ada-002\" \"text-embedding-3-small\" \"text-embedding-v2\" \"embedding-v2\" \"bge-large-zh\" \"glm-embedding\" \"glm-4-embedding\")",
+      "Bash(do)",
+      "Bash(done)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\n\\(feat\\): phase 3 — local embeddings + hybrid vector search\n\n- Local embedding via @huggingface/transformers \\(Xenova/bge-small-en-v1.5, 384d\\)\n- ensureEmbedded\\(\\) lazy pipeline — embed only NULL chunks, skip cached\n- Hybrid search: grep + pgvector cosine similarity + merge/rerank\n- Graceful degradation: embedding failure falls back to grep\n- BGE prefix convention: \"passage:\" for docs, \"query:\" for search\n- Migrations 003-004: IVFFlat index, dimension fix 1536→384\nEOF\n\\)\")",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)",
+      "WebFetch(domain:vercel.com)",
+      "Bash(python3:*)",
+      "Bash(pgrep:*)",
+      "Bash(kill:*)",
+      "Bash(REPO_ID=\"d18eaa9b-301f-4ea5-9e05-81f8a2706ecc\")",
+      "Bash(__NEW_LINE_708636f45b2d49f0__ echo \"=== CHECK 1: Search trace recording ===\")",
+      "Bash(__NEW_LINE_e27817fdf8970a0b__ echo \"=== CHECK 1: Verify search trace in DB ===\")",
+      "Bash(__NEW_LINE_8555e620d8fb1f34__ echo \"=== CHECK 2: Runner with trace_type ===\")",
+      "Bash(__NEW_LINE_18840c70e3c9d42c__ echo \"\")",
+      "Bash(__NEW_LINE_b21bb2901dc7bb6a__ echo \"\")",
+      "Bash(xargs kill:*)"
     ]
   }
 }

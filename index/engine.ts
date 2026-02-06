@@ -3,6 +3,8 @@ import { db } from "../repo/db";
 import { fullScan, diffScan, getHeadCommit, type DiscoveredFile } from "./discovery";
 import { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./chunker";
 
+const MAX_CHUNKS_PER_REPO = 100_000;
+
 export interface IndexResult {
   files_scanned: number;
   chunks_created: number;
@@ -45,6 +47,12 @@ export async function runIndex(repoId: string, force = false): Promise<IndexResu
     } else {
       files = await fullScan(repo.root_path);
     }
+
+    // Check repo chunk limit
+    const countRow = await db.queryRow<{ count: number }>`
+      SELECT count(*)::int AS count FROM chunks WHERE repo_id = ${repoId}
+    `;
+    let currentChunks = countRow?.count ?? 0;
 
     let chunksCreated = 0;
     let chunksUnchanged = 0;
@@ -92,11 +100,13 @@ export async function runIndex(repoId: string, force = false): Promise<IndexResu
           chunksUnchanged++;
           await db.exec`
             UPDATE chunks SET last_seen_commit = ${headCommit}, updated_at = now()
-            WHERE id = ${existing.get(key)!}
+            WHERE id = ${existing.get(key)!} AND repo_id = ${repoId}
           `;
         } else {
-          // New chunk — insert
+          // New chunk — enforce per-repo limit
+          if (currentChunks >= MAX_CHUNKS_PER_REPO) continue;
           chunksCreated++;
+          currentChunks++;
           await db.exec`
             INSERT INTO chunks (repo_id, path, chunk_index, start_line, end_line, content, chunk_hash, last_seen_commit, language)
             VALUES (${repoId}, ${file.path}, ${chunk.chunk_index}, ${chunk.start_line}, ${chunk.end_line},
@@ -110,7 +120,7 @@ export async function runIndex(repoId: string, force = false): Promise<IndexResu
       // Delete stale chunks for this file (old chunk_index/hash combos)
       for (const [key, id] of existing) {
         if (!newKeys.has(key)) {
-          await db.exec`DELETE FROM chunks WHERE id = ${id}`;
+          await db.exec`DELETE FROM chunks WHERE id = ${id} AND repo_id = ${repoId}`;
           chunksDeleted++;
         }
       }

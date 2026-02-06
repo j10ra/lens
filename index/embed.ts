@@ -47,7 +47,7 @@ export async function ensureEmbedded(repoId: string): Promise<EmbedResult> {
       const vecStr = `[${vectors[i].join(",")}]`;
       await db.exec`
         UPDATE chunks SET embedding = ${vecStr}::vector, updated_at = now()
-        WHERE id = ${rows[i].id}
+        WHERE id = ${rows[i].id} AND repo_id = ${repoId}
       `;
     }
 

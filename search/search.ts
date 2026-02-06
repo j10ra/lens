@@ -4,6 +4,7 @@ import { ensureEmbedded } from "../index/embed";
 import { grepSearch } from "./grep";
 import { vectorSearch, hasEmbeddings } from "./vector";
 import { mergeAndRerank, formatResult, type RankedResult } from "./rerank";
+import { writeTrace } from "../repo/trace-writer";
 
 interface SearchParams {
   repo_id: string;
@@ -20,6 +21,7 @@ interface SearchResponse {
 export const search = api(
   { expose: true, method: "POST", path: "/search" },
   async (params: SearchParams): Promise<SearchResponse> => {
+    const start = Date.now();
     const limit = Math.min(params.limit ?? 10, 50);
     const requestedMode = params.mode ?? "hybrid";
 
@@ -34,37 +36,44 @@ export const search = api(
       // Embedding API down — degrade silently
     }
 
-    // Determine actual mode
     const effectiveMode = resolveMode(requestedMode, embeddingsAvailable);
+
+    let results: RankedResult[];
+    let searchModeUsed: string;
 
     if (effectiveMode === "grep") {
       const grepResults = await grepSearch(params.repo_id, params.query, limit);
-      return {
-        results: grepResults.map((r) => formatResult(r, r.score, "grep")),
-        search_mode_used: "grep",
-      };
-    }
-
-    if (effectiveMode === "semantic") {
+      results = grepResults.map((r) => formatResult(r, r.score, "grep"));
+      searchModeUsed = "grep";
+    } else if (effectiveMode === "semantic") {
       const vecResults = await vectorSearch(params.repo_id, params.query, limit);
-      return {
-        results: vecResults.map((r) => formatResult(r, r.score, "semantic")),
-        search_mode_used: "semantic",
-      };
+      results = vecResults.map((r) => formatResult(r, r.score, "semantic"));
+      searchModeUsed = "semantic";
+    } else {
+      // Hybrid: run both in parallel, merge + rerank
+      const [grepResults, vecResults] = await Promise.all([
+        grepSearch(params.repo_id, params.query, limit * 2),
+        vectorSearch(params.repo_id, params.query, limit * 2),
+      ]);
+      const grepScored = grepResults.map((r) => ({ ...r, match_type: "grep" as const }));
+      const vecScored = vecResults.map((r) => ({ ...r, match_type: "semantic" as const }));
+      results = mergeAndRerank(grepScored, vecScored, limit);
+      searchModeUsed = "hybrid";
     }
 
-    // Hybrid: run both in parallel, merge + rerank
-    const [grepResults, vecResults] = await Promise.all([
-      grepSearch(params.repo_id, params.query, limit * 2),
-      vectorSearch(params.repo_id, params.query, limit * 2),
-    ]);
+    // Fire-and-forget trace
+    writeTrace({
+      repo_id: params.repo_id,
+      task_goal: params.query,
+      step: "search",
+      trace_type: "search",
+      input: { query: params.query, mode: requestedMode },
+      output: { mode_used: searchModeUsed, result_count: results.length },
+      status: "success",
+      duration_ms: Date.now() - start,
+    });
 
-    const grepScored = grepResults.map((r) => ({ ...r, match_type: "grep" as const }));
-    const vecScored = vecResults.map((r) => ({ ...r, match_type: "semantic" as const }));
-
-    const merged = mergeAndRerank(grepScored, vecScored, limit);
-
-    return { results: merged, search_mode_used: "hybrid" };
+    return { results, search_mode_used: searchModeUsed };
   },
 );
 

@@ -2,7 +2,7 @@
 
 **Goal:** Cache file/dir summaries. Progressive disclosure: daemon provides context without dumping full files.
 
-**Status:** [ ] Pending
+**Status:** [x] Done
 
 **Depends on:** Phase 3
 

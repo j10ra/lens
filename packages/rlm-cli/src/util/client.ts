@@ -1,4 +1,5 @@
 const BASE_URL = process.env.RLM_HOST ?? "http://127.0.0.1:4000";
+const VERBOSE = process.env.RLM_VERBOSE === "1" || process.argv.includes("--verbose") || process.argv.includes("-v");
 
 export class DaemonError extends Error {
   constructor(
@@ -16,6 +17,9 @@ export async function request<T>(
   body?: unknown,
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
+  if (VERBOSE) {
+    process.stderr.write(`[RLM] ${method} ${url}\n`);
+  }
 
   let res: Response;
   try {
@@ -32,6 +36,10 @@ export async function request<T>(
   }
 
   const data = await res.json();
+
+  if (VERBOSE) {
+    process.stderr.write(`[RLM] ${res.status} ${res.statusText}\n`);
+  }
 
   if (!res.ok) {
     throw new DaemonError(res.status, data);
