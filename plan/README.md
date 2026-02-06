@@ -28,29 +28,28 @@ Master tracker for building the RLM daemon. Each phase has its own file with gra
                                   └──────────────────────────┘
 ```
 
-### Project Structure (target)
+### Project Structure
 
 ```
 RLM/
-├── apps/
-│   └── rlm/                    # Encore.ts app
-│       ├── health/             # Health service
-│       ├── repo/               # Repo registration + management
-│       ├── index/              # File discovery + chunking
-│       ├── search/             # Grep + vector search + rerank
-│       ├── summary/            # File/dir summaries + cache
-│       ├── context/            # Context pack builder
-│       ├── patch/              # Diff generation + application
-│       ├── runner/             # Test/build execution
-│       └── migrations/         # SQL migrations (pgvector, tables)
+├── health/                     # Health service
+├── repo/                       # Repo registration + management
+├── index/                      # File discovery + chunking + watcher
+├── search/                     # Grep + vector search + rerank
+├── summary/                    # File/dir summaries + cache
+├── context/                    # Context pack builder
+├── patch/                      # Diff generation + application
+├── runner/                     # Test/build execution
+├── read/                       # File read service
+├── worker/                     # Background cron worker
 ├── packages/
-│   └── rlm-cli/               # CLI binary (Node/Bun)
+│   └── rlm-cli/               # CLI binary (Node.js)
 │       ├── src/
-│       │   ├── commands/       # register, task, search, read
+│       │   ├── commands/       # register, task, search, read, watch...
 │       │   └── util/           # repo detection, http client, formatter
 │       └── package.json
 ├── plan/                       # This folder — implementation tracker
-└── package.json                # Monorepo root
+└── package.json                # Root
 ```
 
 ### Phase Tracker
@@ -64,6 +63,7 @@ RLM/
 | 4     | Summaries + Repo Memory     | [phase-4.md](phase-4.md) | [x] Done    |
 | 5     | Context Pack Builder        | [phase-5.md](phase-5.md) | [x] Done    |
 | 6     | Patch + Apply + Run         | [phase-6.md](phase-6.md) | [x] Done    |
+| 2.7   | File Watcher (chokidar)     | —                        | [x] Done    |
 | 7     | Multi-Repo Support          | [phase-7.md](phase-7.md) | [ ] Pending |
 
 ### Engineering Decisions
@@ -74,4 +74,4 @@ RLM/
 - **Embeddings:** pgvector extension
 - **LLM:** Z.ai GLM-4.7 (reasoning + patches)
 - **CLI:** Node/Bun executable, callable from any repo
-- **Monorepo:** apps/ + packages/ layout
+- **Layout:** Root-level services + packages/

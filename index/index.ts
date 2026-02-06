@@ -2,6 +2,7 @@ import { api, APIError } from "encore.dev/api";
 import { db } from "../repo/db";
 import { runIndex, type IndexResult } from "./engine";
 import { getHeadCommit } from "./discovery";
+import { startWatcher, stopWatcher, getWatcherStatus } from "./watcher";
 
 // --- POST /index/run ---
 
@@ -73,5 +74,53 @@ export const status = api(
       files_indexed: counts?.files_indexed ?? 0,
       chunks_with_embeddings: counts?.chunks_with_embeddings ?? 0,
     };
+  },
+);
+
+// --- POST /index/watch ---
+
+interface WatchParams {
+  repo_id: string;
+}
+
+interface WatchResponse {
+  started: boolean;
+  already_watching: boolean;
+}
+
+export const watchRepo = api(
+  { expose: true, method: "POST", path: "/index/watch" },
+  async ({ repo_id }: WatchParams): Promise<WatchResponse> => {
+    const repo = await db.queryRow<{ root_path: string }>`
+      SELECT root_path FROM repos WHERE id = ${repo_id}
+    `;
+    if (!repo) throw APIError.notFound("repo not found");
+    return startWatcher(repo_id, repo.root_path);
+  },
+);
+
+// --- POST /index/unwatch ---
+
+export const unwatchRepo = api(
+  { expose: true, method: "POST", path: "/index/unwatch" },
+  async ({ repo_id }: WatchParams): Promise<{ stopped: boolean }> => {
+    return stopWatcher(repo_id);
+  },
+);
+
+// --- GET /index/watch-status/:repo_id ---
+
+interface WatchStatusResponse {
+  watching: boolean;
+  repo_root: string | null;
+  changed_files: number;
+  deleted_files: number;
+  started_at: string | null;
+}
+
+export const watchStatus = api(
+  { expose: true, method: "GET", path: "/index/watch-status/:repo_id" },
+  async ({ repo_id }: WatchParams): Promise<WatchStatusResponse> => {
+    return getWatcherStatus(repo_id);
   },
 );

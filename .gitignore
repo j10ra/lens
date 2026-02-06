@@ -2,8 +2,21 @@
 encore.gen.go
 encore.gen.cue
 /.encore
+encore.gen
 node_modules
-/encore.gen
 dist
 .rlm
 .env
+
+# TypeScript compilation outputs
+**/*.js
+**/*.js.map
+**/*.d.ts
+**/*.d.ts.map
+!dist/**
+
+# Encore generated files
+encore.gen/
+
+# Build artifacts
+tsconfig.tsbuildinfo

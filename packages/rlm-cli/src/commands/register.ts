@@ -20,7 +20,10 @@ export async function registerCommand(opts: { json: boolean }): Promise<void> {
   if (opts.json) {
     output(res, true);
   } else {
-    const verb = res.created ? "Registered" : "Already registered";
-    output(`${verb} ${res.name} (repo_id: ${res.repo_id})`, false);
+    if (res.created) {
+      output(`Registered ${res.name} (repo_id: ${res.repo_id})\nIndexing + file watcher started. Run \`rlm status\` to check progress.`, false);
+    } else {
+      output(`Already registered ${res.name} (repo_id: ${res.repo_id})`, false);
+    }
   }
 }

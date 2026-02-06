@@ -41,7 +41,16 @@ This project is indexed by RLM. When making changes:
 ### Setup (first time for this repo)
 
 1. Register this repo: `rlm repo register`
+   - Auto-indexes, embeds, and starts a file watcher on first register
 2. Verify: `rlm status`
+
+### File Watcher
+
+- `rlm repo watch` — Start watching for file changes (auto-updates index)
+- `rlm repo unwatch` — Stop file watcher
+- `rlm repo watch-status` — Check watcher state
+
+Note: Watchers stop on daemon restart. Re-run `rlm repo watch` to resume.
 
 ### Multi-Repo Management
 
@@ -50,9 +59,10 @@ This project is indexed by RLM. When making changes:
 
 ### How It Works
 
-- Auto-indexes on first run, then tracks git changes
+- Auto-indexes on register, then tracks git changes + file watcher
 - Semantic search available when embeddings ready (~100% status)
 - Background worker refreshes stale repos every 5 minutes
+- File watcher picks up saves in real-time (~500ms debounce)
 - All data isolated per repo (chunks, embeddings, traces)
 ```
 
@@ -64,7 +74,7 @@ Claude Code will read these instructions and invoke `rlm` commands via Bash when
 
 ```bash
 # 1. In your project directory, create .claude/CLAUDE.md with the content above
-# 2. Register the repo
+# 2. Register the repo (auto-indexes + starts file watcher)
 rlm repo register
 
 # 3. Done — Claude Code will now use RLM when you ask it to make changes
@@ -82,6 +92,23 @@ rlm repo register
 #          Makes changes
 #          Runs `rlm run "npm test"` to verify
 ```
+
+---
+
+## File Watcher
+
+The file watcher uses chokidar to monitor your repo for changes in real-time:
+
+- **Auto-started** on first `rlm repo register`
+- Debounces changes (500ms) to avoid thrashing
+- Skips binary files, node_modules, .git, dist, build directories
+- Updates chunks immediately — no need to re-index
+- New chunks get `embedding = NULL` (background worker picks them up)
+
+**Limitations:**
+- Watchers are in-memory — stop when daemon restarts
+- Re-enable with `rlm repo watch` after daemon restart
+- Only watches files < 500KB
 
 ---
 
@@ -105,6 +132,13 @@ rlm status
 ```bash
 rlm index --force
 rlm status
+```
+
+**File watcher not active after restart:**
+
+```bash
+rlm repo watch
+rlm repo watch-status
 ```
 
 **Check all repos:**

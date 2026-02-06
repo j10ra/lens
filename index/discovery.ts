@@ -5,9 +5,9 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const MAX_FILE_SIZE = 500 * 1024; // 500KB
+export const MAX_FILE_SIZE = 500 * 1024; // 500KB
 
-const BINARY_EXTENSIONS = new Set([
+export const BINARY_EXTENSIONS = new Set([
   ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg", ".webp",
   ".mp3", ".mp4", ".wav", ".avi", ".mov", ".mkv",
   ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
@@ -17,7 +17,7 @@ const BINARY_EXTENSIONS = new Set([
   ".lock", ".bin", ".dat", ".db", ".sqlite",
 ]);
 
-const LANG_MAP: Record<string, string> = {
+export const LANG_MAP: Record<string, string> = {
   ".ts": "typescript", ".tsx": "typescript", ".js": "javascript", ".jsx": "javascript",
   ".py": "python", ".rb": "ruby", ".go": "go", ".rs": "rust",
   ".java": "java", ".kt": "kotlin", ".cs": "csharp", ".cpp": "cpp",
@@ -34,11 +34,11 @@ export interface DiscoveredFile {
   status: "added" | "modified" | "deleted";
 }
 
-function detectLanguage(filePath: string): string | null {
+export function detectLanguage(filePath: string): string | null {
   return LANG_MAP[extname(filePath).toLowerCase()] ?? null;
 }
 
-function isBinaryExt(filePath: string): boolean {
+export function isBinaryExt(filePath: string): boolean {
   return BINARY_EXTENSIONS.has(extname(filePath).toLowerCase());
 }
 

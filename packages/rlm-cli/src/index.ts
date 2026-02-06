@@ -12,6 +12,7 @@ import { statusCommand } from "./commands/status.js";
 import { listCommand } from "./commands/list.js";
 import { removeCommand } from "./commands/remove.js";
 import { daemonStatsCommand } from "./commands/daemon-stats.js";
+import { watchCommand, unwatchCommand, watchStatusCommand } from "./commands/watch.js";
 import { error } from "./util/format.js";
 
 const program = new Command()
@@ -39,6 +40,24 @@ repo
   .option("--json", "Output as JSON", false)
   .option("--yes", "Skip confirmation", false)
   .action((opts) => run(() => removeCommand(opts)));
+
+repo
+  .command("watch")
+  .description("Start file watcher for current repo")
+  .option("--json", "Output as JSON", false)
+  .action((opts) => run(() => watchCommand(opts)));
+
+repo
+  .command("unwatch")
+  .description("Stop file watcher for current repo")
+  .option("--json", "Output as JSON", false)
+  .action((opts) => run(() => unwatchCommand(opts)));
+
+repo
+  .command("watch-status")
+  .description("Show file watcher status for current repo")
+  .option("--json", "Output as JSON", false)
+  .action((opts) => run(() => watchStatusCommand(opts)));
 
 // rlm task "<goal>"
 program

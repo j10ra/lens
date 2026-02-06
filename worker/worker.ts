@@ -10,12 +10,6 @@ interface MaintainResponse {
   errors: number;
 }
 
-const _ = new CronJob("maintain-repos", {
-  title: "Auto-index and embed stale repos",
-  every: "5m",
-  endpoint: maintain,
-});
-
 export const maintain = api(
   { expose: false, method: "POST", path: "/worker/maintain" },
   async (): Promise<MaintainResponse> => {
@@ -88,3 +82,10 @@ export const maintain = api(
     return { processed, errors };
   },
 );
+
+// CronJob must be registered after the endpoint is declared
+const _ = new CronJob("maintain-repos", {
+  title: "Auto-index and embed stale repos",
+  every: "5m",
+  endpoint: maintain,
+});

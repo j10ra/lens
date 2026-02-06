@@ -3,6 +3,9 @@ import { db } from "./db";
 import { deriveIdentityKey } from "./identity";
 import { getHeadCommit } from "../index/discovery";
 import { EMBEDDING_MODEL, EMBEDDING_DIM } from "../search/config";
+import { runIndex } from "../index/engine";
+import { ensureEmbedded } from "../index/embed";
+import { startWatcher } from "../index/watcher";
 
 // --- Types ---
 
@@ -56,6 +59,13 @@ export const register = api(
     `;
 
     if (!row) throw APIError.internal("failed to upsert repo");
+
+    if (row.created) {
+      runIndex(row.id)
+        .then(() => ensureEmbedded(row.id))
+        .then(() => startWatcher(row.id, params.root_path))
+        .catch(() => {});
+    }
 
     return {
       repo_id: row.id,
