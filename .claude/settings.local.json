@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(node /Volumes/Drive/__x/RLM/packages/rlm-cli/dist/index.js repo register:*)",
+      "Bash(echo:*)",
+      "Bash(node -e:*)",
+      "Bash(node:*)"
     ]
   }
 }

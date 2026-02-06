@@ -2,7 +2,7 @@
 
 **Goal:** `rlm` CLI talks to daemon from any repo. Claude Code can call it as a tool.
 
-**Status:** [ ] Pending
+**Status:** [x] Done
 
 **Depends on:** Phase 0
 
