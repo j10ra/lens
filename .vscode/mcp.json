@@ -1,0 +1,12 @@
+{
+    "servers": {
+        "encore-mcp": {
+            "args": [
+                "mcp",
+                "run",
+                "--app=rlm-q3s2"
+            ],
+            "command": "encore"
+        }
+    }
+}
