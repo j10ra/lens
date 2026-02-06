@@ -2,7 +2,7 @@
 
 **Goal:** Store embeddings via pgvector. Semantic retrieval finds relevant code even without exact keyword matches. Embedding is on-demand and chunk_hash-aware — no redundant work.
 
-**Status:** [ ] Pending
+**Status:** [x] Done
 
 **Depends on:** Phase 2
 

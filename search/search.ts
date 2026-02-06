@@ -1,67 +1,77 @@
 import { api } from "encore.dev/api";
-import { db } from "../repo/db";
 import { ensureIndexed } from "../index/ensure";
+import { ensureEmbedded } from "../index/embed";
+import { grepSearch } from "./grep";
+import { vectorSearch, hasEmbeddings } from "./vector";
+import { mergeAndRerank, formatResult, type RankedResult } from "./rerank";
 
 interface SearchParams {
   repo_id: string;
   query: string;
-  mode?: string;
+  mode?: string;  // "grep" | "semantic" | "hybrid"
   limit?: number;
 }
 
-interface SearchResult {
-  path: string;
-  start_line: number;
-  end_line: number;
-  snippet: string;
-  score: number;
-  match_type: string;
-}
-
 interface SearchResponse {
-  results: SearchResult[];
+  results: RankedResult[];
   search_mode_used: string;
 }
 
-// Grep-based search on chunks. Replaced with hybrid in Phase 3.
 export const search = api(
   { expose: true, method: "POST", path: "/search" },
   async (params: SearchParams): Promise<SearchResponse> => {
-    // Lazy index before searching
+    const limit = Math.min(params.limit ?? 10, 50);
+    const requestedMode = params.mode ?? "hybrid";
+
+    // Lazy index + embed
     await ensureIndexed(params.repo_id);
 
-    const limit = Math.min(params.limit ?? 20, 50);
-    const pattern = `%${params.query}%`;
-
-    const rows = db.query<{
-      path: string;
-      start_line: number;
-      end_line: number;
-      content: string;
-    }>`
-      SELECT path, start_line, end_line, content
-      FROM chunks
-      WHERE repo_id = ${params.repo_id} AND content ILIKE ${pattern}
-      ORDER BY path, start_line
-      LIMIT ${limit}
-    `;
-
-    const results: SearchResult[] = [];
-    for await (const row of rows) {
-      // Extract matching line as snippet
-      const lines = row.content.split("\n");
-      const matchLine = lines.find((l) => l.toLowerCase().includes(params.query.toLowerCase()));
-
-      results.push({
-        path: row.path,
-        start_line: row.start_line,
-        end_line: row.end_line,
-        snippet: matchLine?.trim() ?? lines[0]?.trim() ?? "",
-        score: 1,
-        match_type: "grep",
-      });
+    let embeddingsAvailable = false;
+    try {
+      await ensureEmbedded(params.repo_id);
+      embeddingsAvailable = await hasEmbeddings(params.repo_id);
+    } catch {
+      // Embedding API down — degrade silently
     }
 
-    return { results, search_mode_used: "grep" };
+    // Determine actual mode
+    const effectiveMode = resolveMode(requestedMode, embeddingsAvailable);
+
+    if (effectiveMode === "grep") {
+      const grepResults = await grepSearch(params.repo_id, params.query, limit);
+      return {
+        results: grepResults.map((r) => formatResult(r, r.score, "grep")),
+        search_mode_used: "grep",
+      };
+    }
+
+    if (effectiveMode === "semantic") {
+      const vecResults = await vectorSearch(params.repo_id, params.query, limit);
+      return {
+        results: vecResults.map((r) => formatResult(r, r.score, "semantic")),
+        search_mode_used: "semantic",
+      };
+    }
+
+    // Hybrid: run both in parallel, merge + rerank
+    const [grepResults, vecResults] = await Promise.all([
+      grepSearch(params.repo_id, params.query, limit * 2),
+      vectorSearch(params.repo_id, params.query, limit * 2),
+    ]);
+
+    const grepScored = grepResults.map((r) => ({ ...r, match_type: "grep" as const }));
+    const vecScored = vecResults.map((r) => ({ ...r, match_type: "semantic" as const }));
+
+    const merged = mergeAndRerank(grepScored, vecScored, limit);
+
+    return { results: merged, search_mode_used: "hybrid" };
   },
 );
+
+function resolveMode(requested: string, embeddingsAvailable: boolean): string {
+  if (requested === "grep") return "grep";
+  if (requested === "semantic" && embeddingsAvailable) return "semantic";
+  if (requested === "semantic" && !embeddingsAvailable) return "grep"; // fallback
+  if (requested === "hybrid" && embeddingsAvailable) return "hybrid";
+  return "grep"; // default fallback
+}
