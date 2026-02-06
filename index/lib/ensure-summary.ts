@@ -1,4 +1,4 @@
-import { db } from "../repo/db";
+import { db } from "../../repo/db";
 import { summarizeFile } from "./summarizer";
 import { summarizeDirectory } from "./directory";
 import { dirname } from "node:path";

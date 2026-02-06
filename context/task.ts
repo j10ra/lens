@@ -1,12 +1,15 @@
+// POST /task — build retrieval-oriented context pack (zero LLM on hot path)
+// Ensures fresh index, gathers top-k files via hybrid search, formats compressed AGENTS.md pack.
+
 import { api } from "encore.dev/api";
-import { ensureIndexed } from "../index/ensure";
-import { ensureEmbedded } from "../index/embed";
-import { generateRepoMap } from "../summary/repomap";
-import { analyzeTask, type TaskAnalysis } from "./analyzer";
-import { gatherContext } from "./gather";
-import { formatContextPack } from "./formatter";
-import { getSmartTraces } from "./traces";
-import { detectScripts } from "../repo/scripts";
+import { ensureIndexed } from "../index/lib/ensure";
+import { ensureEmbedded } from "../index/lib/embed";
+import { generateRepoMap } from "../index/lib/repomap";
+import { analyzeTask, type TaskAnalysis } from "./lib/analyzer";
+import { gatherContext } from "./lib/gather";
+import { formatContextPack } from "./lib/formatter";
+import { getSmartTraces } from "./lib/traces";
+import { detectScripts } from "../repo/lib/scripts";
 import { db } from "../repo/db";
 
 interface TaskParams {
@@ -25,8 +28,6 @@ interface TaskResponse {
   };
 }
 
-/** Build a retrieval-oriented context pack — NO LLM calls.
- *  Includes recent activity traces for session continuity. */
 export const run = api(
   { expose: true, method: "POST", path: "/task" },
   async (params: TaskParams): Promise<TaskResponse> => {

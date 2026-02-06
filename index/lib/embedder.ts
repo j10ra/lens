@@ -1,5 +1,5 @@
 import { pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
-import { EMBEDDING_MODEL, EMBEDDING_DIM, EMBEDDING_BATCH_SIZE } from "./config";
+import { EMBEDDING_MODEL, EMBEDDING_DIM, EMBEDDING_BATCH_SIZE } from "./search-config";
 
 let extractor: FeatureExtractionPipeline | null = null;
 

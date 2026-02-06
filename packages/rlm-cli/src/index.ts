@@ -13,6 +13,7 @@ import { listCommand } from "./commands/list.js";
 import { removeCommand } from "./commands/remove.js";
 import { daemonStatsCommand } from "./commands/daemon-stats.js";
 import { watchCommand, unwatchCommand, watchStatusCommand } from "./commands/watch.js";
+import { configGetCommand, configSetCommand } from "./commands/config.js";
 import { error } from "./util/format.js";
 
 const program = new Command()
@@ -26,6 +27,7 @@ repo
   .command("register")
   .description("Register current repo with the daemon")
   .option("--json", "Output as JSON", false)
+  .option("--inject", "Inject RLM instructions into existing CLAUDE.md", false)
   .action((opts) => run(() => registerCommand(opts)));
 
 repo
@@ -130,6 +132,17 @@ daemon
   .description("Show global daemon statistics")
   .option("--json", "Output as JSON", false)
   .action((opts) => run(() => daemonStatsCommand(opts)));
+
+// rlm config
+const cfg = program.command("config").description("Manage RLM CLI config");
+cfg
+  .command("get <key>")
+  .description("Get config value (inject_behavior, show_progress)")
+  .action((key) => run(() => configGetCommand(key)));
+cfg
+  .command("set <key> <value>")
+  .description('Set config value (e.g. show_progress true, inject_behavior once)')
+  .action((key, value) => run(() => configSetCommand(key, value)));
 
 program.parse();
 

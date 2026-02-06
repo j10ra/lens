@@ -1,4 +1,4 @@
-import { db } from "../repo/db";
+import { db } from "../../repo/db";
 import { getHeadCommit } from "./discovery";
 import { runIndex, type IndexResult } from "./engine";
 

@@ -1,6 +1,6 @@
-import { db } from "../repo/db";
-import { embed } from "../search/embedder";
-import { EMBEDDING_BATCH_SIZE } from "../search/config";
+import { db } from "../../repo/db";
+import { embed } from "./embedder";
+import { EMBEDDING_BATCH_SIZE } from "./search-config";
 
 export interface EmbedResult {
   embedded_count: number;

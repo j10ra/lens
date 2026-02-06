@@ -1,3 +1,6 @@
+// POST /runner/run — sandboxed command execution
+// Allowlisted executables only (npm, cargo, python, git, etc). Traces every run.
+
 import { api, APIError } from "encore.dev/api";
 import { spawn } from "node:child_process";
 import { db } from "../repo/db";

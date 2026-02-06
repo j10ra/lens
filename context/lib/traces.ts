@@ -1,4 +1,4 @@
-import { db } from "../repo/db";
+import { db } from "../../repo/db";
 
 export interface RecentTrace {
   step: string;

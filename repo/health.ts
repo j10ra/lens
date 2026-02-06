@@ -1,3 +1,5 @@
+// GET /health — liveness probe
+
 import { api } from "encore.dev/api";
 
 interface HealthResponse {

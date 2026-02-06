@@ -27,8 +27,15 @@ rlm --version
 rlm daemon stats
 ```
 
-> **Updating the CLI** after code changes: `cd packages/rlm-cli && npm run build`
-> No need to re-link — `npm link` points to `dist/` directly.
+### Updating after changes
+
+| What changed                      | Action                                                                                  |
+| --------------------------------- | --------------------------------------------------------------------------------------- |
+| CLI code (`packages/rlm-cli/`)    | `cd packages/rlm-cli && npm run build` — next `rlm` call picks it up, no re-link needed |
+| Daemon code (services, endpoints) | Kill and re-run `encore run`, then `rlm repo watch` per repo to restore file watchers   |
+| New SQL migrations                | Kill and re-run `encore run`, then `rlm repo watch` per repo                            |
+
+> File watchers run inside the daemon (in-memory). Any daemon restart kills them — re-enable with `rlm repo watch`.
 
 ## Quick Start
 
@@ -47,26 +54,50 @@ This auto-indexes your repo, creates embeddings, and starts a file watcher.
 rlm status
 ```
 
-### 3. Add CLAUDE.md (optional but recommended)
+### 3. Add CLAUDE.md (critical for best results)
 
-Create `.claude/CLAUDE.md` in your project with RLM instructions so Claude Code knows about these commands.
+Create `.claude/CLAUDE.md` in your project:
+
+```markdown
+## RLM — Repo Context Daemon
+
+This project is indexed by RLM. Use **retrieval-led reasoning** for all tasks.
+
+### IMPORTANT: Explore first, then retrieve
+
+Before writing code, build a mental model:
+
+1. `rlm task "<goal>"` — Get compressed orientation (repo map, relevant files, recent traces)
+2. `rlm search "<keyword>"` — Find specific code patterns
+3. `rlm read <path>` — Fetch full files before editing
+4. `rlm run "<command>"` — Verify changes
+
+## Why this works
+
+Passive context (this file) + compressed orientation (`rlm task`) + targeted retrieval (`rlm read`)
+achieved 100% pass rate in Vercel's evals, while skills maxed at 79%. Build your mental model first.
+```
 
 ## Core Commands
 
-- `rlm task "<goal>"` — Get context pack with repo map, relevant files, recent activity
-- `rlm search "<query>"` — Find code patterns, function definitions, usage examples
-- `rlm read <path>` — Fetch full file content (use after search)
-- `rlm run "<command>"` — Execute tests/builds (sandboxed: npm, cargo, python, git)
-- `rlm status` — Check index freshness and embedding coverage
+| Command                | Purpose                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| `rlm task "<goal>"`    | Compressed context pack — repo map, top-k files, traces   |
+| `rlm search "<query>"` | Hybrid semantic + text search                             |
+| `rlm read <path>`      | Fetch full file (use after search)                        |
+| `rlm run "<command>"`  | Execute tests/builds (sandboxed: npm, cargo, python, git) |
+| `rlm status`           | Index freshness, embedding coverage                       |
 
 ## Multi-Repo Management
 
-- `rlm repo list` — Show all registered repos with stats
-- `rlm repo register` — Register current repo
-- `rlm repo remove --yes` — Remove this repo's data
-- `rlm repo watch` — Start watching for file changes (auto-updates index)
-- `rlm repo unwatch` — Stop file watcher
-- `rlm repo watch-status` — Check watcher state
+| Command                 | Purpose                                 |
+| ----------------------- | --------------------------------------- |
+| `rlm repo list`         | Show all registered repos with stats    |
+| `rlm repo register`     | Register current repo                   |
+| `rlm repo remove --yes` | Remove this repo's data                 |
+| `rlm repo watch`        | Start file watcher (auto-updates index) |
+| `rlm repo unwatch`      | Stop file watcher                       |
+| `rlm repo watch-status` | Check watcher state                     |
 
 ## How It Works
 
@@ -94,23 +125,7 @@ The file watcher uses chokidar to monitor your repo for changes in real-time:
 
 ## Integration with Claude Code
 
-Add a `.claude/CLAUDE.md` file to any project with RLM instructions:
-
-```markdown
-## RLM — Repo Context Daemon
-
-This project is indexed by RLM. When making changes:
-
-### Core Commands
-
-- `rlm task "<goal>"` — Get context pack with repo map, relevant files, recent activity
-- `rlm search "<query>"` — Find code patterns, function definitions, usage examples
-- `rlm read <path>` — Fetch full file content (use after search)
-- `rlm run "<command>"` — Execute tests/builds (sandboxed: npm, cargo, python, git)
-- `rlm status` — Check index freshness and embedding coverage
-```
-
-Claude Code will read these instructions and invoke `rlm` commands via Bash when appropriate.
+The `CLAUDE.md` template above is all you need. Claude Code reads it on every turn and follows the retrieval-led pattern automatically.
 
 ## Example Workflow
 

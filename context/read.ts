@@ -1,8 +1,11 @@
+// POST /read — read file content by path with optional line range
+// Validates path traversal, traces every read for session continuity.
+
 import { api, APIError } from "encore.dev/api";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { db } from "../repo/db";
-import { writeTrace } from "../repo/trace-writer";
+import { writeTrace } from "../repo/lib/trace-writer";
 
 interface ReadParams {
   repo_id: string;

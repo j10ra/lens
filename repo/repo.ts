@@ -1,11 +1,14 @@
+// Repo management endpoints — register, get, list, listDetailed, remove, status, daemonStats
+// Entry point for onboarding repos. Registration triggers initial index + embed + watcher.
+
 import { api, APIError } from "encore.dev/api";
 import { db } from "./db";
-import { deriveIdentityKey } from "./identity";
-import { getHeadCommit } from "../index/discovery";
-import { EMBEDDING_MODEL, EMBEDDING_DIM } from "../search/config";
-import { runIndex } from "../index/engine";
-import { ensureEmbedded } from "../index/embed";
-import { startWatcher } from "../index/watcher";
+import { deriveIdentityKey } from "./lib/identity";
+import { getHeadCommit } from "../index/lib/discovery";
+import { EMBEDDING_MODEL, EMBEDDING_DIM } from "../index/lib/search-config";
+import { runIndex } from "../index/lib/engine";
+import { ensureEmbedded } from "../index/lib/embed";
+import { startWatcher } from "../index/lib/watcher";
 
 // --- Types ---
 
@@ -61,10 +64,15 @@ export const register = api(
     if (!row) throw APIError.internal("failed to upsert repo");
 
     if (row.created) {
-      runIndex(row.id)
-        .then(() => ensureEmbedded(row.id))
-        .then(() => startWatcher(row.id, params.root_path))
-        .catch(() => {});
+      // Run indexing synchronously so CLI gets completion confirmation
+      try {
+        await runIndex(row.id);
+        await ensureEmbedded(row.id);
+      } catch {
+        // Log but don't fail registration — indexing can be retried
+      }
+      // Watcher is fire-and-forget (returns object, not Promise)
+      startWatcher(row.id, params.root_path);
     }
 
     return {
@@ -227,6 +235,72 @@ export const daemonStats = api(
       total_summaries: row?.total_summaries ?? 0,
       total_traces: row?.total_traces ?? 0,
       db_size_mb: row?.db_size_mb ?? 0,
+    };
+  },
+);
+
+// --- Status ---
+
+interface StatusParams {
+  id: string;
+}
+
+interface StatusResponse {
+  indexed_commit: string | null;
+  current_head: string | null;
+  is_stale: boolean;
+  chunk_count: number;
+  files_indexed: number;
+  embedded_count: number;
+  embedded_pct: number;
+  summary_count: number;
+  embedder: string;
+  embedding_dim: number;
+  last_activity: string | null;
+  trace_count: number;
+}
+
+// --- Template ---
+
+interface TemplateResponse {
+  content: string;
+}
+
+export const template = api(
+  { expose: true, method: "GET", path: "/repo/template" },
+  async (): Promise<TemplateResponse> => {
+    return {
+      content: `## RLM — Repo Context Daemon
+
+This project is indexed by RLM. When making changes: Use **retrieval-led reasoning** for all tasks.
+
+### Mandatory Workflow (do this first)
+
+Before opening or searching files, run:
+
+- \`rlm task "<goal>"\`
+
+Then use:
+
+- \`rlm search\` → \`rlm read\` → \`rlm run\`
+
+Do not scan the repo manually unless RLM fails.
+
+### Core Commands
+
+- \`rlm task "<goal>"\` — Get context pack with repo map, relevant files, recent activity
+- \`rlm search "<query>"\` — Find code patterns, function definitions, usage examples
+- \`rlm read <path>\` — Fetch full file content (use after search)
+- \`rlm run "<command>"\` — Execute tests/builds (sandboxed: npm, cargo, python, git)
+- \`rlm status\` — Check index freshness and embedding coverage
+
+### How It Works
+
+- Auto-indexes on first run, then tracks git changes
+- Semantic search available when embeddings ready (~100% status)
+- Background worker refreshes stale repos every 5 minutes
+- All data isolated per repo (chunks, embeddings, traces)
+`
     };
   },
 );

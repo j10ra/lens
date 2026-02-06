@@ -1,8 +1,11 @@
+// Index service endpoints — run, status, watchRepo, unwatchRepo, watchStatus
+// Manages diff-aware file indexing and real-time file watchers per repo.
+
 import { api, APIError } from "encore.dev/api";
 import { db } from "../repo/db";
-import { runIndex, type IndexResult } from "./engine";
-import { getHeadCommit } from "./discovery";
-import { startWatcher, stopWatcher, getWatcherStatus } from "./watcher";
+import { runIndex, type IndexResult } from "./lib/engine";
+import { getHeadCommit } from "./lib/discovery";
+import { startWatcher, stopWatcher, getWatcherStatus } from "./lib/watcher";
 
 // --- POST /index/run ---
 

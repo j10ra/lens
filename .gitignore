@@ -20,3 +20,15 @@ encore.gen/
 
 # Build artifacts
 tsconfig.tsbuildinfo
+/encore.gen
+
+# Generated files
+*.d.ts
+*.js
+*.map
+
+# Exceptions - keep source files and dist
+!**/*.ts
+!/dist/**/*.js
+!/node_modules/**/*.js
+!encore.gen/**/*.ts

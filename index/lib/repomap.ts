@@ -1,4 +1,4 @@
-import { db } from "../repo/db";
+import { db } from "../../repo/db";
 
 interface MapEntry {
   path: string;

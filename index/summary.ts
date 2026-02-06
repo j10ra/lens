@@ -1,7 +1,10 @@
+// Summary endpoints — generate, file, map
+// LLM-powered file/directory summaries and repo map generation via Z.ai GLM-4.7.
+
 import { api } from "encore.dev/api";
 import { db } from "../repo/db";
-import { ensureSummarized, type SummaryResult } from "./ensure";
-import { generateRepoMap } from "./repomap";
+import { ensureSummarized, type SummaryResult } from "./lib/ensure-summary";
+import { generateRepoMap } from "./lib/repomap";
 
 // --- POST /summary/generate ---
 

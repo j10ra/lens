@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve, extname } from "node:path";
-import { db } from "../repo/db";
+import { db } from "../../repo/db";
 import { chat } from "./llm";
 
 export interface FileSummary {

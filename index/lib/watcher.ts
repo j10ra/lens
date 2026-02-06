@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from "chokidar";
 import { readFile, stat } from "node:fs/promises";
 import { relative, extname } from "node:path";
-import { db } from "../repo/db";
+import { db } from "../../repo/db";
 import { isBinaryExt, detectLanguage, MAX_FILE_SIZE } from "./discovery";
 import { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./chunker";
 

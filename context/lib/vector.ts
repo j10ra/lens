@@ -1,5 +1,5 @@
-import { db } from "../repo/db";
-import { embedQuery } from "./embedder";
+import { db } from "../../repo/db";
+import { embedQuery } from "../../index/lib/embedder";
 
 export interface VectorResult {
   id: string;

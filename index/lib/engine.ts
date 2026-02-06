@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { db } from "../repo/db";
+import { db } from "../../repo/db";
 import { fullScan, diffScan, getHeadCommit, type DiscoveredFile } from "./discovery";
 import { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./chunker";
 

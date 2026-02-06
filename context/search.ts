@@ -1,10 +1,13 @@
+// POST /search — hybrid code search (grep + semantic vector)
+// Lazy-indexes and embeds before searching. Traces every query for session continuity.
+
 import { api } from "encore.dev/api";
-import { ensureIndexed } from "../index/ensure";
-import { ensureEmbedded } from "../index/embed";
-import { grepSearch } from "./grep";
-import { vectorSearch, hasEmbeddings } from "./vector";
-import { mergeAndRerank, formatResult, type RankedResult } from "./rerank";
-import { writeTrace } from "../repo/trace-writer";
+import { ensureIndexed } from "../index/lib/ensure";
+import { ensureEmbedded } from "../index/lib/embed";
+import { grepSearch } from "./lib/grep";
+import { vectorSearch, hasEmbeddings } from "./lib/vector";
+import { mergeAndRerank, formatResult, type RankedResult } from "./lib/rerank";
+import { writeTrace } from "../repo/lib/trace-writer";
 
 interface SearchParams {
   repo_id: string;

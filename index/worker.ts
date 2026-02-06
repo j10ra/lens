@@ -1,9 +1,12 @@
+// POST /index/maintain — background cron (every 5m)
+// Re-indexes stale repos and backfills missing embeddings.
+
 import { api } from "encore.dev/api";
 import { CronJob } from "encore.dev/cron";
 import { db } from "../repo/db";
-import { getHeadCommit } from "../index/discovery";
-import { ensureIndexed } from "../index/ensure";
-import { ensureEmbedded } from "../index/embed";
+import { getHeadCommit } from "./lib/discovery";
+import { ensureIndexed } from "./lib/ensure";
+import { ensureEmbedded } from "./lib/embed";
 
 interface MaintainResponse {
   processed: number;
@@ -11,11 +14,8 @@ interface MaintainResponse {
 }
 
 export const maintain = api(
-  { expose: false, method: "POST", path: "/worker/maintain" },
+  { expose: false, method: "POST", path: "/index/maintain" },
   async (): Promise<MaintainResponse> => {
-    // Find repos that need work:
-    // - Have unembedded chunks, OR
-    // - Had trace activity in last 24h (likely still being used)
     const candidates: Array<{
       id: string;
       root_path: string;
@@ -47,20 +47,17 @@ export const maintain = api(
     let errors = 0;
 
     for (const repo of candidates) {
-      // Advisory lock — prevent overlapping cron runs on same repo
       const locked = await db.queryRow<{ locked: boolean }>`
         SELECT pg_try_advisory_lock(hashtext(${repo.id})) AS locked
       `;
       if (!locked?.locked) continue;
 
       try {
-        // Check if HEAD has advanced (requires filesystem)
         let isStale = false;
         try {
           const head = await getHeadCommit(repo.root_path);
           isStale = head !== repo.last_indexed_commit;
         } catch {
-          // Repo dir may be gone — skip
           continue;
         }
 
@@ -83,7 +80,6 @@ export const maintain = api(
   },
 );
 
-// CronJob must be registered after the endpoint is declared
 const _ = new CronJob("maintain-repos", {
   title: "Auto-index and embed stale repos",
   every: "5m",

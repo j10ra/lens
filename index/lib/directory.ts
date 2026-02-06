@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { db } from "../repo/db";
+import { db } from "../../repo/db";
 import { chat } from "./llm";
 
 interface DirChildSummary {
