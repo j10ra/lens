@@ -3,8 +3,6 @@ import type { TaskAnalysis } from "./analyzer";
 import type { RecentTrace } from "./traces";
 import type { RepoScripts } from "../../repo/lib/scripts";
 
-const TOKEN_BUDGET = 3000;
-
 /** Estimate token count: ~4 chars per token */
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
@@ -18,47 +16,47 @@ export function formatContextPack(
   context: GatheredContext,
   traces?: RecentTrace[],
   scripts?: RepoScripts,
+  fileCount = 0,
 ): string {
   const hits = context.relevantFiles.filter((f) => f.role === "hit");
   const neighbors = context.relevantFiles.filter((f) => f.role === "neighbor");
 
+  const isSmall = fileCount > 0 && fileCount < 200;
+  const budget = isSmall ? 1500 : 3000;
+
   let pack = buildPack(goal, analysis, context, hits, neighbors, traces, scripts, {
-    maxLinePointers: 2,
-    maxFiles: 8,
-    includeNeighbors: true,
-    maxActivity: 5,
+    maxLinePointers: isSmall ? 1 : 2,
+    maxFiles: isSmall ? 5 : 8,
+    includeNeighbors: !isSmall,
+    includeImportGraph: !isSmall,
+    maxActivity: isSmall ? 3 : 5,
   });
 
   // Truncation cascade if over budget
-  if (estimateTokens(pack) > TOKEN_BUDGET) {
+  if (estimateTokens(pack) > budget) {
     pack = buildPack(goal, analysis, context, hits, neighbors, traces, scripts, {
       maxLinePointers: 1,
-      maxFiles: 8,
-      includeNeighbors: true,
-      maxActivity: 5,
+      maxFiles: isSmall ? 5 : 8,
+      includeNeighbors: !isSmall,
+      includeImportGraph: !isSmall,
+      maxActivity: isSmall ? 3 : 5,
     });
   }
-  if (estimateTokens(pack) > TOKEN_BUDGET) {
-    pack = buildPack(goal, analysis, context, hits, neighbors, traces, scripts, {
-      maxLinePointers: 1,
-      maxFiles: 5,
-      includeNeighbors: true,
-      maxActivity: 5,
-    });
-  }
-  if (estimateTokens(pack) > TOKEN_BUDGET) {
+  if (estimateTokens(pack) > budget) {
     pack = buildPack(goal, analysis, context, hits, neighbors, traces, scripts, {
       maxLinePointers: 1,
       maxFiles: 5,
       includeNeighbors: false,
+      includeImportGraph: false,
       maxActivity: 3,
     });
   }
-  if (estimateTokens(pack) > TOKEN_BUDGET) {
+  if (estimateTokens(pack) > budget) {
     pack = buildPack(goal, analysis, context, hits, neighbors, traces, scripts, {
       maxLinePointers: 1,
       maxFiles: 5,
       includeNeighbors: false,
+      includeImportGraph: false,
       maxActivity: 0,
     });
   }
@@ -70,6 +68,7 @@ interface FormatOpts {
   maxLinePointers: number;
   maxFiles: number;
   includeNeighbors: boolean;
+  includeImportGraph: boolean;
   maxActivity: number;
 }
 
@@ -88,7 +87,7 @@ function buildPack(
   // Header
   L.push(`# ${goal}`);
   L.push(`scope:${analysis.scope}|type:${analysis.task_type}|${hits.length} files`);
-  L.push("IMPORTANT: Prefer retrieval-led reasoning. Use `rlm read <path>` for full content before modifying any file.");
+  L.push("Use `rlm read <path>` for full file content before editing.");
   L.push("");
 
   // Tools
@@ -132,11 +131,13 @@ function buildPack(
   }
 
   // Import graph — chain format, BFS 3 levels
-  const chains = buildImportChains(displayHits, context.importGraph, 3);
-  if (chains.length > 0) {
-    L.push("[Import Graph]");
-    for (const chain of chains) L.push(chain);
-    L.push("");
+  if (opts.includeImportGraph) {
+    const chains = buildImportChains(displayHits, context.importGraph, 3);
+    if (chains.length > 0) {
+      L.push("[Import Graph]");
+      for (const chain of chains) L.push(chain);
+      L.push("");
+    }
   }
 
   // Neighbors
@@ -165,22 +166,28 @@ function buildPack(
   return L.join("\n");
 }
 
-/** Extract line pointers from snippets — first meaningful line per snippet */
+const DECL_RE = /^(export\s+)?(async\s+)?(function|class|interface|type|const|let|def|fn|pub|func|struct|enum)\s/;
+
+/** Extract line pointers from snippets — declaration-first priority */
 function extractLinePointers(file: RelevantFile, max: number): string[] {
   const pointers: string[] = [];
   for (const snip of file.snippets.slice(0, max)) {
     const lines = snip.content.split("\n");
-    // Find first non-empty, non-comment, non-import line
-    const sig = lines.find((l) => {
-      const trimmed = l.trim();
-      return trimmed.length > 0
-        && !trimmed.startsWith("//")
-        && !trimmed.startsWith("*")
-        && !trimmed.startsWith("import ")
-        && !trimmed.startsWith("from ");
+    // Priority 1: declaration/signature line
+    const sigIdx = lines.findIndex((l) => DECL_RE.test(l.trimStart()));
+    if (sigIdx >= 0) {
+      pointers.push(`L${snip.start_line + sigIdx}: ${lines[sigIdx].trim()}`);
+      continue;
+    }
+    // Priority 2: first meaningful non-import line
+    const fallback = lines.find((l) => {
+      const t = l.trim();
+      return t.length > 0 && !t.startsWith("//") && !t.startsWith("*")
+        && !t.startsWith("import ") && !t.startsWith("from ");
     }) ?? lines[0];
-    if (sig) {
-      pointers.push(`L${snip.start_line}: ${sig.trim()}`);
+    if (fallback) {
+      const idx = lines.indexOf(fallback);
+      pointers.push(`L${snip.start_line + idx}: ${fallback.trim()}`);
     }
   }
   return pointers;

@@ -73,7 +73,7 @@ Claude Code will read these instructions and invoke `rlm` commands via Bash when
 ## Quickstart for Any Project
 
 ```bash
-# 1. In your project directory, create .claude/CLAUDE.md with the content above
+# 1. In your project directory, create CLAUDE.md with the content above
 # 2. Register the repo (auto-indexes + starts file watcher)
 rlm repo register
 
@@ -106,6 +106,7 @@ The file watcher uses chokidar to monitor your repo for changes in real-time:
 - New chunks get `embedding = NULL` (background worker picks them up)
 
 **Limitations:**
+
 - Watchers are in-memory — stop when daemon restarts
 - Re-enable with `rlm repo watch` after daemon restart
 - Only watches files < 500KB

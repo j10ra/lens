@@ -25,7 +25,32 @@
       "Bash(__NEW_LINE_8555e620d8fb1f34__ echo \"=== CHECK 2: Runner with trace_type ===\")",
       "Bash(__NEW_LINE_18840c70e3c9d42c__ echo \"\")",
       "Bash(__NEW_LINE_b21bb2901dc7bb6a__ echo \"\")",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(jq)",
+      "Bash(/Volumes/Drive/__x/RLM/packages/rlm-cli/dist/index.js:*)",
+      "Bash(rlm task:*)",
+      "Bash(rlm search:*)",
+      "Bash(rlm read:*)",
+      "Bash(rlm --version:*)",
+      "Bash(rlm status:*)",
+      "WebFetch(domain:modal.com)",
+      "WebFetch(domain:docs.voyageai.com)",
+      "WebFetch(domain:code-representation-learning.github.io)",
+      "WebFetch(domain:jina.ai)",
+      "WebFetch(domain:www.nomic.ai)",
+      "WebFetch(domain:blog.voyageai.com)",
+      "WebFetch(domain:www.genspark.ai)",
+      "WebFetch(domain:elephas.app)",
+      "Bash(git commit:*)",
+      "Bash(pip3 install:*)",
+      "Bash(optimum-cli export:*)",
+      "Bash(/Users/jalipalo/Library/Python/3.11/bin/optimum-cli export onnx:*)",
+      "Bash(/Users/jalipalo/Library/Python/3.11/bin/huggingface-cli whoami:*)",
+      "Bash(/Users/jalipalo/Library/Python/3.11/bin/huggingface-cli upload:*)",
+      "Bash(rlm repo remove:*)",
+      "Bash(rlm repo register:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:ai.google.dev)"
     ]
   }
 }

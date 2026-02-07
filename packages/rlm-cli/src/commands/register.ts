@@ -12,7 +12,10 @@ interface RegisterResponse {
   created: boolean;
 }
 
-export async function registerCommand(opts: { json: boolean; inject: boolean }): Promise<void> {
+export async function registerCommand(opts: {
+  json: boolean;
+  inject: boolean;
+}): Promise<void> {
   const info = await detectRepo();
   const res = await post<RegisterResponse>("/repo/register", {
     root_path: info.root_path,
@@ -30,7 +33,7 @@ export async function registerCommand(opts: { json: boolean; inject: boolean }):
     await injectClaudeMd(info.root_path);
 
     output(`Registered ${res.name} (repo_id: ${res.repo_id})`, false);
-    output(`Created .claude/CLAUDE.md with RLM instructions`, false);
+    output(`Created CLAUDE.md with RLM instructions`, false);
 
     // Show progress if enabled
     const config = await readConfig();

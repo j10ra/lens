@@ -1,44 +1,54 @@
-import { pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
+import { secret } from "encore.dev/config";
 import { EMBEDDING_MODEL, EMBEDDING_DIM, EMBEDDING_BATCH_SIZE } from "./search-config";
 
-let extractor: FeatureExtractionPipeline | null = null;
+const voyageApiKey = secret("VoyageApiKey");
 
-/** Lazy-init the local embedding model (downloads on first use) */
-async function getExtractor(): Promise<FeatureExtractionPipeline> {
-  if (!extractor) {
-    extractor = await pipeline("feature-extraction", EMBEDDING_MODEL, {
-      dtype: "q8" as never, // quantized for speed
-    }) as unknown as FeatureExtractionPipeline;
-  }
-  return extractor;
+const API_URL = "https://api.voyageai.com/v1/embeddings";
+
+interface VoyageResponse {
+  data: Array<{ embedding: number[] }>;
+  usage: { total_tokens: number };
 }
 
-/** Embed texts using local BGE model.
- *  Prefixes with "passage: " for documents, "query: " for queries. */
+/** Embed texts via Voyage AI API.
+ *  isQuery=true uses "query" input_type; false uses "document". */
 export async function embed(texts: string[], isQuery = false): Promise<number[][]> {
-  const ext = await getExtractor();
-  const prefix = isQuery ? "query: " : "passage: ";
   const results: number[][] = [];
 
   for (let i = 0; i < texts.length; i += EMBEDDING_BATCH_SIZE) {
-    const batch = texts.slice(i, i + EMBEDDING_BATCH_SIZE).map((t) => prefix + t);
-    const output = await ext(batch, { pooling: "mean", normalize: true });
+    const batch = texts.slice(i, i + EMBEDDING_BATCH_SIZE);
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${voyageApiKey()}`,
+      },
+      body: JSON.stringify({
+        input: batch,
+        model: EMBEDDING_MODEL,
+        input_type: isQuery ? "query" : "document",
+      }),
+    });
 
-    // output.tolist() returns number[][] for batch
-    const vectors = output.tolist() as number[][];
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Voyage API ${res.status}: ${body}`);
+    }
 
-    for (const vec of vectors) {
-      if (vec.length !== EMBEDDING_DIM) {
-        throw new Error(`Dimension mismatch: expected ${EMBEDDING_DIM}, got ${vec.length}`);
+    const json = (await res.json()) as VoyageResponse;
+
+    for (const item of json.data) {
+      if (item.embedding.length !== EMBEDDING_DIM) {
+        throw new Error(`Dimension mismatch: expected ${EMBEDDING_DIM}, got ${item.embedding.length}`);
       }
-      results.push(vec);
+      results.push(item.embedding);
     }
   }
 
   return results;
 }
 
-/** Embed a single query string (uses "query: " prefix) */
+/** Embed a single query string */
 export async function embedQuery(text: string): Promise<number[]> {
   const [vec] = await embed([text], true);
   return vec;

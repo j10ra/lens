@@ -17,6 +17,16 @@ interface WatcherEntry {
 const watchers = new Map<string, WatcherEntry>();
 const debounceTimers = new Map<string, NodeJS.Timeout>();
 
+// Prevent EMFILE from crashing the daemon
+process.on("uncaughtException", (err) => {
+  if ((err as NodeJS.ErrnoException).code === "EMFILE") {
+    console.error(`[RLM] EMFILE: too many open files — stopping all watchers`);
+    for (const [id] of watchers) stopWatcher(id).catch(() => {});
+    return;
+  }
+  throw err; // re-throw non-EMFILE errors
+});
+
 const IGNORED = [
   /(^|[/\\])\../, // dotfiles
   "**/node_modules/**",
@@ -28,6 +38,14 @@ const IGNORED = [
   "**/.next/**",
   "**/.nuxt/**",
   "**/coverage/**",
+  "**/.turbo/**",
+  "**/out/**",
+  "**/.output/**",
+  "**/*.log",
+  "**/*.lock",
+  "**/pnpm-lock.yaml",
+  "**/package-lock.json",
+  "**/yarn.lock",
 ];
 
 const DEBOUNCE_MS = 500;
@@ -121,37 +139,50 @@ export function startWatcher(repoId: string, rootPath: string): { started: boole
     return { started: false, already_watching: true };
   }
 
-  const fsWatcher = watch(rootPath, {
-    ignored: IGNORED,
-    ignoreInitial: true,
-    awaitWriteFinish: { stabilityThreshold: 200 },
-    persistent: true,
-  });
+  try {
+    const fsWatcher = watch(rootPath, {
+      ignored: IGNORED,
+      ignoreInitial: true,
+      awaitWriteFinish: { stabilityThreshold: 200 },
+      persistent: false,
+      usePolling: false,
+      depth: 5, // limit recursion to avoid EMFILE on large repos
+    });
 
-  const entry: WatcherEntry = {
-    watcher: fsWatcher,
-    repoRoot: rootPath,
-    repoId,
-    changedFiles: 0,
-    deletedFiles: 0,
-    startedAt: new Date(),
-  };
+    const entry: WatcherEntry = {
+      watcher: fsWatcher,
+      repoRoot: rootPath,
+      repoId,
+      changedFiles: 0,
+      deletedFiles: 0,
+      startedAt: new Date(),
+    };
 
-  watchers.set(repoId, entry);
+    watchers.set(repoId, entry);
 
-  fsWatcher.on("add", (path) => {
-    debouncedHandler(`${repoId}:${path}`, () => handleFileChange(repoId, rootPath, path));
-  });
+    fsWatcher.on("add", (path) => {
+      debouncedHandler(`${repoId}:${path}`, () => handleFileChange(repoId, rootPath, path));
+    });
 
-  fsWatcher.on("change", (path) => {
-    debouncedHandler(`${repoId}:${path}`, () => handleFileChange(repoId, rootPath, path));
-  });
+    fsWatcher.on("change", (path) => {
+      debouncedHandler(`${repoId}:${path}`, () => handleFileChange(repoId, rootPath, path));
+    });
 
-  fsWatcher.on("unlink", (path) => {
-    debouncedHandler(`${repoId}:${path}`, () => handleFileDelete(repoId, rootPath, path));
-  });
+    fsWatcher.on("unlink", (path) => {
+      debouncedHandler(`${repoId}:${path}`, () => handleFileDelete(repoId, rootPath, path));
+    });
 
-  return { started: true, already_watching: false };
+    fsWatcher.on("error", (error) => {
+      console.error(`[RLM] Watcher error for ${rootPath}:`, (error as Error).message);
+      // Close the watcher to prevent further errors
+      stopWatcher(repoId).catch(() => {});
+    });
+
+    return { started: true, already_watching: false };
+  } catch (err) {
+    console.error(`[RLM] Failed to start watcher for ${rootPath}:`, (err as Error).message);
+    return { started: false, already_watching: false };
+  }
 }
 
 export async function stopWatcher(repoId: string): Promise<{ stopped: boolean }> {

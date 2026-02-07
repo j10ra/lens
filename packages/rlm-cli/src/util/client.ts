@@ -33,7 +33,7 @@ export async function request<T>(
         method,
         headers: body ? { "Content-Type": "application/json" } : undefined,
         body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(10000), // 10s timeout
+        signal: AbortSignal.timeout(60000), // 60s timeout
       });
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ECONNREFUSED") {

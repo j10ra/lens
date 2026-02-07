@@ -361,30 +361,36 @@ Every 5 minutes:
 ## Key Design Principles
 
 ### 1. Content-Addressed Storage
+
 ```
 chunk_hash = SHA256(content + chunking_params)
 ```
+
 - Same content + same config = same hash
 - Unchanged chunks across commits keep their embeddings
 - No redundant embedding work
 
 ### 2. Eager + Live
+
 - Indexing fires on register (no wait for first `rlm task`)
 - File watcher updates chunks in real-time on save
 - Embeddings happen only for new/changed chunks
 - Background worker keeps things fresh but doesn't block
 
 ### 3. Graceful Degradation
+
 - No embeddings? → grep works fine
 - LLM API down? → summaries skip, context pack still works
 - Partial index? → returns what's available
 
 ### 4. Per-Repo Isolation
+
 - Every query filters by `repo_id`
 - ON DELETE CASCADE cleans up when repo removed
 - Advisory locks prevent concurrent indexing races
 
 ### 5. Minimal Context (No Poisoning)
+
 - Context pack = orientation + file paths only
 - No cached summaries that could mislead
 - Claude must investigate via `rlm search` + `rlm read`
@@ -393,26 +399,26 @@ chunk_hash = SHA256(content + chunking_params)
 
 ## Performance Characteristics
 
-| Operation | Latency | Notes |
-|-----------|---------|-------|
-| `rlm task` (fresh repo) | 2-10s | Index + embed first time |
-| `rlm task` (cached repo) | 100-200ms | Git check + context build |
-| `rlm search` | 200-500ms | Hybrid grep + semantic |
-| `rlm read` | 10-50ms | Disk read + validation |
-| `rlm run` | command time | Sandbox overhead ~5ms |
-| Background worker | N/A | 5m cron, gated |
+| Operation                | Latency      | Notes                     |
+| ------------------------ | ------------ | ------------------------- |
+| `rlm task` (fresh repo)  | 2-10s        | Index + embed first time  |
+| `rlm task` (cached repo) | 100-200ms    | Git check + context build |
+| `rlm search`             | 200-500ms    | Hybrid grep + semantic    |
+| `rlm read`               | 10-50ms      | Disk read + validation    |
+| `rlm run`                | command time | Sandbox overhead ~5ms     |
+| Background worker        | N/A          | 5m cron, gated            |
 
 ---
 
 ## Storage Footprint
 
-| Table | Per-Chunk Size | 10k files (~80k chunks) |
-|-------|----------------|-------------------------|
-| chunks | ~2KB (content + metadata) | ~160MB |
-| embeddings | 1.5KB (384-dim vector) | ~120MB |
-| summaries | ~500B | ~5MB |
-| traces | ~500B | ~5MB |
-| **Total** | ~4KB/chunk | **~300MB** |
+| Table      | Per-Chunk Size            | 10k files (~80k chunks) |
+| ---------- | ------------------------- | ----------------------- |
+| chunks     | ~2KB (content + metadata) | ~160MB                  |
+| embeddings | 1.5KB (384-dim vector)    | ~120MB                  |
+| summaries  | ~500B                     | ~5MB                    |
+| traces     | ~500B                     | ~5MB                    |
+| **Total**  | ~4KB/chunk                | **~300MB**              |
 
 ---
 
@@ -420,7 +426,7 @@ chunk_hash = SHA256(content + chunking_params)
 
 ### For Other Projects
 
-1. Add `.claude/CLAUDE.md` with RLM instructions
+1. Add `CLAUDE.md` with RLM instructions
 2. Run `rlm repo register` once
 3. Claude Code automatically uses `rlm` via Bash
 
@@ -432,10 +438,10 @@ Would require building an MCP server package that wraps the HTTP API. Not curren
 
 ## Troubleshooting
 
-| Issue | Fix |
-|-------|-----|
+| Issue                                | Fix                                                     |
+| ------------------------------------ | ------------------------------------------------------- |
 | `fetch failed - service not running` | Start daemon: `cd /Volumes/Drive/__x/RLM && encore run` |
-| `repo not found` | Run `rlm repo register` in project dir |
-| Search returns empty | Run `rlm index --force` |
-| Embeddings stuck at 0% | Check local model is downloading (first run) |
-| High memory usage | Worker is processing large repo; normal |
+| `repo not found`                     | Run `rlm repo register` in project dir                  |
+| Search returns empty                 | Run `rlm index --force`                                 |
+| Embeddings stuck at 0%               | Check local model is downloading (first run)            |
+| High memory usage                    | Worker is processing large repo; normal                 |

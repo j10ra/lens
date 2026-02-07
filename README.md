@@ -56,7 +56,7 @@ rlm status
 
 ### 3. Add CLAUDE.md (critical for best results)
 
-Create `.claude/CLAUDE.md` in your project:
+Create `CLAUDE.md` in your project:
 
 ```markdown
 ## RLM — Repo Context Daemon

@@ -34,7 +34,7 @@ export async function showProgress(
       }
 
       i++;
-      await sleep(80);
+      await sleep(2000);
     } catch {
       // Status fetch failed — might still be starting, retry quickly
       await sleep(100);

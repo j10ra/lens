@@ -10,9 +10,9 @@ const CANDIDATE_PATHS = [
   "CLAUDE.md",
   "agents.md",
   "AGENTS.md",
-  ".claude/CLAUDE.md",
-  ".claude/agents.md",
-  ".claude/AGENTS.md",
+  ".CLAUDE.md",
+  ".agents.md",
+  ".AGENTS.md",
 ];
 
 async function findTargetFile(repoRoot: string): Promise<string | null> {

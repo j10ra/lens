@@ -3,7 +3,6 @@
 
 import { api } from "encore.dev/api";
 import { ensureIndexed } from "../index/lib/ensure";
-import { ensureEmbedded } from "../index/lib/embed";
 import { generateRepoMap } from "../index/lib/repomap";
 import { analyzeTask, type TaskAnalysis } from "./lib/analyzer";
 import { gatherContext } from "./lib/gather";
@@ -36,8 +35,13 @@ export const run = api(
     // 1. Ensure index is fresh (fast — diff-aware, skips if HEAD unchanged)
     const indexResult = await ensureIndexed(params.repo_id);
 
-    // 2. Ensure embeddings (lazy — only NULL chunks, non-blocking on failure)
-    try { await ensureEmbedded(params.repo_id); } catch { /* grep fallback */ }
+    // Embeddings handled by cron worker — search uses whatever is ready
+
+    // 2b. Get file count for adaptive behavior
+    const fcRow = await db.queryRow<{ count: number }>`
+      SELECT count(DISTINCT path)::int AS count FROM chunks WHERE repo_id = ${params.repo_id}
+    `;
+    const fileCount = fcRow?.count ?? 0;
 
     // 3. Repo map from cached summaries (sparse is fine)
     const repoMap = await generateRepoMap(params.repo_id, { maxDepth: 3 });
@@ -46,7 +50,7 @@ export const run = api(
     const analysis = analyzeTask(params.goal, repoMap);
 
     // 5. Search → gather top-k files with cached summaries + code snippets
-    const gathered = await gatherContext(params.repo_id, repoMap, analysis);
+    const gathered = await gatherContext(params.repo_id, repoMap, analysis, fileCount);
 
     // 6. Get repo root for script detection
     const repo = await db.queryRow<{ root_path: string }>`
@@ -65,7 +69,7 @@ export const run = api(
     const scripts = repo ? await detectScripts(repo.root_path) : undefined;
 
     // 9. Format compressed context pack
-    const contextPack = formatContextPack(params.goal, analysis, gathered, traces, scripts);
+    const contextPack = formatContextPack(params.goal, analysis, gathered, traces, scripts, fileCount);
 
     return {
       context_pack: contextPack,

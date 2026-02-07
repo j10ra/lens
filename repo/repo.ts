@@ -307,34 +307,12 @@ export const template = api(
     return {
       content: `## RLM — Repo Context Daemon
 
-This project is indexed by RLM. When making changes: Use **retrieval-led reasoning** for all tasks.
+Available when native search returns too many results or for orientation in unfamiliar repos.
 
-### Mandatory Workflow (do this first)
-
-Before opening or searching files, run:
-
-- \`rlm task "<goal>"\`
-
-Then use:
-
-- \`rlm search\` → \`rlm read\` → \`rlm run\`
-
-Do not scan the repo manually unless RLM fails.
-
-### Core Commands
-
-- \`rlm task "<goal>"\` — Get context pack with repo map, relevant files, recent activity
-- \`rlm search "<query>"\` — Find code patterns, function definitions, usage examples
-- \`rlm read <path>\` — Fetch full file content (use after search)
-- \`rlm run "<command>"\` — Execute tests/builds (sandboxed: npm, cargo, python, git)
-- \`rlm status\` — Check index freshness and embedding coverage
-
-### How It Works
-
-- Auto-indexes on first run, then tracks git changes
-- Semantic search available when embeddings ready (~100% status)
-- Background worker refreshes stale repos every 5 minutes
-- All data isolated per repo (chunks, embeddings, traces)
+- \`rlm search "<query>"\` — hybrid grep+semantic code search
+- \`rlm read <path>\` — read full file via daemon
+- \`rlm task "<goal>"\` — compressed context pack (repo map + relevant files)
+- \`rlm run "<cmd>"\` — sandboxed test/build (npm, cargo, python, git)
 `
     };
   },
@@ -381,11 +359,14 @@ export const status = api(
       chunk_count: number;
       files_indexed: number;
       embedded_count: number;
+      embeddable_count: number;
     }>`
       SELECT
         count(*)::int AS chunk_count,
         count(DISTINCT path)::int AS files_indexed,
-        count(*) FILTER (WHERE embedding IS NOT NULL)::int AS embedded_count
+        count(*) FILTER (WHERE embedding IS NOT NULL)::int AS embedded_count,
+        count(*) FILTER (WHERE language IN ('typescript','javascript','python','ruby','go','rust',
+                         'java','kotlin','csharp','cpp','c','swift','php','shell'))::int AS embeddable_count
       FROM chunks WHERE repo_id = ${id}
     `;
 
@@ -408,6 +389,7 @@ export const status = api(
 
     const chunkCount = stats?.chunk_count ?? 0;
     const embeddedCount = stats?.embedded_count ?? 0;
+    const embeddableCount = stats?.embeddable_count ?? 0;
 
     return {
       indexed_commit: repo.last_indexed_commit,
@@ -416,7 +398,7 @@ export const status = api(
       chunk_count: chunkCount,
       files_indexed: stats?.files_indexed ?? 0,
       embedded_count: embeddedCount,
-      embedded_pct: chunkCount > 0 ? Math.round((embeddedCount / chunkCount) * 100) : 0,
+      embedded_pct: embeddableCount > 0 ? Math.round((embeddedCount / embeddableCount) * 100) : 0,
       summary_count: summaryRow?.count ?? 0,
       embedder: EMBEDDING_MODEL,
       embedding_dim: EMBEDDING_DIM,

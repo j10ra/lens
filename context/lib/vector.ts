@@ -1,5 +1,6 @@
 import { db } from "../../repo/db";
 import { embedQuery } from "../../index/lib/embedder";
+import { isDocFile } from "../../index/lib/discovery";
 
 export interface VectorResult {
   id: string;
@@ -16,9 +17,13 @@ export async function vectorSearch(
   repoId: string,
   query: string,
   limit: number,
+  codeOnly = true,
 ): Promise<VectorResult[]> {
   const queryVec = await embedQuery(query);
   const vecStr = `[${queryVec.join(",")}]`;
+
+  // Fetch extra rows to compensate for filtering
+  const fetchLimit = codeOnly ? limit * 2 : limit;
 
   const rows = db.query<{
     id: string;
@@ -34,11 +39,12 @@ export async function vectorSearch(
     FROM chunks
     WHERE repo_id = ${repoId} AND embedding IS NOT NULL
     ORDER BY embedding <=> ${vecStr}::vector
-    LIMIT ${limit}
+    LIMIT ${fetchLimit}
   `;
 
   const results: VectorResult[] = [];
   for await (const row of rows) {
+    if (codeOnly && isDocFile(row.path)) continue;
     results.push({
       id: row.id,
       path: row.path,
@@ -46,8 +52,9 @@ export async function vectorSearch(
       end_line: row.end_line,
       content: row.content,
       language: row.language,
-      score: 1 - row.distance, // cosine similarity
+      score: 1 - row.distance,
     });
+    if (results.length >= limit) break;
   }
 
   return results;
