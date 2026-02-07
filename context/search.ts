@@ -3,7 +3,6 @@
 
 import { api } from "encore.dev/api";
 import { ensureIndexed } from "../index/lib/ensure";
-import { ensureEmbedded } from "../index/lib/embed";
 import { grepSearch } from "./lib/grep";
 import { vectorSearch, hasEmbeddings } from "./lib/vector";
 import { mergeAndRerank, formatResult, type RankedResult } from "./lib/rerank";
@@ -31,15 +30,16 @@ export const search = api(
     const requestedMode = params.mode ?? "hybrid";
     const codeOnly = params.code_only ?? true;
 
-    // Lazy index + embed
+    // Lazy index (fast: only new/changed files)
     await ensureIndexed(params.repo_id);
 
+    // Check embedding availability — don't block search on bulk embedding.
+    // Cron worker handles backfill; search just uses whatever is ready.
     let embeddingsAvailable = false;
     try {
-      await ensureEmbedded(params.repo_id);
       embeddingsAvailable = await hasEmbeddings(params.repo_id);
     } catch {
-      // Embedding API down — degrade silently
+      // Embedding check failed — degrade to grep
     }
 
     const effectiveMode = resolveMode(requestedMode, embeddingsAvailable);
@@ -49,11 +49,11 @@ export const search = api(
 
     if (effectiveMode === "grep") {
       const grepResults = await grepSearch(params.repo_id, params.query, limit, codeOnly);
-      results = grepResults.map((r) => formatResult(r, r.score, "grep"));
+      results = grepResults.map((r) => formatResult(r, r.score, "grep", params.query));
       searchModeUsed = "grep";
     } else if (effectiveMode === "semantic") {
       const vecResults = await vectorSearch(params.repo_id, params.query, limit, codeOnly);
-      results = vecResults.map((r) => formatResult(r, r.score, "semantic"));
+      results = vecResults.map((r) => formatResult(r, r.score, "semantic", params.query));
       searchModeUsed = "semantic";
     } else {
       const [grepResults, vecResults] = await Promise.all([
@@ -62,7 +62,7 @@ export const search = api(
       ]);
       const grepScored = grepResults.map((r) => ({ ...r, match_type: "grep" as const }));
       const vecScored = vecResults.map((r) => ({ ...r, match_type: "semantic" as const }));
-      results = mergeAndRerank(grepScored, vecScored, limit);
+      results = mergeAndRerank(grepScored, vecScored, limit, params.query);
       searchModeUsed = "hybrid";
     }
 

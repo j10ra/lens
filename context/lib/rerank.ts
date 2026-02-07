@@ -35,6 +35,7 @@ export function mergeAndRerank(
   grepResults: ScoredResult[],
   vectorResults: ScoredResult[],
   limit: number,
+  query?: string,
 ): RankedResult[] {
   const merged = new Map<string, { grep: number; semantic: number; result: ScoredResult }>();
 
@@ -75,12 +76,19 @@ export function mergeAndRerank(
           ? "grep"
           : "semantic";
 
-      return formatResult(entry.result, combinedScore, matchType);
+      return formatResult(entry.result, combinedScore, matchType, query);
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
 
-  return ranked;
+  // Dedupe by file path — keep highest-scoring chunk per file
+  const seenPaths = new Set<string>();
+  const deduped: RankedResult[] = [];
+  for (const r of ranked) {
+    if (seenPaths.has(r.path)) continue;
+    seenPaths.add(r.path);
+    deduped.push(r);
+  }
+  return deduped.slice(0, limit);
 }
 
 // JS/TS/Python/Rust/Go keyword declarations
@@ -93,13 +101,34 @@ export function formatResult(
   r: BaseResult,
   score: number,
   matchType: string,
+  query?: string,
 ): RankedResult {
   const lines = r.content.split("\n");
-  const sigLine = lines.find((l) => {
-    const t = l.trimStart();
-    return DECL_RE.test(t) || METHOD_RE.test(t);
-  });
-  const snippet = sigLine?.trim() ?? lines.find((l) => l.trim().length > 0)?.trim() ?? "";
+
+  // 1. Try matching line (grep hit)
+  let snippet = "";
+  if (query) {
+    const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 1);
+    const matchLine = lines.find((l) => {
+      const lower = l.toLowerCase();
+      return terms.some((t) => lower.includes(t));
+    });
+    if (matchLine) snippet = matchLine.trim();
+  }
+
+  // 2. Fall back to declaration line
+  if (!snippet) {
+    const sigLine = lines.find((l) => {
+      const t = l.trimStart();
+      return DECL_RE.test(t) || METHOD_RE.test(t);
+    });
+    snippet = sigLine?.trim() ?? "";
+  }
+
+  // 3. Fall back to first non-empty line
+  if (!snippet) {
+    snippet = lines.find((l) => l.trim().length > 0)?.trim() ?? "";
+  }
 
   return {
     path: r.path,

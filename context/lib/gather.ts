@@ -1,7 +1,7 @@
 import { db } from "../../repo/db";
 import { grepSearch } from "./grep";
 import { vectorSearch, hasEmbeddings } from "./vector";
-import { mergeAndRerank, formatResult } from "./rerank";
+import { mergeAndRerank, formatResult, type RankedResult } from "./rerank";
 import { buildImportGraph, expandByImports, extractImportSpecifiers } from "./imports";
 import type { TaskAnalysis } from "./analyzer";
 
@@ -35,30 +35,36 @@ export async function gatherContext(
   repoId: string,
   repoMap: string,
   analysis: TaskAnalysis,
+  fileCount = 0,
 ): Promise<GatheredContext> {
-  // 1. Search for each keyword — collect unique chunk hits
+  const maxFiles = fileCount < 200 ? 5 : MAX_FILES;
+  const maxNeighborExpansion = fileCount < 200 ? 0 : MAX_NEIGHBOR_EXPANSION;
+
+  // 1. Search full goal first (best semantic signal), then supplement with keywords
   const allHitPaths = new Set<string>();
   const snippetsByPath = new Map<string, Snippet[]>();
+  const pathScores = new Map<string, number>();
 
   const embeddingsReady = await hasEmbeddings(repoId).catch(() => false);
 
-  for (const keyword of analysis.keywords.slice(0, 5)) {
-    let results;
+  const searchHybrid = async (query: string, lim: number) => {
     if (embeddingsReady) {
       const [grep, vec] = await Promise.all([
-        grepSearch(repoId, keyword, 10),
-        vectorSearch(repoId, keyword, 10),
+        grepSearch(repoId, query, lim, true),
+        vectorSearch(repoId, query, lim, true),
       ]);
       const grepScored = grep.map((r) => ({ ...r, match_type: "grep" as const }));
       const vecScored = vec.map((r) => ({ ...r, match_type: "semantic" as const }));
-      results = mergeAndRerank(grepScored, vecScored, 10);
-    } else {
-      const grep = await grepSearch(repoId, keyword, 10);
-      results = grep.map((r) => formatResult(r, r.score, "grep"));
+      return mergeAndRerank(grepScored, vecScored, lim, query);
     }
+    const grep = await grepSearch(repoId, query, lim, true);
+    return grep.map((r) => formatResult(r, r.score, "grep", query));
+  };
 
+  const collectResults = (results: RankedResult[]) => {
     for (const r of results) {
       allHitPaths.add(r.path);
+      pathScores.set(r.path, (pathScores.get(r.path) ?? 0) + r.score);
       const existing = snippetsByPath.get(r.path) ?? [];
       existing.push({
         start_line: r.start_line,
@@ -68,6 +74,16 @@ export async function gatherContext(
       });
       snippetsByPath.set(r.path, existing);
     }
+  };
+
+  // Full goal search (multi-word grep + semantic)
+  const fullGoal = analysis.keywords.join(" ");
+  collectResults(await searchHybrid(fullGoal, 15));
+
+  // Supplement with individual keyword searches
+  for (const keyword of analysis.keywords.slice(0, 3)) {
+    if (allHitPaths.size >= maxFiles * 2) break;
+    collectResults(await searchHybrid(keyword, 5));
   }
 
   // Add likely_files from analysis
@@ -82,7 +98,9 @@ export async function gatherContext(
   const knownPaths = new Set(knownPathRows);
 
   // 3. For top-k hit files, fetch chunk content + summaries
-  const hitPaths = [...allHitPaths].slice(0, MAX_FILES);
+  const hitPaths = [...allHitPaths]
+    .sort((a, b) => (pathScores.get(b) ?? 0) - (pathScores.get(a) ?? 0))
+    .slice(0, maxFiles);
 
   // Fetch chunk content for import graph building
   const fileContents = new Map<string, { content: string; language: string }>();
@@ -109,7 +127,7 @@ export async function gatherContext(
   const importGraph = buildImportGraph(graphFiles, knownPaths);
 
   // 5. Expand by imports — get neighbor paths
-  const neighborPaths = expandByImports(hitPaths, importGraph, MAX_NEIGHBOR_EXPANSION);
+  const neighborPaths = expandByImports(hitPaths, importGraph, maxNeighborExpansion);
 
   // 6. Build RelevantFile for hits
   const relevantFiles: RelevantFile[] = [];
