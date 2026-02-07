@@ -1,4 +1,5 @@
 import { db } from "../../repo/db";
+import { isDocFile } from "../../index/lib/discovery";
 
 export interface GrepResult {
   id: string;
@@ -15,7 +16,22 @@ export async function grepSearch(
   repoId: string,
   query: string,
   limit: number,
+  codeOnly = true,
 ): Promise<GrepResult[]> {
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const defnRe = new RegExp(
+    // JS/TS/Python/Rust/Go: keyword-based declarations
+    "(export|public|private|protected|internal)?\\s*" +
+    "(static\\s+)?(abstract\\s+|sealed\\s+|partial\\s+)*(async\\s+)?" +
+    "(function|class|interface|type|const|let|def|fn|pub\\s+fn|func|struct|enum|record)\\s+" +
+    escaped + "\\b" +
+    "|" +
+    // C#/Java methods: access_modifier [modifiers] return_type Name(
+    "(public|private|protected|internal)\\s+[\\w<>\\[\\],?\\s]+\\b" +
+    escaped + "\\s*\\(",
+    "im",
+  );
+
   const pattern = `%${query}%`;
   const rows = db.query<{
     id: string;
@@ -34,6 +50,8 @@ export async function grepSearch(
 
   const results: GrepResult[] = [];
   for await (const row of rows) {
+    if (codeOnly && isDocFile(row.path)) continue;
+
     // Score by match density (occurrences / content length)
     const lowerContent = row.content.toLowerCase();
     const lowerQuery = query.toLowerCase();
@@ -45,7 +63,8 @@ export async function grepSearch(
     }
     const score = count / Math.max(1, row.content.length / 100);
 
-    results.push({ ...row, score });
+    const finalScore = defnRe.test(row.content) ? score * 3 : score;
+    results.push({ ...row, score: finalScore });
   }
 
   return results;

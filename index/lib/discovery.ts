@@ -17,6 +17,16 @@ export const BINARY_EXTENSIONS = new Set([
   ".lock", ".bin", ".dat", ".db", ".sqlite",
 ]);
 
+/** Extensions treated as docs/config — excluded from code search by default */
+export const DOCS_EXTENSIONS = new Set([
+  ".md", ".json", ".yaml", ".yml", ".toml", ".txt", ".rst", ".adoc", ".sql",
+]);
+
+/** Check if a file path is docs/config (by extension) */
+export function isDocFile(filePath: string): boolean {
+  return DOCS_EXTENSIONS.has(extname(filePath).toLowerCase());
+}
+
 export const LANG_MAP: Record<string, string> = {
   ".ts": "typescript", ".tsx": "typescript", ".js": "javascript", ".jsx": "javascript",
   ".py": "python", ".rb": "ruby", ".go": "go", ".rs": "rust",

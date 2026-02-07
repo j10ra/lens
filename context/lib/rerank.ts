@@ -22,8 +22,13 @@ export interface RankedResult {
   language: string | null;
 }
 
-const GREP_WEIGHT = 0.3;
-const SEMANTIC_WEIGHT = 0.7;
+/** Weight by grep selectivity: few grep hits = high precision, trust grep */
+function getWeights(grepCount: number): { grep: number; semantic: number } {
+  if (grepCount === 0) return { grep: 0, semantic: 1 };
+  if (grepCount <= 10) return { grep: 0.8, semantic: 0.2 };
+  if (grepCount <= 50) return { grep: 0.6, semantic: 0.4 };
+  return { grep: 0.5, semantic: 0.5 };
+}
 
 /** Merge grep + vector results, deduplicate by chunk id, rerank */
 export function mergeAndRerank(
@@ -33,9 +38,8 @@ export function mergeAndRerank(
 ): RankedResult[] {
   const merged = new Map<string, { grep: number; semantic: number; result: ScoredResult }>();
 
-  // Normalize scores to 0-1 range
-  const maxGrep = Math.max(1, ...grepResults.map((r) => r.score));
-  const maxSemantic = Math.max(1, ...vectorResults.map((r) => r.score));
+  const maxGrep = Math.max(1e-9, ...grepResults.map((r) => r.score));
+  const maxSemantic = Math.max(1e-9, ...vectorResults.map((r) => r.score));
 
   for (const r of grepResults) {
     merged.set(r.id, {
@@ -58,10 +62,13 @@ export function mergeAndRerank(
     }
   }
 
-  // Compute weighted score + sort
+  const w = getWeights(grepResults.length);
   const ranked = Array.from(merged.values())
     .map((entry) => {
-      const combinedScore = entry.grep * GREP_WEIGHT + entry.semantic * SEMANTIC_WEIGHT;
+      let combinedScore = entry.grep * w.grep + entry.semantic * w.semantic;
+      // Bonus for results matching both grep AND semantic
+      if (entry.grep > 0 && entry.semantic > 0) combinedScore *= 1.25;
+
       const matchType = entry.grep > 0 && entry.semantic > 0
         ? "hybrid"
         : entry.grep > 0
@@ -76,15 +83,23 @@ export function mergeAndRerank(
   return ranked;
 }
 
+// JS/TS/Python/Rust/Go keyword declarations
+const DECL_RE = /^((export|public|private|protected|internal)\s+)?(static\s+)?(abstract\s+|sealed\s+|partial\s+|override\s+|virtual\s+)*(async\s+)?(function|class|interface|type|const|let|def|fn|pub|func|struct|enum|namespace|record|delegate|module)\s/;
+// C#/Java method declarations: access_modifier [modifiers] return_type Name(
+const METHOD_RE = /^(public|private|protected|internal)\s+[\w<>\[\],?\s]+\w+\s*\(/;
+
 /** Format a single result for the search response */
 export function formatResult(
   r: BaseResult,
   score: number,
   matchType: string,
 ): RankedResult {
-  // Extract first meaningful line as snippet
   const lines = r.content.split("\n");
-  const snippet = lines.find((l) => l.trim().length > 0)?.trim() ?? "";
+  const sigLine = lines.find((l) => {
+    const t = l.trimStart();
+    return DECL_RE.test(t) || METHOD_RE.test(t);
+  });
+  const snippet = sigLine?.trim() ?? lines.find((l) => l.trim().length > 0)?.trim() ?? "";
 
   return {
     path: r.path,

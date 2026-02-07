@@ -8,12 +8,14 @@ import { grepSearch } from "./lib/grep";
 import { vectorSearch, hasEmbeddings } from "./lib/vector";
 import { mergeAndRerank, formatResult, type RankedResult } from "./lib/rerank";
 import { writeTrace } from "../repo/lib/trace-writer";
+import { db } from "../repo/db";
 
 interface SearchParams {
   repo_id: string;
   query: string;
   mode?: string;  // "grep" | "semantic" | "hybrid"
   limit?: number;
+  code_only?: boolean;
 }
 
 interface SearchResponse {
@@ -27,6 +29,7 @@ export const search = api(
     const start = Date.now();
     const limit = Math.min(params.limit ?? 10, 50);
     const requestedMode = params.mode ?? "hybrid";
+    const codeOnly = params.code_only ?? true;
 
     // Lazy index + embed
     await ensureIndexed(params.repo_id);
@@ -45,18 +48,17 @@ export const search = api(
     let searchModeUsed: string;
 
     if (effectiveMode === "grep") {
-      const grepResults = await grepSearch(params.repo_id, params.query, limit);
+      const grepResults = await grepSearch(params.repo_id, params.query, limit, codeOnly);
       results = grepResults.map((r) => formatResult(r, r.score, "grep"));
       searchModeUsed = "grep";
     } else if (effectiveMode === "semantic") {
-      const vecResults = await vectorSearch(params.repo_id, params.query, limit);
+      const vecResults = await vectorSearch(params.repo_id, params.query, limit, codeOnly);
       results = vecResults.map((r) => formatResult(r, r.score, "semantic"));
       searchModeUsed = "semantic";
     } else {
-      // Hybrid: run both in parallel, merge + rerank
       const [grepResults, vecResults] = await Promise.all([
-        grepSearch(params.repo_id, params.query, limit * 2),
-        vectorSearch(params.repo_id, params.query, limit * 2),
+        grepSearch(params.repo_id, params.query, limit * 2, codeOnly),
+        vectorSearch(params.repo_id, params.query, limit * 2, codeOnly),
       ]);
       const grepScored = grepResults.map((r) => ({ ...r, match_type: "grep" as const }));
       const vecScored = vecResults.map((r) => ({ ...r, match_type: "semantic" as const }));
