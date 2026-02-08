@@ -46,24 +46,13 @@ export async function indexCommand(opts: { json: boolean; force: boolean; status
     return;
   }
 
-  const res = await post<IndexResult>("/index/run", { repo_id, force: opts.force });
-
   if (opts.json) {
+    const res = await post<IndexResult>("/index/run", { repo_id, force: opts.force });
     output(res, true);
-  } else {
-    output(
-      [
-        `Indexed **${name}** in ${res.duration_ms}ms`,
-        `- Files scanned: ${res.files_scanned}`,
-        `- Chunks created: ${res.chunks_created}`,
-        `- Chunks unchanged: ${res.chunks_unchanged}`,
-        `- Chunks deleted: ${res.chunks_deleted}`,
-      ].join("\n"),
-      false,
-    );
+    return;
   }
 
-  if (!opts.json) {
-    await showProgress(repo_id, name);
-  }
+  // Fire index request non-blocking, poll progress immediately
+  post("/index/run", { repo_id, force: opts.force }).catch(() => {});
+  await showProgress(repo_id, name);
 }

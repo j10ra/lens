@@ -3,6 +3,7 @@ import { ensureRepo } from "../util/ensure-repo.js";
 import { output } from "../util/format.js";
 
 interface StatusResponse {
+  index_status: string;
   indexed_commit: string | null;
   current_head: string | null;
   is_stale: boolean;

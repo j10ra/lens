@@ -296,6 +296,7 @@ interface StatusParams {
 }
 
 interface StatusResponse {
+  index_status: string;
   indexed_commit: string | null;
   current_head: string | null;
   is_stale: boolean;
@@ -322,7 +323,8 @@ export const status = api(
     const repo = await db.queryRow<{
       root_path: string;
       last_indexed_commit: string | null;
-    }>`SELECT root_path, last_indexed_commit FROM repos WHERE id = ${id}`;
+      index_status: string;
+    }>`SELECT root_path, last_indexed_commit, index_status FROM repos WHERE id = ${id}`;
     if (!repo) throw APIError.notFound("repo not found");
 
     let currentHead: string | null = null;
@@ -371,6 +373,7 @@ export const status = api(
     const metadataCount = structuralStats?.metadata_count ?? 0;
 
     return {
+      index_status: repo.index_status,
       indexed_commit: repo.last_indexed_commit,
       current_head: currentHead,
       is_stale: isStale,
