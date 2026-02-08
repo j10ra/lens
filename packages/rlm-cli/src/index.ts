@@ -2,11 +2,10 @@
 import { Command } from "commander";
 import { registerCommand } from "./commands/register.js";
 import { taskCommand } from "./commands/task.js";
+import { contextCommand } from "./commands/context.js";
 import { searchCommand } from "./commands/search.js";
 import { readCommand } from "./commands/read.js";
 import { indexCommand } from "./commands/index.js";
-import { summaryCommand } from "./commands/summary.js";
-import { mapCommand } from "./commands/map.js";
 import { runCommand } from "./commands/run.js";
 import { statusCommand } from "./commands/status.js";
 import { listCommand } from "./commands/list.js";
@@ -61,12 +60,19 @@ repo
   .option("--json", "Output as JSON", false)
   .action((opts) => run(() => watchStatusCommand(opts)));
 
-// rlm task "<goal>"
+// rlm context "<goal>" — primary command
+program
+  .command("context <goal>")
+  .description("Build an intelligent context pack for a goal")
+  .option("--json", "Output as JSON", false)
+  .action((goal, opts) => run(() => contextCommand(goal, opts)));
+
+// rlm task "<goal>" — kept for backward compat
 program
   .command("task <goal>")
-  .description("Build a context pack for a task")
+  .description("Build a context pack (alias for context)")
   .option("--json", "Output as JSON", false)
-  .action((goal, opts) => run(() => taskCommand(goal, opts)));
+  .action((goal, opts) => run(() => contextCommand(goal, opts)));
 
 // rlm search "<query>"
 program
@@ -85,21 +91,6 @@ program
   .option("--force", "Force full re-index", false)
   .option("--status", "Show index status", false)
   .action((opts) => run(() => indexCommand(opts)));
-
-// rlm summary [path]
-program
-  .command("summary [path]")
-  .description("Generate or view file summaries")
-  .option("--json", "Output as JSON", false)
-  .action((path, opts) => run(() => summaryCommand(path, opts)));
-
-// rlm map
-program
-  .command("map")
-  .description("Print repo map with descriptions")
-  .option("--json", "Output as JSON", false)
-  .option("--depth <n>", "Max depth", "3")
-  .action((opts) => run(() => mapCommand(opts)));
 
 // rlm read <path>
 program

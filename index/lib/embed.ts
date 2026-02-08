@@ -23,6 +23,7 @@ export async function ensureEmbedded(repoId: string): Promise<EmbedResult> {
       WHERE repo_id = ${repoId} AND embedding IS NULL
         AND language IN ('typescript','javascript','python','ruby','go','rust',
                          'java','kotlin','csharp','cpp','c','swift','php','shell')
+        AND content IS NOT NULL AND trim(content) != ''
     `;
     const remaining = countRow?.count ?? 0;
     if (remaining === 0) break;

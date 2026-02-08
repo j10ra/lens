@@ -1,6 +1,6 @@
 import { db } from "../db";
 
-export type TraceType = "run" | "search" | "read" | "summary";
+export type TraceType = "run" | "search" | "read";
 
 export interface TraceParams {
   repo_id: string;

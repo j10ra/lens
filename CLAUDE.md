@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Available when native search returns too many results or for orientation in unfamiliar repos.
 
+- `rlm context "<goal>"` — structural context pack (relevant files + impact + git history)
 - `rlm search "<query>"` — hybrid grep+semantic code search
 - `rlm read <path>` — read full file via daemon
-- `rlm task "<goal>"` — compressed context pack (repo map + relevant files)
 - `rlm run "<cmd>"` — sandboxed test/build (npm, cargo, python, git)
 
 ### Development Commands
@@ -35,8 +35,8 @@ Available when native search returns too many results or for orientation in unfa
 
 **File watchers**: In-memory per repo — stop on daemon restart, re-enable with `rlm repo watch`
 
-**Embeddings**: bge-small-en-v1.5 (384 dim). Lazy embedding: only chunks where `embedding IS NULL`. Secret: `ZaiApiKey` via `encore secret set --type dev`
+**Embeddings**: Voyage AI `voyage-code-3` (1024 dim). Lazy: only chunks where `embedding IS NULL`. Secret: `VoyageApiKey` via `encore secret set --type dev`
 
 **Advisory locks**: `repo/lib/identity.ts` hashes UUID to 32-bit int for `pg_advisory_lock`
 
-**Context pack design** (Phase 5): Zero LLM calls on hot path — pure retrieval (~233ms). Compressed format with repo map + file index + snippets. Planning offloaded to receiving agent, not RLM.
+**Context pack**: Zero LLM calls — keyword matching against regex-extracted metadata + structural enrichment (reverse imports, co-changes, git stats). ~240ms.

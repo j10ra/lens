@@ -9,13 +9,22 @@ interface StatusResponse {
   chunk_count: number;
   files_indexed: number;
   embedded_count: number;
+  embeddable_count: number;
   embedded_pct: number;
-  summary_count: number;
   embedder: string;
   embedding_dim: number;
   last_activity: string | null;
   trace_count: number;
+  metadata_count: number;
+  import_edge_count: number;
+  git_commits_analyzed: number;
+  cochange_pairs: number;
 }
+
+const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
+const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
+const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
+const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 
 export async function statusCommand(opts: { json: boolean }): Promise<void> {
   const { repo_id, name } = await ensureRepo();
@@ -26,21 +35,25 @@ export async function statusCommand(opts: { json: boolean }): Promise<void> {
     return;
   }
 
-  const staleTag = s.is_stale ? " (STALE)" : "";
+  const staleTag = s.is_stale ? yellow(" STALE") : "";
+  const check = green("✓");
+  const pending = dim("○");
+
+  const embLabel = s.embeddable_count > 0
+    ? `${s.embedded_count}/${s.embeddable_count} code chunks (${s.embedded_pct}%)`
+    : "no code chunks";
+  const embIcon = s.embedded_count >= s.embeddable_count && s.embeddable_count > 0 ? check : pending;
+
   const lines = [
-    `## ${name}${staleTag}`,
-    "",
-    "Index:",
-    `  Commit:     ${s.indexed_commit ? s.indexed_commit.slice(0, 8) : "(none)"}`,
-    `  HEAD:       ${s.current_head ? s.current_head.slice(0, 8) : "(unknown)"}`,
-    `  Files:      ${s.files_indexed.toLocaleString()}`,
-    `  Chunks:     ${s.chunk_count.toLocaleString()}`,
-    `  Embeddings: ${s.embedded_count.toLocaleString()} (${s.embedded_pct}%) [${s.embedder.replace("Xenova/", "")}, dim:${s.embedding_dim}]`,
-    `  Summaries:  ${s.summary_count.toLocaleString()}`,
-    "",
-    "Activity (30m):",
-    `  Traces:     ${s.trace_count}`,
-    `  Last:       ${s.last_activity ?? "(none)"}`,
+    ``,
+    `  ${bold(name)}${staleTag}`,
+    dim(`  ${"─".repeat(40)}`),
+    `  ${s.chunk_count > 0 ? check : pending} Chunks        ${dim(s.chunk_count.toLocaleString())}`,
+    `  ${s.metadata_count > 0 ? check : pending} Metadata      ${dim(`${s.metadata_count.toLocaleString()} files`)}`,
+    `  ${s.git_commits_analyzed > 0 ? check : pending} Git history   ${dim(`${s.git_commits_analyzed.toLocaleString()} files`)}`,
+    `  ${s.import_edge_count > 0 ? check : pending} Import graph  ${dim(`${s.import_edge_count.toLocaleString()} edges`)}`,
+    `  ${s.cochange_pairs > 0 ? check : pending} Co-changes    ${dim(`${s.cochange_pairs.toLocaleString()} pairs`)}`,
+    `  ${embIcon} Embeddings    ${dim(embLabel)}`,
   ];
 
   output(lines.join("\n"), false);

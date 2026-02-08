@@ -2,6 +2,9 @@ import { readFile } from "node:fs/promises";
 import { db } from "../../repo/db";
 import { fullScan, diffScan, getHeadCommit, type DiscoveredFile } from "./discovery";
 import { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./chunker";
+import { extractAndPersistMetadata } from "./extract-metadata";
+import { buildAndPersistImportGraph } from "./import-graph";
+import { analyzeGitHistory } from "./git-analysis";
 
 const MAX_CHUNKS_PER_REPO = 100_000;
 
@@ -20,7 +23,8 @@ export async function runIndex(repoId: string, force = false): Promise<IndexResu
   const repo = await db.queryRow<{
     root_path: string;
     last_indexed_commit: string | null;
-  }>`SELECT root_path, last_indexed_commit FROM repos WHERE id = ${repoId}`;
+    last_git_analysis_commit: string | null;
+  }>`SELECT root_path, last_indexed_commit, last_git_analysis_commit FROM repos WHERE id = ${repoId}`;
 
   if (!repo) throw new Error("repo not found");
 
@@ -125,6 +129,11 @@ export async function runIndex(repoId: string, force = false): Promise<IndexResu
         }
       }
     }
+
+    // Structural analysis — all local, no API needed
+    await extractAndPersistMetadata(repoId);
+    await buildAndPersistImportGraph(repoId);
+    await analyzeGitHistory(repoId, repo.root_path, repo.last_git_analysis_commit);
 
     // Update repo state
     await db.exec`

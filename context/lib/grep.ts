@@ -24,7 +24,8 @@ export async function grepSearch(
 
   // SQL filter by longest (most selective) term; JS filters the rest
   const sorted = [...terms].sort((a, b) => b.length - a.length);
-  const primary = `%${sorted[0]}%`;
+  const primaryEscaped = sorted[0].replace(/[%_\\]/g, (c) => "\\" + c);
+  const primary = `%${primaryEscaped}%`;
 
   const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const defnRe = new RegExp(
@@ -56,20 +57,28 @@ export async function grepSearch(
   for await (const row of rows) {
     if (codeOnly && isDocFile(row.path)) continue;
 
-    // All terms must appear in chunk
     const lowerContent = row.content.toLowerCase();
-    if (!sorted.every((t) => lowerContent.includes(t))) continue;
 
-    // Score by per-term match density
+    // Count matched terms — require at least 1 match, weight by coverage
+    let matchedTermCount = 0;
     let totalCount = 0;
-    for (const term of terms) {
+    for (const term of sorted) {
       let pos = 0;
+      let found = false;
       while ((pos = lowerContent.indexOf(term, pos)) !== -1) {
         totalCount++;
+        found = true;
         pos += term.length;
       }
+      if (found) matchedTermCount++;
     }
-    const score = totalCount / Math.max(1, row.content.length / 100);
+    if (matchedTermCount === 0) continue;
+
+    const coverage = matchedTermCount / sorted.length;
+    // Multi-word queries: require ≥50% term coverage to filter noise
+    if (sorted.length >= 3 && coverage < 0.5) continue;
+    const density = totalCount / Math.max(1, row.content.length / 100);
+    const score = density * coverage;
 
     const finalScore = defnRe.test(row.content) ? score * 3 : score;
     results.push({ ...row, score: finalScore });

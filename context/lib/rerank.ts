@@ -70,6 +70,31 @@ export function mergeAndRerank(
       // Bonus for results matching both grep AND semantic
       if (entry.grep > 0 && entry.semantic > 0) combinedScore *= 1.25;
 
+      if (query) {
+        const qTerms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 1);
+
+        // Definition boost — if chunk contains a declaration with a query term
+        const lines = entry.result.content.split("\n");
+        const hasDeclMatch = lines.some((line) => {
+          const t = line.trimStart();
+          if (!DECL_RE.test(t) && !METHOD_RE.test(t)) return false;
+          const lower = t.toLowerCase();
+          return qTerms.some((qt) => lower.includes(qt));
+        });
+        if (hasDeclMatch) combinedScore *= 1.5;
+
+        // Filename/path boost — favor files whose name matches query terms
+        const pathLower = entry.result.path.toLowerCase();
+        const base = pathLower.substring(pathLower.lastIndexOf("/") + 1);
+        if (qTerms.some((t) => base.includes(t))) combinedScore *= 1.5;
+        else if (qTerms.some((t) => pathLower.includes(t))) combinedScore *= 1.15;
+      }
+
+      // Penalize semantic-only results when grep found matches
+      if (entry.grep === 0 && entry.semantic > 0 && grepResults.length > 0) {
+        combinedScore *= 0.3;
+      }
+
       const matchType = entry.grep > 0 && entry.semantic > 0
         ? "hybrid"
         : entry.grep > 0
@@ -77,13 +102,39 @@ export function mergeAndRerank(
           : "semantic";
 
       return formatResult(entry.result, combinedScore, matchType, query);
-    })
-    .sort((a, b) => b.score - a.score);
+    });
+
+  // Language priority — detect from grep results (ground truth), not semantic
+  const langCounts = new Map<string, number>();
+  for (const r of grepResults) {
+    if (!r.language) continue;
+    langCounts.set(r.language, (langCounts.get(r.language) ?? 0) + 1);
+  }
+  if (langCounts.size > 1 && grepResults.length >= 3) {
+    let primaryLang = "";
+    let maxCount = 0;
+    for (const [lang, count] of langCounts) {
+      if (count > maxCount) { primaryLang = lang; maxCount = count; }
+    }
+    if (maxCount / grepResults.length > 0.5) {
+      for (const r of ranked) {
+        if (r.language && r.language !== primaryLang) r.score *= 0.4;
+      }
+    }
+  }
+
+  ranked.sort((a, b) => b.score - a.score);
+
+  // Filter low-score noise and trivial snippets
+  const TRIVIAL_SNIPPET_RE = /^[{}();\[\]`]*$/;
+  const filtered = ranked.filter(
+    (r) => r.score >= 0.05 && !TRIVIAL_SNIPPET_RE.test(r.snippet),
+  );
 
   // Dedupe by file path — keep highest-scoring chunk per file
   const seenPaths = new Set<string>();
   const deduped: RankedResult[] = [];
-  for (const r of ranked) {
+  for (const r of filtered) {
     if (seenPaths.has(r.path)) continue;
     seenPaths.add(r.path);
     deduped.push(r);
@@ -105,11 +156,14 @@ export function formatResult(
 ): RankedResult {
   const lines = r.content.split("\n");
 
-  // 1. Try matching line (grep hit)
+  // 1. Try matching line (grep hit) — skip trivial lines
+  const TRIVIAL_LINE_RE = /^[{}();\[\]`,\s]*$/;
   let snippet = "";
   if (query) {
     const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 1);
     const matchLine = lines.find((l) => {
+      const trimmed = l.trim();
+      if (TRIVIAL_LINE_RE.test(trimmed)) return false;
       const lower = l.toLowerCase();
       return terms.some((t) => lower.includes(t));
     });
@@ -125,9 +179,17 @@ export function formatResult(
     snippet = sigLine?.trim() ?? "";
   }
 
-  // 3. Fall back to first non-empty line
+  // 3. Fall back to first substantive line (skip braces, comments, imports)
   if (!snippet) {
-    snippet = lines.find((l) => l.trim().length > 0)?.trim() ?? "";
+    const TRIVIAL_RE = /^[{}();\[\]`]*$/;
+    const substantive = lines.find((l) => {
+      const t = l.trim();
+      return t.length > 0 && !TRIVIAL_RE.test(t)
+        && !t.startsWith("//") && !t.startsWith("/*") && !t.startsWith("*")
+        && !t.startsWith("import ") && !t.startsWith("using ")
+        && !t.startsWith("from ");
+    });
+    snippet = substantive?.trim() ?? `(chunk L${r.start_line}-${r.end_line})`;
   }
 
   return {

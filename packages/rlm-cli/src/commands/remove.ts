@@ -5,7 +5,6 @@ import { output } from "../util/format.js";
 interface DeleteResponse {
   deleted: boolean;
   chunks_removed: number;
-  summaries_removed: number;
   traces_removed: number;
 }
 
@@ -39,6 +38,6 @@ export async function removeCommand(opts: { json: boolean; yes: boolean }): Prom
   if (opts.json) {
     output(res, true);
   } else {
-    process.stdout.write(`\r✓ Removed ${name}: ${res.chunks_removed} chunks, ${res.summaries_removed} summaries, ${res.traces_removed} traces deleted\n`);
+    process.stdout.write(`\r✓ Removed ${name}: ${res.chunks_removed} chunks, ${res.traces_removed} traces deleted\n`);
   }
 }
