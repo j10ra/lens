@@ -6,6 +6,7 @@ export interface InterpretedQuery {
 }
 
 const STOPWORDS = new Set([
+  // Natural language
   "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
   "have", "has", "had", "do", "does", "did", "will", "would", "could",
   "should", "may", "might", "can", "need", "must", "to", "of", "in",
@@ -13,6 +14,12 @@ const STOPWORDS = new Set([
   "and", "but", "or", "not", "no", "so", "if", "then", "than", "that",
   "this", "it", "its", "all", "each", "every", "any", "some", "how",
   "what", "which", "who", "when", "where", "why",
+  // Code keywords & generic identifiers (match 10-30% of files, no discriminative value)
+  "get", "set", "new", "null", "true", "false", "void", "type", "var", "let", "const",
+  "return", "import", "export", "default", "class", "function",
+  "string", "number", "boolean", "object", "array", "index", "data",
+  "value", "result", "item", "list", "name", "id", "key",
+  "src", "lib", "app", "spec", "mock", "module",
 ]);
 
 const NOISE_EXTENSIONS = new Set([

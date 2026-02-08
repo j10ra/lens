@@ -41,6 +41,7 @@ interface IndexStatus {
   chunk_count: number;
   files_indexed: number;
   chunks_with_embeddings: number;
+  files_with_purpose: number;
 }
 
 export const status = api(
@@ -60,17 +61,23 @@ export const status = api(
       currentHead = await getHeadCommit(repo.root_path);
     } catch { /* repo path may not exist */ }
 
-    const counts = await db.queryRow<{
-      chunk_count: number;
-      files_indexed: number;
-      chunks_with_embeddings: number;
-    }>`
-      SELECT
-        count(*)::int AS chunk_count,
-        count(DISTINCT path)::int AS files_indexed,
-        count(*) FILTER (WHERE embedding IS NOT NULL)::int AS chunks_with_embeddings
-      FROM chunks WHERE repo_id = ${repo_id}
-    `;
+    const [counts, purposeCount] = await Promise.all([
+      db.queryRow<{
+        chunk_count: number;
+        files_indexed: number;
+        chunks_with_embeddings: number;
+      }>`
+        SELECT
+          count(*)::int AS chunk_count,
+          count(DISTINCT path)::int AS files_indexed,
+          count(*) FILTER (WHERE embedding IS NOT NULL)::int AS chunks_with_embeddings
+        FROM chunks WHERE repo_id = ${repo_id}
+      `,
+      db.queryRow<{ count: number }>`
+        SELECT count(*)::int AS count FROM file_metadata
+        WHERE repo_id = ${repo_id} AND purpose IS NOT NULL AND purpose != ''
+      `,
+    ]);
 
     return {
       index_status: repo.index_status,
@@ -81,6 +88,7 @@ export const status = api(
       chunk_count: counts?.chunk_count ?? 0,
       files_indexed: counts?.files_indexed ?? 0,
       chunks_with_embeddings: counts?.chunks_with_embeddings ?? 0,
+      files_with_purpose: purposeCount?.count ?? 0,
     };
   },
 );

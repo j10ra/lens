@@ -15,6 +15,6 @@ export const EMBEDDING_BATCH_SIZE = 32; // Voyage max 120K tokens/batch; code ch
 // Secret: encore secret set --type dev OpenRouterApiKey
 export const OpenRouterApiKey = secret("OpenRouterApiKey");
 export const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-export const PURPOSE_MODEL = "qwen/qwen3-coder:free";
+export const PURPOSE_MODEL = "qwen/qwen3-coder-next";
 export const PURPOSE_BATCH_LIMIT = 200;
 export const PURPOSE_CONCURRENCY = 10;
