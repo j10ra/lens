@@ -26,23 +26,54 @@ function stem(word: string): string {
     .replace(/(tion|ment|ness|able|ible|ous|ive|ful|less|ing|er|ed|es|ly|al|ity)$/, "");
 }
 
-function expandKeywords(words: string[]): string[] {
-  const expanded = new Set<string>();
+/** Programming concept synonyms — expands vague terms to implementation-level terms */
+const CONCEPT_SYNONYMS: Record<string, string[]> = {
+  "error": ["interceptor", "exception", "catch", "middleware", "handler"],
+  "errors": ["interceptor", "exception", "catch", "middleware", "handler"],
+  "retry": ["interceptor", "backoff", "retry", "queue"],
+  "retries": ["interceptor", "backoff", "retry", "queue"],
+  "auth": ["interceptor", "token", "login", "guard", "middleware", "session"],
+  "authentication": ["interceptor", "token", "login", "guard", "middleware"],
+  "authorization": ["guard", "role", "permission", "policy"],
+  "cache": ["invalidat", "ttl", "expire", "store", "memo"],
+  "caching": ["invalidat", "ttl", "expire", "store", "memo"],
+  "logging": ["logger", "trace", "monitor", "telemetry"],
+  "validation": ["validator", "schema", "sanitiz", "constraint"],
+  "notification": ["email", "alert", "signal", "push", "webhook"],
+  "upload": ["multipart", "stream", "blob", "attachment", "photo"],
+  "performance": ["optimize", "cache", "lazy", "batch", "throttle"],
+  "security": ["auth", "token", "encrypt", "cors", "csrf", "sanitiz"],
+  "testing": ["spec", "mock", "fixture", "assert", "stub"],
+  "deploy": ["pipeline", "docker", "build", "release", "ci-cd"],
+  "database": ["repository", "migration", "query", "schema", "orm"],
+  "api": ["controller", "endpoint", "route", "middleware", "interceptor"],
+};
+
+function expandKeywords(words: string[]): { exact: string[]; stemmed: string[] } {
+  const exact = new Set<string>();
+  const stemmed = new Set<string>();
   for (const w of words) {
-    expanded.add(w);
-    const stemmed = stem(w);
-    if (stemmed.length >= 3 && stemmed !== w) expanded.add(stemmed);
+    exact.add(w);
+    const s = stem(w);
+    if (s.length >= 3 && s !== w) stemmed.add(s);
     if (w.includes("-")) {
       for (const part of w.split("-")) {
         if (part.length > 2 && !STOPWORDS.has(part)) {
-          expanded.add(part);
-          const s = stem(part);
-          if (s.length >= 3) expanded.add(s);
+          exact.add(part);
+          const ps = stem(part);
+          if (ps.length >= 3 && ps !== part) stemmed.add(ps);
         }
       }
     }
+    // Concept synonyms — add as exact (match paths + exports + docstring)
+    const synonyms = CONCEPT_SYNONYMS[w];
+    if (synonyms) {
+      for (const syn of synonyms) exact.add(syn);
+    }
   }
-  return [...expanded];
+  // Remove stems that are already in exact
+  for (const e of exact) stemmed.delete(e);
+  return { exact: [...exact], stemmed: [...stemmed] };
 }
 
 function isNoisePath(path: string): boolean {
@@ -53,8 +84,7 @@ function isNoisePath(path: string): boolean {
   return false;
 }
 
-/** Build TF-IDF weights: rare terms get higher weight than common ones.
- *  IDF = log(N / df) where df = number of files containing the term. */
+/** Build TF-IDF weights: rare terms get higher weight than common ones. */
 function buildTermWeights(
   words: string[],
   metadata: FileMetadataRow[],
@@ -69,7 +99,6 @@ function buildTermWeights(
       const haystack = `${f.path} ${(f.exports ?? []).join(" ")} ${f.docstring ?? ""}`.toLowerCase();
       if (haystack.includes(w)) df++;
     }
-    // IDF: log(N/df), clamped to [1, 10]. df=0 → max weight
     const idf = df > 0 ? Math.min(10, Math.max(1, Math.log(N / df))) : 10;
     weights.set(w, idf);
   }
@@ -77,7 +106,7 @@ function buildTermWeights(
 }
 
 /** Keyword-scored file selection with TF-IDF weighting and quadratic coverage boost.
- *  Rare terms score higher. Files matching many query terms get exponential boost. */
+ *  Exact terms match path+exports+docstring. Stems only match exports+docstring (not paths). */
 export function interpretQuery(
   _repoId: string,
   query: string,
@@ -89,8 +118,9 @@ export function interpretQuery(
     .split(/\s+/)
     .filter((w) => w.length > 2 && !STOPWORDS.has(w));
 
-  const words = expandKeywords(rawWords);
-  const termWeights = buildTermWeights(words, metadata);
+  const { exact, stemmed } = expandKeywords(rawWords);
+  const allTerms = [...exact, ...stemmed];
+  const termWeights = buildTermWeights(allTerms, metadata);
 
   const scored = metadata.map((f) => {
     let score = 0;
@@ -99,7 +129,8 @@ export function interpretQuery(
     const exportsLower = (f.exports ?? []).join(" ").toLowerCase();
     const docLower = (f.docstring ?? "").toLowerCase();
 
-    for (const w of words) {
+    // Exact terms: match path + exports + docstring
+    for (const w of exact) {
       const weight = termWeights.get(w) ?? 1;
       let termScore = 0;
       if (pathLower.includes(w)) termScore += 3 * weight;
@@ -109,10 +140,20 @@ export function interpretQuery(
       score += termScore;
     }
 
-    // Quadratic coverage boost: files matching more query terms
-    // score exponentially higher (4/5 terms >> 1/5 terms)
+    // Stemmed terms: only match exports + docstring (NOT paths)
+    // Prevents "handling" stem → "handl" matching "StorageHandling" in paths
+    for (const w of stemmed) {
+      const weight = termWeights.get(w) ?? 1;
+      let termScore = 0;
+      if (exportsLower.includes(w)) termScore += 2 * weight;
+      if (docLower.includes(w)) termScore += 1 * weight;
+      if (termScore > 0) matchedTerms++;
+      score += termScore;
+    }
+
+    // Quadratic coverage boost
     if (matchedTerms > 1) {
-      const coverage = matchedTerms / words.length;
+      const coverage = matchedTerms / allTerms.length;
       score *= 1 + coverage * coverage;
     }
 

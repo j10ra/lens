@@ -81,10 +81,14 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
       return { ...cached, stats: { ...cached.stats, cached: true, duration_ms: Date.now() - start } };
     }
 
-    // 3. Parallel load: metadata + all file stats (single query each)
-    const [metadata, allStats] = await Promise.all([
+    // 3. Parallel load: metadata + stats + semantic (all at once)
+    const embAvailable = await hasEmbeddings(params.repo_id);
+    const [metadata, allStats, vecResults] = await Promise.all([
       loadFileMetadata(params.repo_id),
       getAllFileStats(params.repo_id),
+      embAvailable
+        ? vectorSearch(params.repo_id, params.goal, 10, true).catch(() => [])
+        : Promise.resolve([]),
     ]);
 
     // 4. Keyword-scored file selection with TF-IDF
@@ -94,38 +98,39 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
     }
     const interpreted = interpretQuery(params.repo_id, params.goal, metadata, statsForInterpreter);
 
-    // 5. Semantic boost — only when keyword results are sparse
-    try {
-      const keywordSparse = interpreted.files.length < 5;
-      const embAvailable = keywordSparse && await hasEmbeddings(params.repo_id);
-      if (embAvailable && interpreted.files.length < 8) {
-        const vecResults = await vectorSearch(params.repo_id, params.goal, 10, true);
-
-        const vecByFile = new Map<string, { score: number; content: string }>();
-        for (const r of vecResults) {
-          const existing = vecByFile.get(r.path);
-          if (!existing || r.score > existing.score) {
-            vecByFile.set(r.path, { score: r.score, content: r.content });
-          }
-        }
-
-        const existingPaths = new Set(interpreted.files.map((f) => f.path));
-        const candidates = [...vecByFile.entries()]
-          .filter(([path]) => !existingPaths.has(path))
-          .sort((a, b) => b[1].score - a[1].score);
-
-        for (const [path, data] of candidates) {
-          if (interpreted.files.length >= 8) break;
-          const lines = data.content.split("\n");
-          const sigLine = lines.find((l) => {
-            const t = l.trimStart();
-            return /^(export|public|private|protected|def |fn |func |class |interface |struct |enum )/.test(t);
-          });
-          interpreted.files.push({ path, reason: sigLine?.trim().slice(0, 80) || "semantic match" });
+    // 5. Semantic merge — always runs, can replace weak keyword tail
+    if (vecResults.length > 0) {
+      const vecByFile = new Map<string, { score: number; content: string }>();
+      for (const r of vecResults) {
+        const existing = vecByFile.get(r.path);
+        if (!existing || r.score > existing.score) {
+          vecByFile.set(r.path, { score: r.score, content: r.content });
         }
       }
-    } catch {
-      // No embeddings or API error — continue with keyword-only
+
+      const existingPaths = new Set(interpreted.files.map((f) => f.path));
+      const candidates = [...vecByFile.entries()]
+        .filter(([path]) => !existingPaths.has(path))
+        .sort((a, b) => b[1].score - a[1].score)
+        .slice(0, 5);
+
+      const extractReason = (content: string): string => {
+        const sigLine = content.split("\n").find((l) => {
+          const t = l.trimStart();
+          return /^(export|public|private|protected|def |fn |func |class |interface |struct |enum )/.test(t);
+        });
+        return sigLine?.trim().slice(0, 80) || "semantic match";
+      };
+
+      for (const [path, data] of candidates) {
+        if (interpreted.files.length < 8) {
+          interpreted.files.push({ path, reason: extractReason(data.content) });
+        } else {
+          // Pop weakest keyword result, push semantic result
+          interpreted.files.pop();
+          interpreted.files.push({ path, reason: extractReason(data.content) });
+        }
+      }
     }
 
     const hitPaths = interpreted.files.map((f) => f.path);
