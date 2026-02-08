@@ -68,17 +68,37 @@ export const register = api(
     const identityKey = deriveIdentityKey(params.root_path, params.remote_url);
     const name = params.name ?? params.root_path.split("/").pop() ?? "unknown";
 
-    const row = await db.queryRow<{ id: string; created: boolean }>`
-      INSERT INTO repos (identity_key, name, root_path, remote_url)
-      VALUES (${identityKey}, ${name}, ${params.root_path}, ${params.remote_url ?? null})
-      ON CONFLICT (identity_key) DO UPDATE
-        SET root_path = EXCLUDED.root_path,
-            remote_url = COALESCE(EXCLUDED.remote_url, repos.remote_url),
-            updated_at = now()
-      RETURNING id, (xmax = 0) AS created
+    // Check for existing repo by root_path first (prevents duplicates when
+    // identity_key changes due to remote_url being added/removed)
+    const existing = await db.queryRow<{ id: string }>`
+      SELECT id FROM repos WHERE root_path = ${params.root_path} LIMIT 1
     `;
 
-    if (!row) throw APIError.internal("failed to upsert repo");
+    let row: { id: string; created: boolean };
+
+    if (existing) {
+      await db.exec`
+        UPDATE repos
+        SET identity_key = ${identityKey},
+            name = ${name},
+            remote_url = COALESCE(${params.remote_url ?? null}, remote_url),
+            updated_at = now()
+        WHERE id = ${existing.id}
+      `;
+      row = { id: existing.id, created: false };
+    } else {
+      const inserted = await db.queryRow<{ id: string; created: boolean }>`
+        INSERT INTO repos (identity_key, name, root_path, remote_url)
+        VALUES (${identityKey}, ${name}, ${params.root_path}, ${params.remote_url ?? null})
+        ON CONFLICT (identity_key) DO UPDATE
+          SET root_path = EXCLUDED.root_path,
+              remote_url = COALESCE(EXCLUDED.remote_url, repos.remote_url),
+              updated_at = now()
+        RETURNING id, (xmax = 0) AS created
+      `;
+      if (!inserted) throw APIError.internal("failed to upsert repo");
+      row = inserted;
+    }
 
     if (row.created) {
       // Fire-and-forget — CLI polls /repo/:id/status for progress
