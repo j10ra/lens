@@ -4,6 +4,7 @@ import { fullScan, diffScan, getHeadCommit, type DiscoveredFile } from "./discov
 import { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./chunker";
 import { extractAndPersistMetadata } from "./extract-metadata";
 import { buildAndPersistImportGraph } from "./import-graph";
+import { buildVocabClusters } from "./vocab-clusters";
 import { analyzeGitHistory } from "./git-analysis";
 
 const MAX_CHUNKS_PER_REPO = 100_000;
@@ -80,6 +81,8 @@ export async function runIndex(repoId: string, force = false): Promise<IndexResu
       } catch {
         continue;
       }
+      // Postgres TEXT cannot contain null bytes
+      content = content.replaceAll("\x00", "");
 
       const newChunks = chunkFile(content, DEFAULT_CHUNKING_PARAMS);
 
@@ -132,6 +135,7 @@ export async function runIndex(repoId: string, force = false): Promise<IndexResu
 
     // Structural analysis — all local, no API needed
     await extractAndPersistMetadata(repoId);
+    await buildVocabClusters(repoId);
     await buildAndPersistImportGraph(repoId);
     await analyzeGitHistory(repoId, repo.root_path, repo.last_git_analysis_commit);
 

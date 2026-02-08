@@ -3,7 +3,7 @@
 import { api } from "encore.dev/api";
 import { ensureIndexed } from "../index/lib/ensure";
 import {
-  loadFileMetadata, getAllFileStats,
+  loadFileMetadata, getAllFileStats, loadVocabClusters,
   getReverseImports, getForwardImports, get2HopReverseDeps, getCochanges,
 } from "./lib/structural";
 import { interpretQuery } from "./lib/query-interpreter";
@@ -81,14 +81,15 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
       return { ...cached, stats: { ...cached.stats, cached: true, duration_ms: Date.now() - start } };
     }
 
-    // 3. Parallel load: metadata + stats + semantic (all at once)
+    // 3. Parallel load: metadata + stats + semantic + clusters (all at once)
     const embAvailable = await hasEmbeddings(params.repo_id);
-    const [metadata, allStats, vecResults] = await Promise.all([
+    const [metadata, allStats, vecResults, vocabClusters] = await Promise.all([
       loadFileMetadata(params.repo_id),
       getAllFileStats(params.repo_id),
       embAvailable
         ? vectorSearch(params.repo_id, params.goal, 10, true).catch(() => [])
         : Promise.resolve([]),
+      loadVocabClusters(params.repo_id),
     ]);
 
     // 4. Keyword-scored file selection with TF-IDF
@@ -96,7 +97,7 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
     for (const [path, stat] of allStats) {
       statsForInterpreter.set(path, { commit_count: stat.commit_count, recent_count: stat.recent_count });
     }
-    const interpreted = interpretQuery(params.repo_id, params.goal, metadata, statsForInterpreter);
+    const interpreted = interpretQuery(params.repo_id, params.goal, metadata, statsForInterpreter, vocabClusters);
 
     // 5. Semantic merge — always runs, can replace weak keyword tail
     if (vecResults.length > 0) {

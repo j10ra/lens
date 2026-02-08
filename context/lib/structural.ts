@@ -134,6 +134,22 @@ export async function getCochanges(
   return rows;
 }
 
+export interface VocabCluster {
+  terms: string[];
+  files: string[];
+}
+
+/** Load vocab clusters from repos table, or null if not computed */
+export async function loadVocabClusters(repoId: string): Promise<VocabCluster[] | null> {
+  const row = await db.queryRow<{ vocab_clusters: string | VocabCluster[] | null }>`
+    SELECT vocab_clusters FROM repos WHERE id = ${repoId}
+  `;
+  if (!row?.vocab_clusters) return null;
+  return typeof row.vocab_clusters === "string"
+    ? JSON.parse(row.vocab_clusters)
+    : row.vocab_clusters;
+}
+
 export interface FileMetadataRow {
   path: string;
   language: string | null;

@@ -1,4 +1,4 @@
-import type { FileMetadataRow } from "./structural";
+import type { FileMetadataRow, VocabCluster } from "./structural";
 
 export interface InterpretedQuery {
   files: Array<{ path: string; reason: string }>;
@@ -15,8 +15,18 @@ const STOPWORDS = new Set([
   "what", "which", "who", "when", "where", "why",
 ]);
 
-const NOISE_EXTENSIONS = new Set([".md", ".json", ".yaml", ".yml", ".toml", ".lock", ".sql", ".txt", ".csv"]);
-const NOISE_PATHS = [".gitignore", ".github/", ".vscode/", ".idea/", "node_modules/", "dist/", "build/"];
+const NOISE_EXTENSIONS = new Set([
+  ".md", ".json", ".yaml", ".yml", ".toml", ".lock", ".sql", ".txt", ".csv",
+  ".psd", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot",
+  ".xml", ".axml", ".resx", ".config",
+]);
+const NOISE_PATHS = [
+  ".gitignore", ".github/", ".vscode/", ".idea/", "node_modules/", "dist/", "build/",
+  "vendor/", "vendors/", "/scripts/", "areas/helppage/", "packages.config",
+  "resources/drawable/", "resources/layout/", "resources/values/",
+  "wwwroot/lib/", "wwwroot/css/", "wwwroot/js/lib/",
+  ".min.js", ".min.css", ".designer.cs", "assemblyinfo.cs",
+];
 
 function stem(word: string): string {
   if (word.length <= 4) return word;
@@ -49,9 +59,14 @@ const CONCEPT_SYNONYMS: Record<string, string[]> = {
   "api": ["controller", "endpoint", "route", "middleware", "interceptor"],
 };
 
-function expandKeywords(words: string[]): { exact: string[]; stemmed: string[] } {
+function expandKeywords(
+  words: string[],
+  clusters: VocabCluster[] | null,
+): { exact: string[]; stemmed: string[]; clusterFiles: Set<string> } {
   const exact = new Set<string>();
   const stemmed = new Set<string>();
+  const clusterFiles = new Set<string>();
+
   for (const w of words) {
     exact.add(w);
     const s = stem(w);
@@ -65,15 +80,31 @@ function expandKeywords(words: string[]): { exact: string[]; stemmed: string[] }
         }
       }
     }
-    // Concept synonyms — add as exact (match paths + exports + docstring)
+  }
+
+  // Static concept synonyms — always apply (domain intent mapping)
+  for (const w of words) {
     const synonyms = CONCEPT_SYNONYMS[w];
     if (synonyms) {
       for (const syn of synonyms) exact.add(syn);
     }
   }
+
+  // Vocab clusters (repo-specific) — supplement with cluster file candidates
+  if (clusters) {
+    for (const w of words) {
+      for (const cluster of clusters) {
+        if (cluster.terms.includes(w) || cluster.terms.some((t) => stem(t) === stem(w))) {
+          for (const t of cluster.terms) exact.add(t);
+          for (const f of cluster.files) clusterFiles.add(f);
+        }
+      }
+    }
+  }
+
   // Remove stems that are already in exact
   for (const e of exact) stemmed.delete(e);
-  return { exact: [...exact], stemmed: [...stemmed] };
+  return { exact: [...exact], stemmed: [...stemmed], clusterFiles };
 }
 
 function isNoisePath(path: string): boolean {
@@ -112,13 +143,14 @@ export function interpretQuery(
   query: string,
   metadata: FileMetadataRow[],
   fileStats?: Map<string, { commit_count: number; recent_count: number }>,
+  vocabClusters?: VocabCluster[] | null,
 ): InterpretedQuery {
   const rawWords = query.toLowerCase()
     .replace(/[^a-z0-9\s_-]/g, " ")
     .split(/\s+/)
     .filter((w) => w.length > 2 && !STOPWORDS.has(w));
 
-  const { exact, stemmed } = expandKeywords(rawWords);
+  const { exact, stemmed, clusterFiles } = expandKeywords(rawWords, vocabClusters ?? null);
   const allTerms = [...exact, ...stemmed];
   const termWeights = buildTermWeights(allTerms, metadata);
 
@@ -129,11 +161,29 @@ export function interpretQuery(
     const exportsLower = (f.exports ?? []).join(" ").toLowerCase();
     const docLower = (f.docstring ?? "").toLowerCase();
 
-    // Exact terms: match path + exports + docstring
+    // Split path into meaningful tokens: filename stem + directory segments
+    const pathSegments = pathLower.split("/");
+    const fileName = pathSegments[pathSegments.length - 1].replace(/\.[^.]+$/, "");
+    // Tokenize filename (camelCase/PascalCase/snake_case → words)
+    const fileTokens = fileName
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/[._-]/g, " ")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((t) => t.length >= 2);
+    // Directory names (last 3 segments, excluding filename)
+    const dirTokens = pathSegments.slice(-4, -1)
+      .flatMap((s) => s.replace(/\./g, " ").split(/\s+/))
+      .filter((t) => t.length >= 2);
+    const pathTokenSet = new Set([...fileTokens, ...dirTokens]);
+
+    // Exact terms: match path tokens + exports + docstring
+    // Path scoring: filename token match = 4x, dir token match = 2x (replaces substring)
     for (const w of exact) {
       const weight = termWeights.get(w) ?? 1;
       let termScore = 0;
-      if (pathLower.includes(w)) termScore += 3 * weight;
+      if (fileTokens.some((t) => t === w || t.includes(w))) termScore += 4 * weight;
+      else if (pathTokenSet.has(w)) termScore += 2 * weight;
       if (exportsLower.includes(w)) termScore += 2 * weight;
       if (docLower.includes(w)) termScore += 1 * weight;
       if (termScore > 0) matchedTerms++;
@@ -166,6 +216,11 @@ export function interpretQuery(
     const stats = fileStats?.get(f.path);
     if (stats && stats.recent_count > 0 && score > 0) {
       score += Math.min(stats.recent_count, 5) * 0.5;
+    }
+
+    // Cluster file bonus: only boost files that already have keyword matches
+    if (score > 0 && clusterFiles.has(f.path)) {
+      score *= 1.3;
     }
 
     return { path: f.path, score, docstring: f.docstring, exports: f.exports };

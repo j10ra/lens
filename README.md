@@ -1,6 +1,6 @@
 # RLM — Local Repo Context Daemon
 
-RLM indexes codebases and serves targeted context to Claude Code. Zero LLM calls on the query path — pure retrieval with structural analysis (~240ms).
+RLM indexes codebases and serves targeted context packs to Claude Code. Zero LLM calls on the query path — TF-IDF keyword scoring + Voyage semantic boost + structural enrichment (~150ms cold, ~10ms cached).
 
 ## Install
 
@@ -21,13 +21,13 @@ npm install && npm run build && npm link
 
 Verify: `rlm --version`
 
-### 3. Set secrets (optional — for embeddings)
+### 3. Set secrets (optional — for embeddings + vocab clusters)
 
 ```bash
-encore secret set --type dev VoyageApiKey   # Voyage AI (semantic search)
+encore secret set --type dev VoyageApiKey   # Voyage AI voyage-code-3
 ```
 
-Embeddings are optional. Core search uses grep; semantic search activates when embeddings are available.
+Without Voyage: core keyword search + static concept synonyms still work. With Voyage: semantic vector search + repo-specific vocab clusters activate.
 
 ## Integrate with Claude Code
 
@@ -38,108 +38,100 @@ cd /path/to/your/project
 rlm repo register
 ```
 
-This scans files, extracts metadata (exports, imports, docstrings), analyzes git history, builds the import graph, and starts chunking. Takes ~30s for a 3,000-file repo.
-
-Progress output:
-```
-  Indexing chunks...         done 14,153 chunks
-  Extracting metadata...     done 795 files
-  Analyzing git history...   done 1,568 files
-  Building import graph...   done 2,449 edges
-  Co-change pairs...         done 3,372 pairs
-
-  Ready - run `rlm context "your goal"` to get started
-  Background: embeddings 67% — run `rlm status` to check
-```
+Scans files, extracts metadata (exports, imports, docstrings), builds vocab clusters (Voyage), constructs import graph, analyzes git history. ~30-50s for a 3,000-file repo.
 
 ### Step 2: CLAUDE.md (auto-injected)
 
 `rlm repo register` automatically creates/prepends a `CLAUDE.md` in your project with RLM instructions. Claude Code reads it on every turn and follows the retrieval pattern automatically.
 
-Control injection behavior: `rlm config set inject_behavior <once|always|skip>`
+Control injection: `rlm config set inject_behavior <once|always|skip>`
 
 ### Step 3: Verify
 
 ```bash
-rlm status          # Index health + embedding coverage
-rlm context "auth"  # Should return relevant files with impact analysis
+rlm status                              # Index health + embedding coverage
+rlm context "gate in container acceptance"  # Context pack
 ```
 
 ## How Context Works
 
-When you run `rlm context "gate in container acceptance"`, RLM:
+`rlm context "gate in container acceptance"` triggers:
 
-1. **Keyword-matches** against pre-extracted file metadata (exports, imports, docstrings)
-2. **Boosts** recently active files (git commit frequency in last 90 days)
-3. **Enriches** with reverse imports ("what breaks if I change this?")
-4. **Enriches** with co-change history ("what files always change together?")
-5. **Formats** a compact context pack (~200-300 tokens)
+1. **Auto-index** if HEAD has changed (diff scan, no re-index if up-to-date)
+2. **Keyword scoring** — TF-IDF weighted match against file metadata (exports, docstrings, path tokens)
+3. **Concept expansion** — static synonyms (error→interceptor/middleware) + repo-specific vocab clusters (Voyage-embedded export terms clustered by cosine similarity)
+4. **Semantic boost** — Voyage vector search merges high-similarity chunks into results (when embeddings available)
+5. **Structural enrichment** — forward/reverse imports, 2-hop dependency chains, co-change clusters, git activity
+6. **Cache** — keyed by (repo, goal, commit), 120s TTL, 20 entries
 
-Example output:
+Output:
 ```
 # gate in container acceptance
 
-## Where to Look
-1. src/models/container-acceptance.ts
-   exports: ContainerAcceptanceItem
-2. src/services/acceptance.service.ts
-   exports: ContainerControlAcceptanceService
+## Files
+1. src/models/container-acceptance.ts — exports: ContainerAcceptanceItem
+2. src/services/acceptance.service.ts — exports: ContainerControlAcceptanceService
 
-## Impact
-container-acceptance.ts <- container-visit.ts
-acceptance.service.ts <- acceptance.component.ts, container-control.module.ts
+## Dependency Graph
+container-acceptance.ts → container-visit.ts (imports)
+acceptance.service.ts ← acceptance.component.ts, container-control.module.ts (imported by)
 
-## History
-acceptance.service.ts: 14 commits/90d, co-changes: acceptance.component.ts (8x)
+## Co-change Clusters
+[acceptance.service.ts, acceptance.component.ts, container-control.module.ts] — 8 co-commits
 
-## Tools
-rlm search "<query>" | rlm read <path> | rlm run "<cmd>"
+## Activity
+acceptance.service.ts: 14 commits, 3/90d, last: 2d ago
 ```
 
-Zero LLM calls. Pure structural retrieval. ~240ms.
+Zero LLM calls. ~150ms cold, ~10ms cached.
 
-## Core Commands
+## CLI Commands
 
 | Command | Purpose |
 | --- | --- |
-| `rlm context "<goal>"` | Structural context pack — relevant files, impact, git history |
-| `rlm search "<query>"` | Hybrid grep + semantic search |
-| `rlm read <path>` | Fetch full file content |
-| `rlm run "<cmd>"` | Execute commands (npm, cargo, python, git) |
-| `rlm status` | Index health, embedding coverage, structural stats |
-| `rlm task "<goal>"` | Alias for `rlm context` (backward compat) |
+| `rlm context "<goal>"` | Context pack — relevant files, deps, co-changes, activity |
+| `rlm status` | Index health, embedding coverage |
+| `rlm index [--force]` | Trigger indexing (auto-runs on context if stale) |
 
-## Repo Management
+### Repo Management
 
 | Command | Purpose |
 | --- | --- |
 | `rlm repo register` | Register + index current repo |
 | `rlm repo list` | Show all registered repos |
 | `rlm repo remove --yes` | Remove repo data |
-| `rlm repo watch` | Start file watcher (auto-updates index) |
+| `rlm repo watch` | Start file watcher (auto-reindex on save) |
 | `rlm repo unwatch` | Stop file watcher |
 | `rlm repo watch-status` | Check watcher state |
 
-## What Gets Indexed
+### Config
 
-During `rlm repo register`, RLM builds:
+| Command | Purpose |
+| --- | --- |
+| `rlm config get <key>` | Get config value |
+| `rlm config set <key> <value>` | Set config value |
+| `rlm daemon stats` | Global daemon statistics |
+
+## What Gets Indexed
 
 | Data | Source | Used by |
 | --- | --- | --- |
-| Chunks | File content split into ~100-line segments | `rlm search` |
-| Metadata | Regex-extracted exports, imports, docstrings | `rlm context` |
-| Import graph | Directed edges (source → target) | Impact analysis in `rlm context` |
-| Git stats | Commit count, recent activity per file | Activity boost in `rlm context` |
-| Co-changes | File pairs that change together in commits | History section in `rlm context` |
-| Embeddings | Voyage AI `voyage-code-3` (background, optional) | Semantic search in `rlm search` |
+| Chunks | File content split into ~100-line segments | Vector search (semantic boost) |
+| Metadata | Regex-extracted exports, imports, docstrings | TF-IDF keyword scoring |
+| Vocab clusters | Voyage-embedded export terms, cosine-clustered | Concept expansion at query time |
+| Import graph | Directed edges (source → target) | Dependency graph in context pack |
+| Git stats | Commit count, recent activity per file | Activity boost + activity section |
+| Co-changes | File pairs that change together in commits | Co-change clusters in context pack |
+| Embeddings | Voyage AI `voyage-code-3` (background, optional) | Semantic vector search |
 
 ## How It Works
 
-- **Auto-indexes** on register, then tracks git changes + file watcher
-- **Semantic search** available when embeddings ready (check `rlm status`)
+- **Auto-indexes** on register, re-indexes when HEAD changes (diff-aware)
+- **Vocab clusters** built at index time — Voyage embeds unique export terms, clusters by cosine > 0.75, stored as JSONB
+- **Semantic search** activates when embeddings are ready (check `rlm status`)
 - **Background worker** refreshes stale repos every 5 minutes
 - **File watcher** picks up saves in real-time (~500ms debounce)
-- **Per-repo isolation** — chunks, embeddings, metadata all separate
+- **Per-repo isolation** — chunks, embeddings, metadata, clusters all separate
 
 ### File Watcher
 
@@ -164,7 +156,7 @@ After daemon restart: `rlm repo watch` to restore file watchers.
 
 **Repo not found:** `rlm repo register && rlm status`
 
-**Search returns empty:** `rlm index --force && rlm status`
+**Stale index:** `rlm index --force && rlm status`
 
 **File watcher not active:** `rlm repo watch && rlm repo watch-status`
 
