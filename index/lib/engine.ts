@@ -137,6 +137,7 @@ export async function runIndex(repoId: string, force = false): Promise<IndexResu
     await extractAndPersistMetadata(repoId);
     await buildVocabClusters(repoId);
     await buildAndPersistImportGraph(repoId);
+    await computeMaxImportDepth(repoId);
     await analyzeGitHistory(repoId, repo.root_path, repo.last_git_analysis_commit);
 
     // Update repo state
@@ -159,6 +160,51 @@ export async function runIndex(repoId: string, force = false): Promise<IndexResu
   } finally {
     await db.exec`SELECT pg_advisory_unlock(${lockId})`;
   }
+}
+
+/** Compute longest import chain depth via BFS from leaves, store in repos. */
+async function computeMaxImportDepth(repoId: string): Promise<void> {
+  const allSources = new Set<string>();
+  const allTargets = new Set<string>();
+  const rev = new Map<string, string[]>(); // target → sources
+
+  const rows = db.query<{ source_path: string; target_path: string }>`
+    SELECT source_path, target_path FROM file_imports WHERE repo_id = ${repoId}
+  `;
+  for await (const r of rows) {
+    allSources.add(r.source_path);
+    allTargets.add(r.target_path);
+    const list = rev.get(r.target_path) ?? [];
+    list.push(r.source_path);
+    rev.set(r.target_path, list);
+  }
+
+  // Leaves: imported but don't import anything
+  const leaves: string[] = [];
+  for (const t of allTargets) {
+    if (!allSources.has(t)) leaves.push(t);
+  }
+
+  let maxDepth = allSources.size > 0 && leaves.length === 0 ? 1 : 0;
+  const visited = new Set<string>(leaves);
+  let frontier = leaves;
+  let depth = 0;
+
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const node of frontier) {
+      for (const imp of rev.get(node) ?? []) {
+        if (!visited.has(imp)) {
+          visited.add(imp);
+          next.push(imp);
+        }
+      }
+    }
+    if (next.length > 0) maxDepth = ++depth;
+    frontier = next;
+  }
+
+  await db.exec`UPDATE repos SET max_import_depth = ${maxDepth} WHERE id = ${repoId}`;
 }
 
 /** Hash a UUID string to a stable 32-bit int for pg_advisory_lock */

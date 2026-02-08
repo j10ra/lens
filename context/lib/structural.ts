@@ -134,6 +134,49 @@ export async function getCochanges(
   return rows;
 }
 
+/** Indegree count per file — how many other files import it */
+export async function getIndegrees(repoId: string): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  const cursor = db.query<{ target_path: string; indegree: number }>`
+    SELECT target_path, count(*)::int AS indegree FROM file_imports
+    WHERE repo_id = ${repoId}
+    GROUP BY target_path
+  `;
+  for await (const row of cursor) {
+    result.set(row.target_path, row.indegree);
+  }
+  return result;
+}
+
+/** Top co-change partners for given paths, filtered by min count */
+export async function getCochangePartners(
+  repoId: string,
+  paths: string[],
+  minCount = 5,
+  limit = 10,
+): Promise<Array<{ path: string; partner: string; count: number }>> {
+  if (paths.length === 0) return [];
+  const rows: Array<{ path: string; partner: string; count: number }> = [];
+  const cursor = db.query<{ path_a: string; path_b: string; cochange_count: number }>`
+    SELECT path_a, path_b, cochange_count FROM file_cochanges
+    WHERE repo_id = ${repoId}
+      AND (path_a = ANY(${paths}) OR path_b = ANY(${paths}))
+      AND cochange_count >= ${minCount}
+    ORDER BY cochange_count DESC
+    LIMIT ${limit}
+  `;
+  const pathSet = new Set(paths);
+  for await (const row of cursor) {
+    const isA = pathSet.has(row.path_a);
+    rows.push({
+      path: isA ? row.path_a : row.path_b,
+      partner: isA ? row.path_b : row.path_a,
+      count: row.cochange_count,
+    });
+  }
+  return rows;
+}
+
 export interface VocabCluster {
   terms: string[];
   files: string[];

@@ -116,6 +116,24 @@ file.ts: N commits, M/90d, last: Xd ago
 
 ~150ms cold, ~10ms cached. Zero LLM calls.
 
+### Scoring Formula
+
+Per-file score (applied to files matching at least one query term):
+
+| Factor | Weight | Description |
+|--------|--------|-------------|
+| Filename token | 4x * IDF | camelCase/snake_case split |
+| Directory token | 2x * IDF | Last 3 path segments |
+| Export match | 2x * IDF | Exported symbols |
+| Docstring/purpose | 1x * IDF | OR logic, no double-count |
+| Coverage boost | *(1 + (matched/total)²) | Multi-term matches favored |
+| Noise penalty | *0.3 | vendor/, .min.js, etc. |
+| Activity boost | +min(recent, 5) * 0.5 | Recent commits (90d) |
+| Cluster boost | *1.3 | Vocab cluster match |
+| Indegree boost | *(1 + log2(deg) * 0.1) | Files imported by 3+ others |
+
+Post-scoring: sibling dedup (max 2/group) → cap (import-depth-based, 8-15) → co-change promotion (up to 3) → semantic merge (up to 5 replacements)
+
 ### Indexing Pipeline
 
 ```

@@ -5,8 +5,9 @@ import { ensureIndexed } from "../index/lib/ensure";
 import {
   loadFileMetadata, getAllFileStats, loadVocabClusters,
   getReverseImports, getForwardImports, get2HopReverseDeps, getCochanges,
+  getIndegrees, getCochangePartners,
 } from "./lib/structural";
-import { interpretQuery } from "./lib/query-interpreter";
+import { interpretQuery, isNoisePath } from "./lib/query-interpreter";
 import { vectorSearch, hasEmbeddings } from "./lib/vector";
 import { formatContextPack, type ContextData } from "./lib/formatter";
 import { db } from "../repo/db";
@@ -81,15 +82,17 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
       return { ...cached, stats: { ...cached.stats, cached: true, duration_ms: Date.now() - start } };
     }
 
-    // 3. Parallel load: metadata + stats + semantic + clusters (all at once)
+    // 3. Parallel load: metadata + stats + semantic + clusters + indegrees + repo info
     const embAvailable = await hasEmbeddings(params.repo_id);
-    const [metadata, allStats, vecResults, vocabClusters] = await Promise.all([
+    const [metadata, allStats, vecResults, vocabClusters, indegreeMap, repoInfo] = await Promise.all([
       loadFileMetadata(params.repo_id),
       getAllFileStats(params.repo_id),
       embAvailable
         ? vectorSearch(params.repo_id, params.goal, 10, true).catch(() => [])
         : Promise.resolve([]),
       loadVocabClusters(params.repo_id),
+      getIndegrees(params.repo_id),
+      db.queryRow<{ max_import_depth: number }>`SELECT max_import_depth FROM repos WHERE id = ${params.repo_id}`,
     ]);
 
     // 4. Keyword-scored file selection with TF-IDF
@@ -97,9 +100,26 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
     for (const [path, stat] of allStats) {
       statsForInterpreter.set(path, { commit_count: stat.commit_count, recent_count: stat.recent_count });
     }
-    const interpreted = interpretQuery(params.goal, metadata, statsForInterpreter, vocabClusters);
+    const maxImportDepth = repoInfo?.max_import_depth ?? 0;
+    const interpreted = interpretQuery(params.goal, metadata, statsForInterpreter, vocabClusters, indegreeMap, maxImportDepth);
 
-    // 5. Semantic merge — always runs, can replace weak keyword tail
+    // 5. Co-change promotion — direct partners of top-5 keyword files
+    const topForCochange = interpreted.files.slice(0, 5).map((f) => f.path);
+    const cochangePartners = await getCochangePartners(params.repo_id, topForCochange, 3, 20);
+    const existingPathSet = new Set(interpreted.files.map((f) => f.path));
+    let promoted = 0;
+    for (const cp of cochangePartners) {
+      if (promoted >= 3) break;
+      if (existingPathSet.has(cp.partner) || isNoisePath(cp.partner)) continue;
+      interpreted.files.push({
+        path: cp.partner,
+        reason: `co-changes with ${cp.path.split("/").pop()} (${cp.count}x)`,
+      });
+      existingPathSet.add(cp.partner);
+      promoted++;
+    }
+
+    // 6. Semantic merge — always runs, can replace weak keyword tail
     if (vecResults.length > 0) {
       const vecByFile = new Map<string, { score: number; content: string }>();
       for (const r of vecResults) {
@@ -109,11 +129,12 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
         }
       }
 
-      const existingPaths = new Set(interpreted.files.map((f) => f.path));
+      const existingPathsSemantic = new Set(interpreted.files.map((f) => f.path));
       const candidates = [...vecByFile.entries()]
-        .filter(([path]) => !existingPaths.has(path))
+        .filter(([path]) => !existingPathsSemantic.has(path) && !isNoisePath(path))
         .sort((a, b) => b[1].score - a[1].score)
         .slice(0, 5);
+      const cap = interpreted.fileCap;
 
       const extractReason = (content: string): string => {
         const sigLine = content.split("\n").find((l) => {
@@ -124,7 +145,7 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
       };
 
       for (const [path, data] of candidates) {
-        if (interpreted.files.length < 8) {
+        if (interpreted.files.length < cap) {
           interpreted.files.push({ path, reason: extractReason(data.content) });
         } else {
           // Pop weakest keyword result, push semantic result
@@ -137,7 +158,7 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
     const hitPaths = interpreted.files.map((f) => f.path);
     const topPaths = hitPaths.slice(0, 3);
 
-    // 6. Structural enrichment — all in parallel
+    // 7. Structural enrichment — all in parallel
     const [reverseImports, forwardImports, hop2Deps, cochanges] = await Promise.all([
       getReverseImports(params.repo_id, hitPaths),
       getForwardImports(params.repo_id, hitPaths),
@@ -145,7 +166,43 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
       getCochanges(params.repo_id, hitPaths),
     ]);
 
-    // 7. Format — reuse allStats (no second query)
+    // 7b. Cluster-based co-change promotion — promote high-count cluster members
+    //     not already selected (uses cochanges data we just loaded, zero extra queries)
+    if (cochanges.length > 0) {
+      const selectedSet = new Set(interpreted.files.map((f) => f.path));
+      const cap = interpreted.fileCap;
+      // Build clusters same as formatter does
+      const clusters: Array<{ members: string[]; count: number }> = [];
+      for (const cc of cochanges) {
+        const isA = selectedSet.has(cc.path);
+        const src = isA ? cc.path : cc.partner;
+        const tgt = isA ? cc.partner : cc.path;
+        let merged = false;
+        for (const c of clusters) {
+          if (c.members.includes(src) || c.members.includes(tgt)) {
+            if (!c.members.includes(src)) c.members.push(src);
+            if (!c.members.includes(tgt)) c.members.push(tgt);
+            c.count = Math.max(c.count, cc.count);
+            merged = true;
+            break;
+          }
+        }
+        if (!merged) clusters.push({ members: [src, tgt], count: cc.count });
+      }
+      // Promote unselected members from high-count clusters (>= 5 co-commits)
+      for (const c of clusters.sort((a, b) => b.count - a.count)) {
+        if (c.count < 5) break;
+        if (interpreted.files.length >= cap) break;
+        for (const m of c.members) {
+          if (interpreted.files.length >= cap) break;
+          if (selectedSet.has(m) || isNoisePath(m)) continue;
+          interpreted.files.push({ path: m, reason: `co-change cluster (${c.count}x)` });
+          selectedSet.add(m);
+        }
+      }
+    }
+
+    // 8. Format — reuse allStats (no second query)
     const data: ContextData = {
       goal: params.goal,
       files: interpreted.files,
@@ -168,7 +225,7 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
       },
     };
 
-    // 8. Cache
+    // 9. Cache
     cacheSet(key, response);
     return response;
   } catch (err) {

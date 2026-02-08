@@ -26,7 +26,7 @@ function daysAgo(d: Date | null): string {
 
 export function formatContextPack(data: ContextData): string {
   const L: string[] = [];
-  const files = data.files.slice(0, 8);
+  const files = data.files.slice(0, 15);
 
   // Build exports lookup from metadata
   const exportsMap = new Map<string, string[]>();

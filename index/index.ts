@@ -116,6 +116,81 @@ export const unwatchRepo = api(
   },
 );
 
+// --- POST /index/recompute-depth ---
+
+export const recomputeDepth = api(
+  { expose: true, method: "POST", path: "/index/recompute-depth" },
+  async ({ repo_id }: { repo_id: string }): Promise<{ max_import_depth: number }> => {
+    const depth = await computeImportDepthBFS(repo_id);
+    await db.exec`UPDATE repos SET max_import_depth = ${depth} WHERE id = ${repo_id}`;
+    return { max_import_depth: depth };
+  },
+);
+
+/** BFS from leaves (imported but never import) upward. Tracks visited to handle cycles. */
+async function computeImportDepthBFS(repoId: string): Promise<number> {
+  // Load full graph into memory
+  const fwd = new Map<string, string[]>(); // source → targets
+  const allSources = new Set<string>();
+  const allTargets = new Set<string>();
+
+  const rows = db.query<{ source_path: string; target_path: string }>`
+    SELECT source_path, target_path FROM file_imports WHERE repo_id = ${repoId}
+  `;
+  for await (const r of rows) {
+    allSources.add(r.source_path);
+    allTargets.add(r.target_path);
+    const list = fwd.get(r.source_path) ?? [];
+    list.push(r.target_path);
+    fwd.set(r.source_path, list);
+  }
+
+  if (allSources.size === 0) return 0;
+
+  // Build reverse graph: target → sources (who imports it)
+  const rev = new Map<string, string[]>();
+  for (const [src, targets] of fwd) {
+    for (const t of targets) {
+      const list = rev.get(t) ?? [];
+      list.push(src);
+      rev.set(t, list);
+    }
+  }
+
+  // Leaves: files that are imported but don't import anything
+  const leaves: string[] = [];
+  for (const t of allTargets) {
+    if (!allSources.has(t)) leaves.push(t);
+  }
+  if (leaves.length === 0) return 1; // all files in cycles
+
+  // BFS upward from leaves
+  let maxDepth = 0;
+  const visited = new Set<string>();
+  let frontier = leaves;
+  let depth = 0;
+  for (const l of leaves) visited.add(l);
+
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const node of frontier) {
+      const importers = rev.get(node) ?? [];
+      for (const imp of importers) {
+        if (!visited.has(imp)) {
+          visited.add(imp);
+          next.push(imp);
+        }
+      }
+    }
+    if (next.length > 0) {
+      depth++;
+      maxDepth = depth;
+    }
+    frontier = next;
+  }
+  return maxDepth;
+}
+
 // --- GET /index/watch-status/:repo_id ---
 
 interface WatchStatusResponse {

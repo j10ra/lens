@@ -2,6 +2,7 @@ import type { FileMetadataRow, VocabCluster } from "./structural";
 
 export interface InterpretedQuery {
   files: Array<{ path: string; reason: string }>;
+  fileCap: number;
 }
 
 const STOPWORDS = new Set([
@@ -106,7 +107,7 @@ function expandKeywords(
   return { exact: [...exact], stemmed: [...stemmed], clusterFiles };
 }
 
-function isNoisePath(path: string): boolean {
+export function isNoisePath(path: string): boolean {
   const lower = path.toLowerCase();
   if (NOISE_PATHS.some((p) => lower.includes(p))) return true;
   const lastDot = lower.lastIndexOf(".");
@@ -142,6 +143,8 @@ export function interpretQuery(
   metadata: FileMetadataRow[],
   fileStats?: Map<string, { commit_count: number; recent_count: number }>,
   vocabClusters?: VocabCluster[] | null,
+  indegrees?: Map<string, number>,
+  maxImportDepth?: number,
 ): InterpretedQuery {
   const rawWords = query.toLowerCase()
     .replace(/[^a-z0-9\s_-]/g, " ")
@@ -222,18 +225,52 @@ export function interpretQuery(
       score *= 1.3;
     }
 
+    // Indegree boost: hub files imported by 3+ others get log-scaled bonus
+    if (score > 0 && indegrees) {
+      const deg = indegrees.get(f.path) ?? 0;
+      if (deg >= 3) {
+        score *= 1 + Math.log2(deg) * 0.1;
+      }
+    }
+
     return { path: f.path, score, docstring: f.docstring, exports: f.exports };
   });
 
-  const top = scored.filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+  // Dynamic cap based on import depth
+  const depth = maxImportDepth ?? 0;
+  const fileCap = Math.min(Math.max(8, depth * 2 + 4), 15);
+
+  const sorted = scored.filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  // Sibling dedup: max 2 files per sibling group
+  const siblingCounts = new Map<string, number>();
+  const deduped: typeof sorted = [];
+  for (const f of sorted) {
+    const key = siblingKey(f.path);
+    const count = siblingCounts.get(key) ?? 0;
+    if (count >= 2) continue;
+    siblingCounts.set(key, count + 1);
+    deduped.push(f);
+    if (deduped.length >= fileCap) break;
+  }
 
   return {
-    files: top.map((f) => {
+    fileCap,
+    files: deduped.map((f) => {
       const reason = f.docstring?.slice(0, 80)
         || (f.exports?.length ? `exports: ${f.exports.slice(0, 4).join(", ")}` : "path match");
       return { path: f.path, reason };
     }),
   };
+}
+
+/** Sibling key: directory + first 3 hyphen/dot tokens of filename */
+function siblingKey(path: string): string {
+  const lastSlash = path.lastIndexOf("/");
+  const dir = lastSlash >= 0 ? path.substring(0, lastSlash) : "";
+  const file = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+  const stem = file.replace(/\.[^.]+$/, "");
+  const tokens = stem.split(/[-.]/).slice(0, 3).join("-");
+  return `${dir}/${tokens}`;
 }
