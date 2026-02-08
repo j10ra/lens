@@ -19,9 +19,6 @@ Encore.ts Daemon (127.0.0.1:4000)
   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
   │  health   │  │   repo   │  │  index   │  │ context  │
   └──────────┘  └──────────┘  └──────────┘  └──────────┘
-  ┌──────────┐
-  │  patch   │
-  └──────────┘
 
   Postgres + pgvector
   ┌───────┐ ┌───────┐ ┌──────────────┐ ┌──────────────┐
@@ -44,7 +41,6 @@ Encore.ts Daemon (127.0.0.1:4000)
 | repo | `/repo/*` | Register, list, remove, status |
 | index | `/index/*` | Chunk indexing, file watcher, embed worker |
 | context | `POST /context` | Structural context packs (main endpoint) |
-| patch | `/patch/*` | Code patch operations |
 
 ## Data Flow
 

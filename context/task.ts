@@ -97,7 +97,7 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
     for (const [path, stat] of allStats) {
       statsForInterpreter.set(path, { commit_count: stat.commit_count, recent_count: stat.recent_count });
     }
-    const interpreted = interpretQuery(params.repo_id, params.goal, metadata, statsForInterpreter, vocabClusters);
+    const interpreted = interpretQuery(params.goal, metadata, statsForInterpreter, vocabClusters);
 
     // 5. Semantic merge — always runs, can replace weak keyword tail
     if (vecResults.length > 0) {

@@ -8,7 +8,7 @@ Local daemon that indexes codebases and serves context packs to Claude Code. Zer
 
 ### Architecture
 
-- **Services**: `health/`, `repo/`, `index/`, `context/`, `patch/` (Encore.ts, flat structure at repo root)
+- **Services**: `repo/`, `index/`, `context/` (Encore.ts, flat structure at repo root)
 - **CLI**: `packages/rlm-cli/` (TypeScript, compiled to `dist/`)
 - **Database**: Postgres via Encore (Docker), single `rlm` database
 - **Only endpoint**: `POST /context` — everything else is internal

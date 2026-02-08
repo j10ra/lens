@@ -2,7 +2,6 @@ import type { FileMetadataRow, VocabCluster } from "./structural";
 
 export interface InterpretedQuery {
   files: Array<{ path: string; reason: string }>;
-  refined_keywords: string[];
 }
 
 const STOPWORDS = new Set([
@@ -139,7 +138,6 @@ function buildTermWeights(
 /** Keyword-scored file selection with TF-IDF weighting and quadratic coverage boost.
  *  Exact terms match path+exports+docstring. Stems only match exports+docstring (not paths). */
 export function interpretQuery(
-  _repoId: string,
   query: string,
   metadata: FileMetadataRow[],
   fileStats?: Map<string, { commit_count: number; recent_count: number }>,
@@ -237,6 +235,5 @@ export function interpretQuery(
         || (f.exports?.length ? `exports: ${f.exports.slice(0, 4).join(", ")}` : "path match");
       return { path: f.path, reason };
     }),
-    refined_keywords: rawWords,
   };
 }

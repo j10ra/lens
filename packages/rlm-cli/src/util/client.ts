@@ -5,7 +5,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export class DaemonError extends Error {
+class DaemonError extends Error {
   constructor(
     public status: number,
     public body: unknown,

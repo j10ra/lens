@@ -7,7 +7,7 @@ const execFileAsync = promisify(execFile);
 
 export const MAX_FILE_SIZE = 500 * 1024; // 500KB
 
-export const BINARY_EXTENSIONS = new Set([
+const BINARY_EXTENSIONS = new Set([
   ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg", ".webp",
   ".mp3", ".mp4", ".wav", ".avi", ".mov", ".mkv",
   ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
@@ -18,7 +18,7 @@ export const BINARY_EXTENSIONS = new Set([
 ]);
 
 /** Extensions treated as docs/config — excluded from code search by default */
-export const DOCS_EXTENSIONS = new Set([
+const DOCS_EXTENSIONS = new Set([
   ".md", ".json", ".yaml", ".yml", ".toml", ".txt", ".rst", ".adoc", ".sql",
 ]);
 
