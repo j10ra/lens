@@ -15,12 +15,9 @@ const STOPWORDS = new Set([
   "what", "which", "who", "when", "where", "why",
 ]);
 
-// Files that match keywords but add no value for code navigation
 const NOISE_EXTENSIONS = new Set([".md", ".json", ".yaml", ".yml", ".toml", ".lock", ".sql", ".txt", ".csv"]);
 const NOISE_PATHS = [".gitignore", ".github/", ".vscode/", ".idea/", "node_modules/", "dist/", "build/"];
 
-/** Naive suffix stemmer — strips common English suffixes for fuzzy matching.
- *  "embedding" → "embed", "watcher" → "watch", "indexing" → "index" */
 function stem(word: string): string {
   if (word.length <= 4) return word;
   return word
@@ -29,7 +26,6 @@ function stem(word: string): string {
     .replace(/(tion|ment|ness|able|ible|ous|ive|ful|less|ing|er|ed|es|ly|al|ity)$/, "");
 }
 
-/** Expand keywords: original + stem + hyphen-split parts */
 function expandKeywords(words: string[]): string[] {
   const expanded = new Set<string>();
   for (const w of words) {
@@ -49,7 +45,6 @@ function expandKeywords(words: string[]): string[] {
   return [...expanded];
 }
 
-/** Check if path is a noise file (config, migration, dotfile) */
 function isNoisePath(path: string): boolean {
   const lower = path.toLowerCase();
   if (NOISE_PATHS.some((p) => lower.includes(p))) return true;
@@ -58,9 +53,31 @@ function isNoisePath(path: string): boolean {
   return false;
 }
 
-/** Keyword-scored file selection from metadata index.
- *  Scores: path match (3), export match (2), docstring match (1).
- *  Penalizes non-code files. Boosts recently active files. */
+/** Build TF-IDF weights: rare terms get higher weight than common ones.
+ *  IDF = log(N / df) where df = number of files containing the term. */
+function buildTermWeights(
+  words: string[],
+  metadata: FileMetadataRow[],
+): Map<string, number> {
+  const N = metadata.length;
+  const weights = new Map<string, number>();
+  if (N === 0) return weights;
+
+  for (const w of words) {
+    let df = 0;
+    for (const f of metadata) {
+      const haystack = `${f.path} ${(f.exports ?? []).join(" ")} ${f.docstring ?? ""}`.toLowerCase();
+      if (haystack.includes(w)) df++;
+    }
+    // IDF: log(N/df), clamped to [1, 10]. df=0 → max weight
+    const idf = df > 0 ? Math.min(10, Math.max(1, Math.log(N / df))) : 10;
+    weights.set(w, idf);
+  }
+  return weights;
+}
+
+/** Keyword-scored file selection with TF-IDF weighting and quadratic coverage boost.
+ *  Rare terms score higher. Files matching many query terms get exponential boost. */
 export function interpretQuery(
   _repoId: string,
   query: string,
@@ -73,20 +90,33 @@ export function interpretQuery(
     .filter((w) => w.length > 2 && !STOPWORDS.has(w));
 
   const words = expandKeywords(rawWords);
+  const termWeights = buildTermWeights(words, metadata);
 
   const scored = metadata.map((f) => {
     let score = 0;
+    let matchedTerms = 0;
     const pathLower = f.path.toLowerCase();
     const exportsLower = (f.exports ?? []).join(" ").toLowerCase();
     const docLower = (f.docstring ?? "").toLowerCase();
 
     for (const w of words) {
-      if (pathLower.includes(w)) score += 3;
-      if (exportsLower.includes(w)) score += 2;
-      if (docLower.includes(w)) score += 1;
+      const weight = termWeights.get(w) ?? 1;
+      let termScore = 0;
+      if (pathLower.includes(w)) termScore += 3 * weight;
+      if (exportsLower.includes(w)) termScore += 2 * weight;
+      if (docLower.includes(w)) termScore += 1 * weight;
+      if (termScore > 0) matchedTerms++;
+      score += termScore;
     }
 
-    // Penalize noise files — still show them but rank below code
+    // Quadratic coverage boost: files matching more query terms
+    // score exponentially higher (4/5 terms >> 1/5 terms)
+    if (matchedTerms > 1) {
+      const coverage = matchedTerms / words.length;
+      score *= 1 + coverage * coverage;
+    }
+
+    // Penalize noise files
     if (score > 0 && isNoisePath(f.path)) {
       score *= 0.3;
     }

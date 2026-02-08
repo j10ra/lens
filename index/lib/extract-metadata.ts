@@ -1,5 +1,5 @@
 import { db } from "../../repo/db";
-import { extractImportSpecifiers } from "../../context/lib/imports";
+import { extractImportSpecifiers } from "./imports";
 import { detectLanguage } from "./discovery";
 
 // --- Export extraction regexes ---

@@ -4,12 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## RLM — Repo Context Daemon
 
-Available when native search returns too many results or for orientation in unfamiliar repos.
-
-- `rlm context "<goal>"` — structural context pack (relevant files + impact + git history)
-- `rlm search "<query>"` — hybrid grep+semantic code search
-- `rlm read <path>` — read full file via daemon
-- `rlm run "<cmd>"` — sandboxed test/build (npm, cargo, python, git)
+`rlm context "<goal>"` — dependency graph, co-changes, file activity, cross-layer file discovery
 
 ### Development Commands
 
@@ -39,4 +34,4 @@ Available when native search returns too many results or for orientation in unfa
 
 **Advisory locks**: `repo/lib/identity.ts` hashes UUID to 32-bit int for `pg_advisory_lock`
 
-**Context pack**: Zero LLM calls — keyword matching against regex-extracted metadata + structural enrichment (reverse imports, co-changes, git stats). ~240ms.
+**Context pack**: Zero LLM calls — TF-IDF keyword matching + Voyage semantic boost + structural enrichment (forward/reverse imports, 2-hop deps, co-changes, git stats). Cached 120s.

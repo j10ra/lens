@@ -281,13 +281,7 @@ export const template = api(
   async (): Promise<TemplateResponse> => {
     return {
       content: `## RLM — Repo Context Daemon
-
-Available when native search returns too many results or for orientation in unfamiliar repos.
-
-- \`rlm search "<query>"\` — hybrid grep+semantic code search
-- \`rlm read <path>\` — read full file via daemon
-- \`rlm context "<goal>"\` — intelligent context pack (impact analysis + history)
-- \`rlm run "<cmd>"\` — sandboxed test/build (npm, cargo, python, git)
+\`rlm context "<goal>"\` — dependency graph, co-changes, file activity, cross-layer file discovery
 `
     };
   },

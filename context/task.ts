@@ -1,13 +1,14 @@
-// POST /context — LLM-routed context pack with impact analysis + history
-// POST /task — alias kept for backward compat
+// POST /context — context pack with dependency graph, co-changes, activity
 
 import { api } from "encore.dev/api";
 import { ensureIndexed } from "../index/lib/ensure";
-import { loadFileMetadata, getReverseImports, getCochanges, getFileStats } from "./lib/structural";
+import {
+  loadFileMetadata, getAllFileStats,
+  getReverseImports, getForwardImports, get2HopReverseDeps, getCochanges,
+} from "./lib/structural";
 import { interpretQuery } from "./lib/query-interpreter";
 import { vectorSearch, hasEmbeddings } from "./lib/vector";
 import { formatContextPack, type ContextData } from "./lib/formatter";
-import { detectScripts } from "../repo/lib/scripts";
 import { db } from "../repo/db";
 
 interface ContextParams {
@@ -21,8 +22,44 @@ interface ContextResponse {
     files_in_context: number;
     index_fresh: boolean;
     duration_ms: number;
+    cached: boolean;
   };
 }
+
+// --- In-memory cache ---
+interface CacheEntry {
+  response: ContextResponse;
+  expires: number;
+}
+
+const CACHE_TTL = 120_000; // 120s
+const CACHE_MAX = 20;
+const cache = new Map<string, CacheEntry>();
+
+function cacheKey(repoId: string, goal: string, commit: string | null): string {
+  return `${repoId}:${commit ?? ""}:${goal}`;
+}
+
+function cacheGet(key: string): ContextResponse | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.response;
+}
+
+function cacheSet(key: string, response: ContextResponse): void {
+  // Evict oldest if at capacity
+  if (cache.size >= CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+  }
+  cache.set(key, { response, expires: Date.now() + CACHE_TTL });
+}
+
+// --- Build ---
 
 async function buildContext(params: ContextParams): Promise<ContextResponse> {
   const start = Date.now();
@@ -31,20 +68,30 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
     // 1. Ensure index is fresh
     const indexResult = await ensureIndexed(params.repo_id);
 
-    // 2. Load file metadata index
-    const metadata = await loadFileMetadata(params.repo_id);
+    // Get current commit for cache key
+    const repo = await db.queryRow<{ last_indexed_commit: string | null; root_path: string }>`
+      SELECT last_indexed_commit, root_path FROM repos WHERE id = ${params.repo_id}
+    `;
+    const commit = repo?.last_indexed_commit ?? null;
 
-    // 3. Load file stats for activity context
-    const allPaths = metadata.map((m) => m.path);
-    const allStats = await getFileStats(params.repo_id, allPaths);
+    // 2. Check cache
+    const key = cacheKey(params.repo_id, params.goal, commit);
+    const cached = cacheGet(key);
+    if (cached) {
+      return { ...cached, stats: { ...cached.stats, cached: true, duration_ms: Date.now() - start } };
+    }
 
-    // Build stats map for query interpreter
+    // 3. Parallel load: metadata + all file stats (single query each)
+    const [metadata, allStats] = await Promise.all([
+      loadFileMetadata(params.repo_id),
+      getAllFileStats(params.repo_id),
+    ]);
+
+    // 4. Keyword-scored file selection with TF-IDF
     const statsForInterpreter = new Map<string, { commit_count: number; recent_count: number }>();
     for (const [path, stat] of allStats) {
       statsForInterpreter.set(path, { commit_count: stat.commit_count, recent_count: stat.recent_count });
     }
-
-    // 4. Keyword-scored file selection from metadata index
     const interpreted = interpretQuery(params.repo_id, params.goal, metadata, statsForInterpreter);
 
     // 5. Semantic boost — only when keyword results are sparse
@@ -54,7 +101,6 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
       if (embAvailable && interpreted.files.length < 8) {
         const vecResults = await vectorSearch(params.repo_id, params.goal, 10, true);
 
-        // Best score per file
         const vecByFile = new Map<string, { score: number; content: string }>();
         for (const r of vecResults) {
           const existing = vecByFile.get(r.path);
@@ -63,7 +109,6 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
           }
         }
 
-        // Add vector-found files not already in keyword results
         const existingPaths = new Set(interpreted.files.map((f) => f.path));
         const candidates = [...vecByFile.entries()]
           .filter(([path]) => !existingPaths.has(path))
@@ -76,8 +121,7 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
             const t = l.trimStart();
             return /^(export|public|private|protected|def |fn |func |class |interface |struct |enum )/.test(t);
           });
-          const reason = sigLine?.trim().slice(0, 80) || "semantic match";
-          interpreted.files.push({ path, reason });
+          interpreted.files.push({ path, reason: sigLine?.trim().slice(0, 80) || "semantic match" });
         }
       }
     } catch {
@@ -85,59 +129,56 @@ async function buildContext(params: ContextParams): Promise<ContextResponse> {
     }
 
     const hitPaths = interpreted.files.map((f) => f.path);
+    const topPaths = hitPaths.slice(0, 3);
 
-    // 6. Structural enrichment — run in parallel
-    const [reverseImports, cochanges, fileStats] = await Promise.all([
+    // 6. Structural enrichment — all in parallel
+    const [reverseImports, forwardImports, hop2Deps, cochanges] = await Promise.all([
       getReverseImports(params.repo_id, hitPaths),
+      getForwardImports(params.repo_id, hitPaths),
+      get2HopReverseDeps(params.repo_id, topPaths),
       getCochanges(params.repo_id, hitPaths),
-      getFileStats(params.repo_id, hitPaths),
     ]);
 
-    // 7. Get repo root for script detection
-    const repo = await db.queryRow<{ root_path: string }>`
-      SELECT root_path FROM repos WHERE id = ${params.repo_id}
-    `;
-    const scripts = repo ? await detectScripts(repo.root_path).catch(() => undefined) : undefined;
-
-    // 8. Format
+    // 7. Format — reuse allStats (no second query)
     const data: ContextData = {
       goal: params.goal,
       files: interpreted.files,
+      metadata,
       reverseImports,
+      forwardImports,
+      hop2Deps,
       cochanges,
-      fileStats,
-      scripts,
+      fileStats: allStats,
     };
     const contextPack = formatContextPack(data);
 
-    return {
+    const response: ContextResponse = {
       context_pack: contextPack,
       stats: {
         files_in_context: interpreted.files.length,
         index_fresh: indexResult === null,
         duration_ms: Date.now() - start,
+        cached: false,
       },
     };
+
+    // 8. Cache
+    cacheSet(key, response);
+    return response;
   } catch (err) {
     return {
-      context_pack: `# ${params.goal}\n\nContext generation failed. Use \`rlm search "<query>"\` and \`rlm read <path>\` to explore manually.`,
+      context_pack: `# ${params.goal}\n\nContext generation failed. Try re-indexing with \`rlm index --force\`.`,
       stats: {
         files_in_context: 0,
         index_fresh: false,
         duration_ms: Date.now() - start,
+        cached: false,
       },
     };
   }
 }
 
-// New endpoint
 export const context = api(
   { expose: true, method: "POST", path: "/context" },
-  async (params: ContextParams): Promise<ContextResponse> => buildContext(params),
-);
-
-// Keep /task for backward compat
-export const run = api(
-  { expose: true, method: "POST", path: "/task" },
   async (params: ContextParams): Promise<ContextResponse> => buildContext(params),
 );

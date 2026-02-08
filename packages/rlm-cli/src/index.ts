@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { registerCommand } from "./commands/register.js";
-import { taskCommand } from "./commands/task.js";
 import { contextCommand } from "./commands/context.js";
-import { searchCommand } from "./commands/search.js";
-import { readCommand } from "./commands/read.js";
 import { indexCommand } from "./commands/index.js";
-import { runCommand } from "./commands/run.js";
 import { statusCommand } from "./commands/status.js";
 import { listCommand } from "./commands/list.js";
 import { removeCommand } from "./commands/remove.js";
@@ -67,22 +63,6 @@ program
   .option("--json", "Output as JSON", false)
   .action((goal, opts) => run(() => contextCommand(goal, opts)));
 
-// rlm task "<goal>" — kept for backward compat
-program
-  .command("task <goal>")
-  .description("Build a context pack (alias for context)")
-  .option("--json", "Output as JSON", false)
-  .action((goal, opts) => run(() => contextCommand(goal, opts)));
-
-// rlm search "<query>"
-program
-  .command("search <query>")
-  .description("Search the repo")
-  .option("--json", "Output as JSON", false)
-  .option("--mode <mode>", "Search mode: grep|semantic|hybrid")
-  .option("--limit <n>", "Max results")
-  .action((query, opts) => run(() => searchCommand(query, opts)));
-
 // rlm index
 program
   .command("index")
@@ -91,23 +71,6 @@ program
   .option("--force", "Force full re-index", false)
   .option("--status", "Show index status", false)
   .action((opts) => run(() => indexCommand(opts)));
-
-// rlm read <path>
-program
-  .command("read <path>")
-  .description("Read a file from the repo")
-  .option("--json", "Output as JSON", false)
-  .option("--start <line>", "Start line")
-  .option("--end <line>", "End line")
-  .action((path, opts) => run(() => readCommand(path, opts)));
-
-// rlm run "<command>"
-program
-  .command("run <command>")
-  .description("Run a command in the repo (sandboxed)")
-  .option("--json", "Output as JSON", false)
-  .option("--timeout <ms>", "Timeout in ms")
-  .action((command, opts) => run(() => runCommand(command, opts)));
 
 // rlm status
 program

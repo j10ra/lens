@@ -1,5 +1,5 @@
 import { db } from "../../repo/db";
-import { extractImportSpecifiers, resolveImport } from "../../context/lib/imports";
+import { extractImportSpecifiers, resolveImport } from "./imports";
 import { detectLanguage } from "./discovery";
 
 /** Build repo-wide import graph from chunks, persist directed edges to file_imports */
