@@ -9,6 +9,8 @@ import { EMBEDDING_MODEL, EMBEDDING_DIM } from "../index/lib/search-config";
 import { runIndex } from "../index/lib/engine";
 import { ensureEmbedded } from "../index/lib/embed";
 import { startWatcher, stopWatcher } from "../index/lib/watcher";
+import { purposeModelState, enrichPurpose } from "../index/lib/enrich-purpose";
+import { maintenanceState } from "../index/worker";
 
 // --- Types ---
 
@@ -49,9 +51,9 @@ async function indexAndEmbed(repoId: string, name: string, rootPath: string) {
   try {
     console.log(`[RLM] Starting indexing for ${name}...`);
     await runIndex(repoId);
-    console.log(`[RLM] Index complete, starting embeddings...`);
-    await ensureEmbedded(repoId);
-    console.log(`[RLM] Embeddings complete for ${name}`);
+    console.log(`[RLM] Index complete, starting embeddings + purpose summaries...`);
+    await Promise.all([ensureEmbedded(repoId), enrichPurpose(repoId)]);
+    console.log(`[RLM] Embeddings + purpose summaries complete for ${name}`);
     startWatcher(repoId, rootPath);
   } catch (err) {
     console.error(`[RLM] Indexing failed for ${name}:`, err);
@@ -170,7 +172,6 @@ interface DeleteParams {
 interface DeleteResponse {
   deleted: boolean;
   chunks_removed: number;
-  traces_removed: number;
 }
 
 export const remove = api(
@@ -182,15 +183,12 @@ export const remove = api(
     // Count before delete
     const counts = await db.queryRow<{
       chunks: number;
-      traces: number;
     }>`
       SELECT
-        (SELECT count(*)::int FROM chunks WHERE repo_id = ${id}) AS chunks,
-        (SELECT count(*)::int FROM traces WHERE repo_id = ${id}) AS traces
+        (SELECT count(*)::int FROM chunks WHERE repo_id = ${id}) AS chunks
     `;
 
     // Delete explicitly to avoid slow CASCADE with pgvector
-    await db.exec`DELETE FROM traces WHERE repo_id = ${id}`;
     await db.exec`DELETE FROM file_cochanges WHERE repo_id = ${id}`;
     await db.exec`DELETE FROM file_stats WHERE repo_id = ${id}`;
     await db.exec`DELETE FROM file_imports WHERE repo_id = ${id}`;
@@ -223,7 +221,6 @@ export const remove = api(
     return {
       deleted: true,
       chunks_removed: counts?.chunks ?? 0,
-      traces_removed: counts?.traces ?? 0,
     };
   },
 );
@@ -235,8 +232,10 @@ interface DaemonStats {
   total_chunks: number;
   total_embeddings: number;
   total_summaries: number;
-  total_traces: number;
   db_size_mb: number;
+  last_maintenance_at: string | null;
+  next_maintenance_at: string | null;
+  last_maintenance_result: { processed: number; errors: number } | null;
 }
 
 export const daemonStats = api(
@@ -247,7 +246,6 @@ export const daemonStats = api(
       total_chunks: number;
       total_embeddings: number;
       total_summaries: number;
-      total_traces: number;
       db_size_mb: number;
     }>`
       SELECT
@@ -255,17 +253,21 @@ export const daemonStats = api(
         (SELECT count(*)::int FROM chunks) AS total_chunks,
         (SELECT count(*) FILTER (WHERE embedding IS NOT NULL)::int FROM chunks) AS total_embeddings,
         (SELECT count(*)::int FROM summaries) AS total_summaries,
-        (SELECT count(*)::int FROM traces) AS total_traces,
         (SELECT pg_database_size(current_database()) / 1048576)::int AS db_size_mb
     `;
+
+    const lastRun = maintenanceState.last_run_at;
+    const nextRun = lastRun ? new Date(lastRun.getTime() + 5 * 60_000) : null;
 
     return {
       repos_count: row?.repos_count ?? 0,
       total_chunks: row?.total_chunks ?? 0,
       total_embeddings: row?.total_embeddings ?? 0,
       total_summaries: row?.total_summaries ?? 0,
-      total_traces: row?.total_traces ?? 0,
       db_size_mb: row?.db_size_mb ?? 0,
+      last_maintenance_at: lastRun?.toISOString() ?? null,
+      next_maintenance_at: nextRun?.toISOString() ?? null,
+      last_maintenance_result: maintenanceState.last_result,
     };
   },
 );
@@ -304,12 +306,14 @@ interface StatusResponse {
   embedded_pct: number;
   embedder: string;
   embedding_dim: number;
-  last_activity: string | null;
-  trace_count: number;
   metadata_count: number;
   import_edge_count: number;
   git_commits_analyzed: number;
   cochange_pairs: number;
+  purpose_count: number;
+  purpose_total: number;
+  purpose_model_status: string;
+  purpose_model_progress: number;
 }
 
 export const status = api(
@@ -328,7 +332,7 @@ export const status = api(
 
     const isStale = !!(currentHead && repo.last_indexed_commit !== currentHead);
 
-    const [stats, traceStats, structuralStats] = await Promise.all([
+    const [stats, structuralStats] = await Promise.all([
       db.queryRow<{
         chunk_count: number;
         files_indexed: number;
@@ -345,33 +349,26 @@ export const status = api(
         FROM chunks WHERE repo_id = ${id}
       `,
       db.queryRow<{
-        trace_count: number;
-        last_activity: string | null;
-      }>`
-        SELECT
-          count(*)::int AS trace_count,
-          max(to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) AS last_activity
-        FROM traces
-        WHERE repo_id = ${id}
-          AND created_at > now() - interval '30 minutes'
-      `,
-      db.queryRow<{
         metadata_count: number;
         import_edge_count: number;
         git_file_count: number;
         cochange_pairs: number;
+        purpose_count: number;
       }>`
         SELECT
           (SELECT count(*)::int FROM file_metadata WHERE repo_id = ${id}) AS metadata_count,
           (SELECT count(*)::int FROM file_imports WHERE repo_id = ${id}) AS import_edge_count,
           (SELECT count(*)::int FROM file_stats WHERE repo_id = ${id}) AS git_file_count,
-          (SELECT count(*)::int FROM file_cochanges WHERE repo_id = ${id}) AS cochange_pairs
+          (SELECT count(*)::int FROM file_cochanges WHERE repo_id = ${id}) AS cochange_pairs,
+          (SELECT count(*) FILTER (WHERE purpose != '' AND purpose IS NOT NULL)::int FROM file_metadata WHERE repo_id = ${id}) AS purpose_count
       `,
     ]);
 
     const chunkCount = stats?.chunk_count ?? 0;
     const embeddedCount = stats?.embedded_count ?? 0;
     const embeddableCount = stats?.embeddable_count ?? 0;
+
+    const metadataCount = structuralStats?.metadata_count ?? 0;
 
     return {
       indexed_commit: repo.last_indexed_commit,
@@ -384,12 +381,14 @@ export const status = api(
       embedded_pct: embeddableCount > 0 ? Math.round((embeddedCount / embeddableCount) * 100) : 0,
       embedder: EMBEDDING_MODEL,
       embedding_dim: EMBEDDING_DIM,
-      last_activity: traceStats?.last_activity ?? null,
-      trace_count: traceStats?.trace_count ?? 0,
-      metadata_count: structuralStats?.metadata_count ?? 0,
+      metadata_count: metadataCount,
       import_edge_count: structuralStats?.import_edge_count ?? 0,
       git_commits_analyzed: structuralStats?.git_file_count ?? 0,
       cochange_pairs: structuralStats?.cochange_pairs ?? 0,
+      purpose_count: structuralStats?.purpose_count ?? 0,
+      purpose_total: metadataCount,
+      purpose_model_status: purposeModelState.status,
+      purpose_model_progress: purposeModelState.progress,
     };
   },
 );

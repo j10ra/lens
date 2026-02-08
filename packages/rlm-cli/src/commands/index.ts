@@ -22,7 +22,7 @@ interface IndexStatus {
   chunks_with_embeddings: number;
 }
 
-export async function indexCommand(opts: { json: boolean; force: boolean; status: boolean; progress: boolean }): Promise<void> {
+export async function indexCommand(opts: { json: boolean; force: boolean; status: boolean }): Promise<void> {
   const { repo_id, name } = await ensureRepo();
 
   if (opts.status) {
@@ -63,7 +63,7 @@ export async function indexCommand(opts: { json: boolean; force: boolean; status
     );
   }
 
-  if (opts.progress) {
+  if (!opts.json) {
     await showProgress(repo_id, name);
   }
 }

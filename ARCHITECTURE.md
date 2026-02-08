@@ -2,7 +2,7 @@
 
 ## Overview
 
-RLM indexes repos and serves structural context packs to Claude Code. Zero LLM calls on the query path — TF-IDF keyword scoring, Voyage semantic boost, structural enrichment. ~150ms cold, ~10ms cached.
+RLM indexes repos and serves structural context packs to Claude Code. TF-IDF keyword scoring, Voyage semantic boost, local LLM file summaries, structural enrichment. ~150ms cold, ~10ms cached.
 
 ## System Architecture
 
@@ -27,9 +27,9 @@ Encore.ts Daemon (127.0.0.1:4000)
   ┌───────┐ ┌───────┐ ┌──────────────┐ ┌──────────────┐
   │ repos │ │chunks │ │file_metadata │ │file_imports  │
   └───────┘ └───────┘ └──────────────┘ └──────────────┘
-  ┌──────────┐ ┌──────────────┐ ┌────────┐
-  │file_stats│ │file_cochanges│ │ traces │
-  └──────────┘ └──────────────┘ └────────┘
+  ┌──────────┐ ┌──────────────┐
+  │file_stats│ │file_cochanges│
+  └──────────┘ └──────────────┘
 
   External API (optional)
   Voyage AI voyage-code-3 (embeddings + vocab clusters, 1024 dim)
@@ -60,8 +60,11 @@ CLI → POST /repo/register
      d. buildAndPersistImportGraph() — directed import edges
      e. analyzeGitHistory() — file stats + co-change pairs
      f. startWatcher() — chokidar file watcher
-  4. Inject CLAUDE.md into project
-  5. Return repo_id
+  4. Post-index (parallel, fire-and-forget):
+     a. ensureEmbedded() — Voyage API vector embeddings
+     b. enrichPurpose() — local ONNX LLM file summaries
+  5. Inject CLAUDE.md into project
+  6. Return repo_id
 ```
 
 ### Context: `rlm context "goal"`
@@ -80,7 +83,7 @@ CLI → POST /context { repo_id, goal }
      - Filename token match: 4x * IDF weight
      - Directory token match: 2x * IDF weight
      - Export match: 2x * IDF weight
-     - Docstring match: 1x * IDF weight
+     - Docstring/purpose match: 1x * IDF weight (OR logic)
      - Quadratic coverage boost for multi-term matches
      - Noise penalty: vendor/, .min.js, drawable/, etc. → 0.3x
      - Activity boost: recent commits → up to +2.5
@@ -132,6 +135,10 @@ runIndex(repoId) — index/lib/engine.ts
      c. buildAndPersistImportGraph() — directed edges
      d. analyzeGitHistory() — git log → stats + co-changes
   8. Update repos state (last_indexed_commit, index_status)
+
+Post-index (parallel, fire-and-forget from /index/run and register):
+  a. ensureEmbedded() — Voyage API
+  b. enrichPurpose() — local ONNX model
 ```
 
 ### Vocab Clusters
@@ -157,6 +164,19 @@ Per-language regex patterns extract:
 | Docstring | /\*\* ... \*/ | /// summary | \"\"\" ... \"\"\" | // Package | //! or /// |
 | Imports | import from, require() | using, import | import, from import | import | use |
 
+### Purpose Summaries (local LLM)
+
+LLM-generated 1-sentence file descriptions in `index/lib/enrich-purpose.ts`:
+
+1. Model: `onnx-community/Qwen2.5-Coder-0.5B-Instruct` (q4, ~250MB, code-trained)
+2. Input: first chunk (chunk_index=0) per file — covers imports, class signatures, top-level structure
+3. Sequential processing, max 200 files per run
+4. Staleness: `purpose_hash` tracks `chunk_hash` of chunk 0 — purpose regenerates when content changes
+5. Fallback: if model fails to load, files keep `purpose = ''`, retries on next cron tick
+6. Model cached in `~/.cache/huggingface/` after first download
+
+Supplements regex `docstring` (~30-40% coverage) with LLM `purpose` (100% coverage). Scoring uses OR logic: `docstring || purpose` at 1x weight — no double-counting.
+
 ### Import Graph
 
 Directed edges stored in `file_imports`:
@@ -174,11 +194,12 @@ Parses `git log --name-only --format="%H %aI" --no-merges -n 2000`:
 
 ## Background Worker
 
-Every 5 minutes:
-1. Find repos with stale index or NULL embeddings
+Every 5 minutes (`index/worker.ts`):
+1. Find repos with stale index, NULL embeddings, or empty purpose
 2. Advisory lock per repo
 3. Re-index if HEAD changed
 4. Embed chunks with NULL embedding (Voyage AI, batch 32)
+5. Enrich files with empty purpose (local ONNX, max 200/run)
 
 ## Embeddings
 
@@ -200,11 +221,10 @@ Every 5 minutes:
 | --- | --- | --- |
 | repos | id, root_path, vocab_clusters (JSONB) | Repo registry + cached clusters |
 | chunks | repo_id, path, content, embedding (vector) | File content + Voyage embeddings |
-| file_metadata | repo_id, path, exports, imports, docstring | Regex-extracted structure |
+| file_metadata | repo_id, path, exports, imports, docstring, purpose, purpose_hash | Regex structure + LLM summaries |
 | file_imports | repo_id, source_path, target_path | Directed import graph |
 | file_stats | repo_id, path, commit_count, recent_count | Git activity per file |
 | file_cochanges | repo_id, path_a, path_b, cochange_count | Co-commit pairs |
-| traces | repo_id, type, input, output | API call traces |
 
 ## Performance
 

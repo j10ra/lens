@@ -127,7 +127,7 @@ function buildTermWeights(
   for (const w of words) {
     let df = 0;
     for (const f of metadata) {
-      const haystack = `${f.path} ${(f.exports ?? []).join(" ")} ${f.docstring ?? ""}`.toLowerCase();
+      const haystack = `${f.path} ${(f.exports ?? []).join(" ")} ${f.docstring ?? ""} ${f.purpose ?? ""}`.toLowerCase();
       if (haystack.includes(w)) df++;
     }
     const idf = df > 0 ? Math.min(10, Math.max(1, Math.log(N / df))) : 10;
@@ -160,6 +160,7 @@ export function interpretQuery(
     const pathLower = f.path.toLowerCase();
     const exportsLower = (f.exports ?? []).join(" ").toLowerCase();
     const docLower = (f.docstring ?? "").toLowerCase();
+    const purposeLower = (f.purpose ?? "").toLowerCase();
 
     // Split path into meaningful tokens: filename stem + directory segments
     const pathSegments = pathLower.split("/");
@@ -185,18 +186,18 @@ export function interpretQuery(
       if (fileTokens.some((t) => t === w || t.includes(w))) termScore += 4 * weight;
       else if (pathTokenSet.has(w)) termScore += 2 * weight;
       if (exportsLower.includes(w)) termScore += 2 * weight;
-      if (docLower.includes(w)) termScore += 1 * weight;
+      if (docLower.includes(w) || purposeLower.includes(w)) termScore += 1 * weight;
       if (termScore > 0) matchedTerms++;
       score += termScore;
     }
 
-    // Stemmed terms: only match exports + docstring (NOT paths)
+    // Stemmed terms: only match exports + docstring/purpose (NOT paths)
     // Prevents "handling" stem → "handl" matching "StorageHandling" in paths
     for (const w of stemmed) {
       const weight = termWeights.get(w) ?? 1;
       let termScore = 0;
       if (exportsLower.includes(w)) termScore += 2 * weight;
-      if (docLower.includes(w)) termScore += 1 * weight;
+      if (docLower.includes(w) || purposeLower.includes(w)) termScore += 1 * weight;
       if (termScore > 0) matchedTerms++;
       score += termScore;
     }

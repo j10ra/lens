@@ -155,6 +155,7 @@ export interface FileMetadataRow {
   language: string | null;
   exports: string[];
   docstring: string;
+  purpose: string;
 }
 
 /** Load file metadata index for query interpretation */
@@ -165,8 +166,10 @@ export async function loadFileMetadata(repoId: string): Promise<FileMetadataRow[
     language: string | null;
     exports: string | string[];
     docstring: string;
+    purpose: string;
   }>`
-    SELECT fm.path, fm.language, fm.exports, fm.docstring
+    SELECT fm.path, fm.language, fm.exports, fm.docstring,
+           COALESCE(fm.purpose, '') AS purpose
     FROM file_metadata fm
     WHERE fm.repo_id = ${repoId}
     ORDER BY fm.path
@@ -177,6 +180,7 @@ export async function loadFileMetadata(repoId: string): Promise<FileMetadataRow[
       language: row.language,
       exports: typeof row.exports === "string" ? JSON.parse(row.exports) : row.exports,
       docstring: row.docstring,
+      purpose: row.purpose,
     });
   }
   return rows;

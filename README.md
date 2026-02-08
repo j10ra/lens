@@ -1,6 +1,6 @@
 # RLM — Local Repo Context Daemon
 
-RLM indexes codebases and serves targeted context packs to Claude Code. Zero LLM calls on the query path — TF-IDF keyword scoring + Voyage semantic boost + structural enrichment (~150ms cold, ~10ms cached).
+RLM indexes codebases and serves targeted context packs to Claude Code. TF-IDF keyword scoring + Voyage semantic boost + local LLM file summaries + structural enrichment (~150ms cold, ~10ms cached).
 
 ## Install
 
@@ -38,7 +38,7 @@ cd /path/to/your/project
 rlm repo register
 ```
 
-Scans files, extracts metadata (exports, imports, docstrings), builds vocab clusters (Voyage), constructs import graph, analyzes git history. ~30-50s for a 3,000-file repo.
+Scans files, extracts metadata (exports, imports, docstrings), builds vocab clusters (Voyage), constructs import graph, analyzes git history. Embeddings + LLM file summaries run in parallel after indexing. ~30-50s for a 3,000-file repo.
 
 ### Step 2: CLAUDE.md (auto-injected)
 
@@ -58,7 +58,7 @@ rlm context "gate in container acceptance"  # Context pack
 `rlm context "gate in container acceptance"` triggers:
 
 1. **Auto-index** if HEAD has changed (diff scan, no re-index if up-to-date)
-2. **Keyword scoring** — TF-IDF weighted match against file metadata (exports, docstrings, path tokens)
+2. **Keyword scoring** — TF-IDF weighted match against file metadata (exports, docstrings, LLM purpose summaries, path tokens)
 3. **Concept expansion** — static synonyms (error→interceptor/middleware) + repo-specific vocab clusters (Voyage-embedded export terms clustered by cosine similarity)
 4. **Semantic boost** — Voyage vector search merges high-similarity chunks into results (when embeddings available)
 5. **Structural enrichment** — forward/reverse imports, 2-hop dependency chains, co-change clusters, git activity
@@ -83,7 +83,7 @@ acceptance.service.ts ← acceptance.component.ts, container-control.module.ts (
 acceptance.service.ts: 14 commits, 3/90d, last: 2d ago
 ```
 
-Zero LLM calls. ~150ms cold, ~10ms cached.
+Zero LLM calls at query time. ~150ms cold, ~10ms cached.
 
 ## CLI Commands
 
@@ -91,7 +91,8 @@ Zero LLM calls. ~150ms cold, ~10ms cached.
 | --- | --- |
 | `rlm context "<goal>"` | Context pack — relevant files, deps, co-changes, activity |
 | `rlm status` | Index health, embedding coverage |
-| `rlm index [--force]` | Trigger indexing (auto-runs on context if stale) |
+| `rlm index` | Diff scan — re-chunks only changed files since last index |
+| `rlm index --force` | Full scan — re-chunks every file from scratch |
 
 ### Repo Management
 
@@ -118,6 +119,7 @@ Zero LLM calls. ~150ms cold, ~10ms cached.
 | --- | --- | --- |
 | Chunks | File content split into ~100-line segments | Vector search (semantic boost) |
 | Metadata | Regex-extracted exports, imports, docstrings | TF-IDF keyword scoring |
+| Purpose summaries | Local LLM (Qwen2.5-Coder-0.5B, ONNX q4) per file | TF-IDF keyword scoring (supplements docstrings) |
 | Vocab clusters | Voyage-embedded export terms, cosine-clustered | Concept expansion at query time |
 | Import graph | Directed edges (source → target) | Dependency graph in context pack |
 | Git stats | Commit count, recent activity per file | Activity boost + activity section |
@@ -129,7 +131,8 @@ Zero LLM calls. ~150ms cold, ~10ms cached.
 - **Auto-indexes** on register, re-indexes when HEAD changes (diff-aware)
 - **Vocab clusters** built at index time — Voyage embeds unique export terms, clusters by cosine > 0.75, stored as JSONB
 - **Semantic search** activates when embeddings are ready (check `rlm status`)
-- **Background worker** refreshes stale repos every 5 minutes
+- **Purpose summaries** — local ONNX model generates 1-sentence file descriptions, fills gaps where regex docstrings are missing (~250MB model, first run downloads to `~/.cache/huggingface/`)
+- **Background worker** refreshes stale repos every 5 minutes (embeddings + purpose summaries)
 - **File watcher** picks up saves in real-time (~500ms debounce)
 - **Per-repo isolation** — chunks, embeddings, metadata, clusters all separate
 

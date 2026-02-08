@@ -5,6 +5,8 @@ import { api, APIError } from "encore.dev/api";
 import { db } from "../repo/db";
 import { runIndex, type IndexResult } from "./lib/engine";
 import { getHeadCommit } from "./lib/discovery";
+import { ensureEmbedded } from "./lib/embed";
+import { enrichPurpose } from "./lib/enrich-purpose";
 import { startWatcher, stopWatcher, getWatcherStatus } from "./lib/watcher";
 
 // --- POST /index/run ---
@@ -17,7 +19,10 @@ interface RunParams {
 export const run = api(
   { expose: true, method: "POST", path: "/index/run" },
   async (params: RunParams): Promise<IndexResult> => {
-    return runIndex(params.repo_id, params.force ?? false);
+    const result = await runIndex(params.repo_id, params.force ?? false);
+    // Fire-and-forget: embeddings + purpose summaries in parallel
+    Promise.all([ensureEmbedded(params.repo_id), enrichPurpose(params.repo_id)]).catch(() => {});
+    return result;
   },
 );
 

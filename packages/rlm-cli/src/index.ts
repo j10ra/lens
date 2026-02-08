@@ -68,9 +68,8 @@ program
   .command("index")
   .description("Index the current repo")
   .option("--json", "Output as JSON", false)
-  .option("--force", "Force full re-index", false)
+  .option("--force", "Full re-scan (default: diff scan, changed files only)", false)
   .option("--status", "Show index status", false)
-  .option("--progress", "Show live progress after indexing", false)
   .action((opts) => run(() => indexCommand(opts)));
 
 // rlm status
