@@ -39,14 +39,15 @@ Local daemon that indexes codebases and serves context packs to Claude Code. Zer
 
 ### Context Pack Pipeline
 
-`POST /context { repo_id, goal }` → ~150ms cold, ~10ms cached:
+`POST /context { repo_id, goal }` → ~0.5-7s cold, ~10ms cached:
 
 1. **Auto-index** — diff scan if HEAD changed, skip if up-to-date
-2. **TF-IDF keyword scoring** — segment-aware path tokens (filename 4x, dir 2x) + exports + docstrings
+2. **TF-IDF keyword scoring** — code-domain stopwords, segment-aware path tokens (filename 4x, dir 2x) + exports + docstrings + purpose summaries. Indegree boost for hub files, sibling dedup (max 2/group), dynamic cap (8-15 based on import depth)
 3. **Concept expansion** — static synonyms (always) + repo-specific vocab clusters (when Voyage available)
-4. **Semantic boost** — Voyage vector search merges top chunks (when embeddings available)
-5. **Structural enrichment** — forward/reverse imports, 2-hop deps, co-change clusters, git activity
-6. **Cache** — keyed by (repo_id, goal, commit), 120s TTL, 20 entries
+4. **Co-change promotion** — direct partners of top-5 keyword files + cluster-based promotion
+5. **Semantic boost** — Voyage vector search merges top chunks (when embeddings available)
+6. **Structural enrichment** — forward/reverse imports, 2-hop deps, co-change clusters, git activity
+7. **Cache** — keyed by (repo_id, goal, commit), 120s TTL, 20 entries
 
 ### Indexing Pipeline
 
@@ -56,7 +57,8 @@ Local daemon that indexes codebases and serves context packs to Claude Code. Zer
 2. `extractAndPersistMetadata()` — exports, imports, docstrings per file
 3. `buildVocabClusters()` — Voyage-embed unique terms, cosine cluster >0.75, store as JSONB
 4. `buildAndPersistImportGraph()` — directed import edges
-5. `analyzeGitHistory()` — commit counts, co-change pairs
+5. `computeMaxImportDepth()` — BFS from leaves, determines dynamic file cap
+6. `analyzeGitHistory()` — commit counts, co-change pairs
 
 ### Voyage AI Integration
 
@@ -70,9 +72,13 @@ Local daemon that indexes codebases and serves context packs to Claude Code. Zer
 
 `context/lib/query-interpreter.ts`:
 
+- Stopwords: natural language + 30 code-domain terms (index, data, value, module, etc.)
 - Noise filtering: vendor/, scripts/, .min.js, .designer.cs, drawable/, layout/ etc.
 - Path scoring: tokenized segments (camelCase/snake_case split), not substring match
 - Static `CONCEPT_SYNONYMS`: error→interceptor/middleware, auth→token/guard, etc.
 - Vocab cluster expansion: adds cluster terms + 1.3x boost for cluster-matched files
 - TF-IDF weighting: rare terms score higher than common ones
 - Quadratic coverage boost: files matching multiple query terms rank higher
+- Indegree boost: hub files (imported by 3+) get log2-scaled bonus
+- Sibling dedup: max 2 files per directory/name-prefix group
+- Dynamic file cap: min(max(8, importDepth * 2 + 4), 15)
