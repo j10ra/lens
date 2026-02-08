@@ -1,6 +1,7 @@
 import { ensureRepo } from "../util/ensure-repo.js";
 import { get, post } from "../util/client.js";
 import { output } from "../util/format.js";
+import { showProgress } from "../util/progress.js";
 
 interface IndexResult {
   files_scanned: number;
@@ -21,7 +22,7 @@ interface IndexStatus {
   chunks_with_embeddings: number;
 }
 
-export async function indexCommand(opts: { json: boolean; force: boolean; status: boolean }): Promise<void> {
+export async function indexCommand(opts: { json: boolean; force: boolean; status: boolean; progress: boolean }): Promise<void> {
   const { repo_id, name } = await ensureRepo();
 
   if (opts.status) {
@@ -60,5 +61,9 @@ export async function indexCommand(opts: { json: boolean; force: boolean; status
       ].join("\n"),
       false,
     );
+  }
+
+  if (opts.progress) {
+    await showProgress(repo_id, name);
   }
 }

@@ -13,12 +13,14 @@ interface StatusResponse {
   embedded_pct: number;
   embedder: string;
   embedding_dim: number;
-  last_activity: string | null;
-  trace_count: number;
   metadata_count: number;
   import_edge_count: number;
   git_commits_analyzed: number;
   cochange_pairs: number;
+  purpose_count: number;
+  purpose_total: number;
+  purpose_model_status: string;
+  purpose_model_progress: number;
 }
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
@@ -44,6 +46,11 @@ export async function statusCommand(opts: { json: boolean }): Promise<void> {
     : "no code chunks";
   const embIcon = s.embedded_count >= s.embeddable_count && s.embeddable_count > 0 ? check : pending;
 
+  const purposeLabel = s.purpose_total > 0
+    ? `${s.purpose_count}/${s.purpose_total} files`
+    : "no files";
+  const purposeIcon = s.purpose_count > 0 && s.purpose_count >= s.purpose_total ? check : pending;
+
   const lines = [
     ``,
     `  ${bold(name)}${staleTag}`,
@@ -54,6 +61,7 @@ export async function statusCommand(opts: { json: boolean }): Promise<void> {
     `  ${s.import_edge_count > 0 ? check : pending} Import graph  ${dim(`${s.import_edge_count.toLocaleString()} edges`)}`,
     `  ${s.cochange_pairs > 0 ? check : pending} Co-changes    ${dim(`${s.cochange_pairs.toLocaleString()} pairs`)}`,
     `  ${embIcon} Embeddings    ${dim(embLabel)}`,
+    `  ${purposeIcon} Summaries     ${dim(purposeLabel)}`,
   ];
 
   output(lines.join("\n"), false);

@@ -10,6 +10,10 @@ interface StatusResponse {
   import_edge_count: number;
   git_commits_analyzed: number;
   cochange_pairs: number;
+  purpose_count: number;
+  purpose_total: number;
+  purpose_model_status: string;
+  purpose_model_progress: number;
 }
 
 // ANSI colors
@@ -17,7 +21,10 @@ const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
 const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
+const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
+
+const MAX_CONN_FAILURES = 5;
 
 export async function showProgress(
   repoId: string,
@@ -29,6 +36,7 @@ export async function showProgress(
   let i = 0;
   let lastState = "";
   let readyShown = false;
+  let connFailures = 0;
 
   while (Date.now() - start < timeoutMs) {
     try {
@@ -90,18 +98,36 @@ export async function showProgress(
         }
       }
 
-      // Ready message
-      const structuralDone = s.metadata_count > 0 && s.chunk_count > 0;
-      const embeddingsDone = s.embedded_count >= s.embeddable_count && s.embeddable_count > 0;
+      // Summaries (purpose enrichment)
+      if (s.purpose_model_status === "downloading") {
+        lines.push(`  ${cyan(f)} Summaries       ${dim(`Downloading model (${s.purpose_model_progress}%)...`)}`);
+      } else if (s.purpose_total > 0) {
+        const purposeDone = s.purpose_count >= s.purpose_total;
+        if (purposeDone) {
+          lines.push(`  ${green("✓")} Summaries       ${dim(`${s.purpose_count}/${s.purpose_total} files`)}`);
+        } else {
+          const pBar = createBar(Math.round((s.purpose_count / s.purpose_total) * 100), 20);
+          lines.push(`  ${cyan(f)} Summaries       ${pBar} ${dim(`${s.purpose_count}/${s.purpose_total}`)}`);
+        }
+      }
 
+      // Completion checks
+      const structuralDone = s.metadata_count > 0 && s.chunk_count > 0
+        && s.git_commits_analyzed > 0 && s.import_edge_count > 0;
+      const embeddingsDone = (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0)
+        || s.embeddable_count === 0;
+      const summariesDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;
+      const allDone = structuralDone && embeddingsDone && summariesDone;
+
+      // Ready message — show once structural is done (context usable)
       if (structuralDone) {
         readyShown = true;
         lines.push(``);
-        if (embeddingsDone || s.embeddable_count === 0) {
+        if (allDone) {
           lines.push(`  ${green("✓")} ${bold("Ready")} — run ${cyan('rlm context "<goal>"')}`);
         } else {
           lines.push(`  ${green("✓")} ${bold("Ready")} — run ${cyan('rlm context "<goal>"')}`);
-          lines.push(`  ${dim("Ctrl+C to exit — embeddings continue in background")}`);
+          lines.push(`  ${dim("Ctrl+C to exit — background tasks continue")}`);
         }
       }
 
@@ -115,15 +141,19 @@ export async function showProgress(
         lastState = state;
       }
 
-      // Exit when everything is done
-      if (structuralDone && (embeddingsDone || s.embeddable_count === 0)) {
-        return;
-      }
+      if (allDone) return;
 
+      connFailures = 0;
       i++;
       await sleep(2000);
-    } catch {
-      await sleep(500);
+    } catch (err) {
+      connFailures++;
+      if (connFailures >= MAX_CONN_FAILURES) {
+        process.stdout.write(`\n  ${red("✗")} ${bold("Daemon unavailable")} — ${dim("connection lost after " + connFailures + " retries")}\n`);
+        process.stdout.write(`  ${dim("Restart with: encore run")}\n\n`);
+        process.exit(1);
+      }
+      await sleep(1000);
     }
   }
 }
@@ -132,9 +162,7 @@ function createBar(pct: number, width: number): string {
   const clamped = Math.min(pct, 100);
   const filled = Math.round((clamped / 100) * width);
   const bar = "█".repeat(filled) + "░".repeat(width - filled);
-  if (clamped >= 100) return `\x1b[32m${bar}\x1b[0m`;
-  if (clamped >= 50) return `\x1b[36m${bar}\x1b[0m`;
-  return `\x1b[33m${bar}\x1b[0m`;
+  return `\x1b[32m${bar}\x1b[0m`;
 }
 
 function sleep(ms: number): Promise<void> {

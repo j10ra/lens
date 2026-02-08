@@ -6,8 +6,10 @@ interface DaemonStats {
   total_chunks: number;
   total_embeddings: number;
   total_summaries: number;
-  total_traces: number;
   db_size_mb: number;
+  last_maintenance_at: string | null;
+  next_maintenance_at: string | null;
+  last_maintenance_result: { processed: number; errors: number } | null;
 }
 
 export async function daemonStatsCommand(opts: { json: boolean }): Promise<void> {
@@ -22,6 +24,10 @@ export async function daemonStatsCommand(opts: { json: boolean }): Promise<void>
     ? Math.round((s.total_embeddings / s.total_chunks) * 100)
     : 0;
 
+  const maintResult = s.last_maintenance_result
+    ? `${s.last_maintenance_result.processed} processed, ${s.last_maintenance_result.errors} errors`
+    : "—";
+
   const lines = [
     "## RLM Daemon",
     "",
@@ -29,8 +35,12 @@ export async function daemonStatsCommand(opts: { json: boolean }): Promise<void>
     `  Chunks:     ${s.total_chunks.toLocaleString()}`,
     `  Embeddings: ${s.total_embeddings.toLocaleString()} (${embedPct}%)`,
     `  Summaries:  ${s.total_summaries.toLocaleString()}`,
-    `  Traces:     ${s.total_traces.toLocaleString()}`,
     `  DB Size:    ${s.db_size_mb} MB`,
+    "",
+    "  ## Maintenance Cron",
+    `  Last maintenance: ${s.last_maintenance_at ?? "never"}`,
+    `  Next maintenance: ${s.next_maintenance_at ?? "—"}`,
+    `  Last result:      ${maintResult}`,
   ];
 
   output(lines.join("\n"), false);
