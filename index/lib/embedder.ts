@@ -1,9 +1,4 @@
-import { secret } from "encore.dev/config";
-import { EMBEDDING_MODEL, EMBEDDING_DIM, EMBEDDING_BATCH_SIZE } from "./search-config";
-
-const voyageApiKey = secret("VoyageApiKey");
-
-const API_URL = "https://api.voyageai.com/v1/embeddings";
+import { EMBEDDING_MODEL, EMBEDDING_DIM, EMBEDDING_BATCH_SIZE, VOYAGE_API_URL, VoyageApiKey } from "./models";
 
 interface VoyageResponse {
   data: Array<{ embedding: number[] }>;
@@ -17,11 +12,11 @@ export async function embed(texts: string[], isQuery = false): Promise<number[][
 
   for (let i = 0; i < texts.length; i += EMBEDDING_BATCH_SIZE) {
     const batch = texts.slice(i, i + EMBEDDING_BATCH_SIZE);
-    const res = await fetch(API_URL, {
+    const res = await fetch(VOYAGE_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${voyageApiKey()}`,
+        Authorization: `Bearer ${VoyageApiKey()}`,
       },
       body: JSON.stringify({
         input: batch,

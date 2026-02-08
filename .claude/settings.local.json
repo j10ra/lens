@@ -50,7 +50,15 @@
       "Bash(rlm repo remove:*)",
       "Bash(rlm repo register:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(./plan/bench.sh:*)",
+      "Bash(/Users/jalipalo/.local/share/claude/versions/2.1.34 --ripgrep --version)",
+      "Bash(bash /Volumes/Drive/__x/RLM/plan/bench-context.sh:*)",
+      "Bash(bash:*)",
+      "Bash(1 <<'SQL'\nSELECT path, LEFT\\(purpose, 120\\) AS purpose FROM purpose_backup WHERE purpose != '' ORDER BY path LIMIT 15;\nSQL)",
+      "Bash(psql:*)",
+      "WebFetch(domain:openrouter.ai)",
+      "WebFetch(domain:openrouter.zendesk.com)"
     ]
   }
 }

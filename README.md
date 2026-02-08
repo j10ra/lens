@@ -1,6 +1,6 @@
 # RLM — Local Repo Context Daemon
 
-RLM indexes codebases and serves targeted context packs to Claude Code. TF-IDF keyword scoring + Voyage semantic boost + local LLM file summaries + structural enrichment (~150ms cold, ~10ms cached).
+RLM indexes codebases and serves targeted context packs to Claude Code. TF-IDF keyword scoring + Voyage semantic boost + OpenRouter file summaries + structural enrichment (~150ms cold, ~10ms cached).
 
 ## Install
 
@@ -21,13 +21,14 @@ npm install && npm run build && npm link
 
 Verify: `rlm --version`
 
-### 3. Set secrets (optional — for embeddings + vocab clusters)
+### 3. Set secrets (optional)
 
 ```bash
-encore secret set --type dev VoyageApiKey   # Voyage AI voyage-code-3
+encore secret set --type dev VoyageApiKey      # Voyage AI embeddings + vocab clusters
+encore secret set --type dev OpenRouterApiKey   # LLM purpose summaries
 ```
 
-Without Voyage: core keyword search + static concept synonyms still work. With Voyage: semantic vector search + repo-specific vocab clusters activate.
+Without secrets: core keyword search + static concept synonyms still work. With Voyage: semantic vector search + vocab clusters. With OpenRouter: LLM file summaries enrich keyword scoring.
 
 ## Integrate with Claude Code
 
@@ -38,7 +39,7 @@ cd /path/to/your/project
 rlm repo register
 ```
 
-Scans files, extracts metadata (exports, imports, docstrings), builds vocab clusters (Voyage), constructs import graph, analyzes git history. Embeddings + LLM file summaries run in parallel after indexing. ~30-50s for a 3,000-file repo.
+Scans files, extracts metadata (exports, imports, docstrings), builds vocab clusters (Voyage), constructs import graph, analyzes git history. Embeddings + OpenRouter file summaries run in parallel after indexing. ~30-50s for a 3,000-file repo.
 
 ### Step 2: CLAUDE.md (auto-injected)
 
@@ -119,7 +120,7 @@ Zero LLM calls at query time. ~150ms cold, ~10ms cached.
 | --- | --- | --- |
 | Chunks | File content split into ~100-line segments | Vector search (semantic boost) |
 | Metadata | Regex-extracted exports, imports, docstrings | TF-IDF keyword scoring |
-| Purpose summaries | Local LLM (Qwen2.5-Coder-0.5B, ONNX q4) per file | TF-IDF keyword scoring (supplements docstrings) |
+| Purpose summaries | OpenRouter API (configurable model) per code file | TF-IDF keyword scoring (supplements docstrings) |
 | Vocab clusters | Voyage-embedded export terms, cosine-clustered | Concept expansion at query time |
 | Import graph | Directed edges (source → target) | Dependency graph in context pack |
 | Git stats | Commit count, recent activity per file | Activity boost + activity section |
@@ -131,7 +132,7 @@ Zero LLM calls at query time. ~150ms cold, ~10ms cached.
 - **Auto-indexes** on register, re-indexes when HEAD changes (diff-aware)
 - **Vocab clusters** built at index time — Voyage embeds unique export terms, clusters by cosine > 0.75, stored as JSONB
 - **Semantic search** activates when embeddings are ready (check `rlm status`)
-- **Purpose summaries** — local ONNX model generates 1-sentence file descriptions, fills gaps where regex docstrings are missing (~250MB model, first run downloads to `~/.cache/huggingface/`)
+- **Purpose summaries** — OpenRouter API generates 1-sentence file descriptions for code files, fills gaps where regex docstrings are missing. Model configurable in `index/lib/models.ts`
 - **Background worker** refreshes stale repos every 5 minutes (embeddings + purpose summaries)
 - **File watcher** picks up saves in real-time (~500ms debounce)
 - **Per-repo isolation** — chunks, embeddings, metadata, clusters all separate

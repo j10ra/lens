@@ -1,43 +1,9 @@
 import { db } from "../../repo/db";
-
-const MAX_FILES_PER_RUN = 200;
-const MODEL_ID = "onnx-community/Qwen2.5-Coder-0.5B-Instruct";
+import { OPENROUTER_API_URL, PURPOSE_MODEL, PURPOSE_BATCH_LIMIT, PURPOSE_CONCURRENCY, OpenRouterApiKey } from "./models";
 
 export const purposeModelState = {
-  status: "not_loaded" as "not_loaded" | "downloading" | "ready" | "failed",
-  progress: 0,
+  status: "ready" as "ready" | "failed",
 };
-
-let pipelinePromise: Promise<any> | null = null;
-
-function getGenerator() {
-  if (!pipelinePromise) {
-    purposeModelState.status = "downloading";
-    purposeModelState.progress = 0;
-    pipelinePromise = import("@huggingface/transformers")
-      .then(({ pipeline }) =>
-        pipeline("text-generation", MODEL_ID, {
-          dtype: "q4",
-          progress_callback: (data: any) => {
-            if (data.status === "progress") {
-              purposeModelState.progress = Math.round(data.progress ?? 0);
-            }
-          },
-        }),
-      )
-      .then((gen) => {
-        purposeModelState.status = "ready";
-        return gen;
-      })
-      .catch((err) => {
-        console.error("[RLM] Purpose model load failed:", err.message);
-        purposeModelState.status = "failed";
-        pipelinePromise = null;
-        return null;
-      });
-  }
-  return pipelinePromise;
-}
 
 export interface EnrichResult {
   enriched: number;
@@ -47,92 +13,132 @@ export interface EnrichResult {
 
 interface CandidateRow {
   path: string;
-  language: string | null;
-  exports: string | string[];
   first_chunk: string;
   chunk_hash: string;
 }
 
-export async function enrichPurpose(repoId: string): Promise<EnrichResult> {
-  const start = Date.now();
+async function generatePurpose(apiKey: string, path: string, content: string): Promise<string> {
+  const res = await fetch(OPENROUTER_API_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: PURPOSE_MODEL,
+      messages: [
+        { role: "system", content: "Describe what this code file does in one sentence. Be specific about its responsibilities. Reply with only the sentence, no preamble." },
+        { role: "user", content: `File: ${path}\n\n${content}` },
+      ],
+      max_tokens: 150,
+      temperature: 0.1,
+    }),
+  });
 
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`OpenRouter ${res.status}: ${body}`);
+  }
+
+  const json = await res.json() as any;
+  return (json.choices?.[0]?.message?.content ?? "").trim().slice(0, 500);
+}
+
+async function processBatch(
+  apiKey: string,
+  repoId: string,
+  rows: CandidateRow[],
+): Promise<{ enriched: number; skipped: number }> {
+  let enriched = 0;
+  let skipped = 0;
+
+  const results = await Promise.allSettled(
+    rows.map(async (row) => {
+      const purpose = await generatePurpose(apiKey, row.path, row.first_chunk);
+      return { row, purpose };
+    }),
+  );
+
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      const { row, purpose } = result.value;
+      if (purpose) {
+        await db.exec`
+          UPDATE file_metadata
+          SET purpose = ${purpose}, purpose_hash = ${row.chunk_hash}
+          WHERE repo_id = ${repoId} AND path = ${row.path}
+        `;
+        enriched++;
+      } else {
+        await db.exec`
+          UPDATE file_metadata SET purpose_hash = ${row.chunk_hash}
+          WHERE repo_id = ${repoId} AND path = ${row.path}
+        `;
+        skipped++;
+      }
+    } else {
+      skipped++;
+    }
+  }
+
+  return { enriched, skipped };
+}
+
+async function loadCandidates(repoId: string): Promise<CandidateRow[]> {
   const candidates: CandidateRow[] = [];
   const cursor = db.query<CandidateRow>`
-    SELECT fm.path, fm.language, fm.exports,
-           c.content AS first_chunk, c.chunk_hash
+    SELECT fm.path, c.content AS first_chunk, c.chunk_hash
     FROM file_metadata fm
     JOIN chunks c ON c.repo_id = fm.repo_id AND c.path = fm.path AND c.chunk_index = 0
     WHERE fm.repo_id = ${repoId}
+      AND fm.language IN ('typescript','javascript','python','ruby','go','rust',
+                          'java','kotlin','csharp','cpp','c','swift','php','shell','sql')
       AND (fm.purpose = '' OR fm.purpose IS NULL
            OR fm.purpose_hash != c.chunk_hash)
-    LIMIT ${MAX_FILES_PER_RUN}
+    LIMIT ${PURPOSE_BATCH_LIMIT}
   `;
   for await (const row of cursor) {
     candidates.push(row);
   }
+  return candidates;
+}
 
-  if (candidates.length === 0) {
-    return { enriched: 0, skipped: 0, duration_ms: Date.now() - start };
-  }
+/** Enrich file purpose summaries via OpenRouter.
+ *  fullRun=true: loops until all files done (index/register).
+ *  fullRun=false: single batch of 200 (cron). */
+export async function enrichPurpose(repoId: string, fullRun = false): Promise<EnrichResult> {
+  const start = Date.now();
 
-  const generator = await getGenerator();
-  if (!generator) {
-    return { enriched: 0, skipped: candidates.length, duration_ms: Date.now() - start };
-  }
-
-  let enriched = 0;
-  let skipped = 0;
-
+  let apiKey: string;
   try {
-    for (const row of candidates) {
-      try {
-        const messages = [
-          {
-            role: "system",
-            content:
-              "Describe what this code file does in one sentence. Be specific about its responsibilities.",
-          },
-          { role: "user", content: `File: ${row.path}\n\n${row.first_chunk}` },
-        ];
-
-        const result = await generator(messages, { max_new_tokens: 80 });
-        const text: string = result[0]?.generated_text?.at(-1)?.content ?? "";
-        const purpose = text.trim().slice(0, 500);
-
-        if (purpose) {
-          await db.exec`
-            UPDATE file_metadata
-            SET purpose = ${purpose}, purpose_hash = ${row.chunk_hash}
-            WHERE repo_id = ${repoId} AND path = ${row.path}
-          `;
-          enriched++;
-        } else {
-          // Mark as attempted so we don't retry endlessly
-          await db.exec`
-            UPDATE file_metadata
-            SET purpose_hash = ${row.chunk_hash}
-            WHERE repo_id = ${repoId} AND path = ${row.path}
-          `;
-          skipped++;
-        }
-
-        if (enriched % 50 === 0 && enriched > 0) {
-          console.log(
-            `[RLM] Purpose: ${enriched} enriched (${candidates.length - enriched - skipped} remaining)`,
-          );
-        }
-      } catch (err) {
-        console.error(`[RLM] Purpose generation failed for ${row.path}:`, (err as Error).message);
-        skipped++;
-      }
-    }
-  } finally {
-    try {
-      await generator.dispose();
-      pipelinePromise = null;
-      purposeModelState.status = "not_loaded";
-    } catch { /* ignore dispose errors */ }
+    apiKey = OpenRouterApiKey();
+  } catch (err) {
+    console.error("[RLM] OpenRouterApiKey secret missing:", (err as Error).message);
+    purposeModelState.status = "failed";
+    return { enriched: 0, skipped: 0, duration_ms: 0 };
   }
 
-  return { enriched, skipped, duration_ms: Date.now() - start };
+  purposeModelState.status = "ready";
+
+  let totalEnriched = 0;
+  let totalSkipped = 0;
+
+  while (true) {
+    const candidates = await loadCandidates(repoId);
+    if (candidates.length === 0) break;
+
+    for (let i = 0; i < candidates.length; i += PURPOSE_CONCURRENCY) {
+      const batch = candidates.slice(i, i + PURPOSE_CONCURRENCY);
+      const { enriched, skipped } = await processBatch(apiKey, repoId, batch);
+      totalEnriched += enriched;
+      totalSkipped += skipped;
+    }
+
+    console.log(`[RLM] Purpose: ${totalEnriched} enriched, ${totalSkipped} skipped so far`);
+
+    if (!fullRun) break;
+  }
+
+  console.log(`[RLM] Purpose complete: ${totalEnriched} enriched, ${totalSkipped} skipped in ${Date.now() - start}ms`);
+  return { enriched: totalEnriched, skipped: totalSkipped, duration_ms: Date.now() - start };
 }

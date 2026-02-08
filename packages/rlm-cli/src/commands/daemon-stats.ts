@@ -5,7 +5,6 @@ interface DaemonStats {
   repos_count: number;
   total_chunks: number;
   total_embeddings: number;
-  total_summaries: number;
   db_size_mb: number;
   last_maintenance_at: string | null;
   next_maintenance_at: string | null;
@@ -34,7 +33,6 @@ export async function daemonStatsCommand(opts: { json: boolean }): Promise<void>
     `  Repos:      ${s.repos_count}`,
     `  Chunks:     ${s.total_chunks.toLocaleString()}`,
     `  Embeddings: ${s.total_embeddings.toLocaleString()} (${embedPct}%)`,
-    `  Summaries:  ${s.total_summaries.toLocaleString()}`,
     `  DB Size:    ${s.db_size_mb} MB`,
     "",
     "  ## Maintenance Cron",

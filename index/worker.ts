@@ -39,12 +39,16 @@ export const maintain = api(
     }>`
       SELECT r.id, r.root_path, r.last_indexed_commit,
         (SELECT count(*)::int FROM chunks WHERE repo_id = r.id AND embedding IS NULL) AS unembedded,
-        (SELECT count(*)::int FROM file_metadata WHERE repo_id = r.id AND (purpose = '' OR purpose IS NULL)) AS unpurposed
+        (SELECT count(*)::int FROM file_metadata WHERE repo_id = r.id AND (purpose = '' OR purpose IS NULL)
+          AND language IN ('typescript','javascript','python','ruby','go','rust',
+                          'java','kotlin','csharp','cpp','c','swift','php','shell','sql')) AS unpurposed
       FROM repos r
       WHERE r.last_indexed_commit IS NOT NULL
         AND (
           EXISTS (SELECT 1 FROM chunks WHERE repo_id = r.id AND embedding IS NULL)
-          OR EXISTS (SELECT 1 FROM file_metadata WHERE repo_id = r.id AND (purpose = '' OR purpose IS NULL))
+          OR EXISTS (SELECT 1 FROM file_metadata WHERE repo_id = r.id AND (purpose = '' OR purpose IS NULL)
+                     AND language IN ('typescript','javascript','python','ruby','go','rust',
+                                     'java','kotlin','csharp','cpp','c','swift','php','shell','sql'))
         )
     `;
 
@@ -101,3 +105,6 @@ const _ = new CronJob("maintain-repos", {
   every: "5m",
   endpoint: maintain,
 });
+
+// Run maintenance immediately on startup (30s delay for DB warmup)
+setTimeout(() => { maintain({}).catch(() => {}); }, 30_000);

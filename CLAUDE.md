@@ -29,7 +29,9 @@ Local daemon that indexes codebases and serves context packs to Claude Code. Zer
 
 **Database**: `repo/db.ts` exports named `db` — DB resources cannot be default-exported
 
-**Secrets**: `encore secret set --type dev <key>` (dev type, not local). `VoyageApiKey` for embeddings + vocab clusters
+**Secrets**: `encore secret set --type dev <key>` (dev type, not local). `VoyageApiKey` for embeddings + vocab clusters. `OpenRouterApiKey` for purpose summaries
+
+**Model config**: All model names, API URLs, batch sizes, secrets in `index/lib/models.ts` (single source of truth)
 
 **Advisory locks**: `repo/lib/identity.ts` hashes UUID to 32-bit int for `pg_advisory_lock`
 

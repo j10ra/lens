@@ -21,7 +21,7 @@ export const run = api(
   async (params: RunParams): Promise<IndexResult> => {
     const result = await runIndex(params.repo_id, params.force ?? false);
     // Fire-and-forget: embeddings + purpose summaries in parallel
-    Promise.all([ensureEmbedded(params.repo_id), enrichPurpose(params.repo_id)]).catch(() => {});
+    Promise.all([ensureEmbedded(params.repo_id), enrichPurpose(params.repo_id, true)]).catch(() => {});
     return result;
   },
 );

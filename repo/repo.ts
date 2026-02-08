@@ -5,7 +5,7 @@ import { api, APIError } from "encore.dev/api";
 import { db } from "./db";
 import { deriveIdentityKey } from "./lib/identity";
 import { getHeadCommit } from "../index/lib/discovery";
-import { EMBEDDING_MODEL, EMBEDDING_DIM } from "../index/lib/search-config";
+import { EMBEDDING_MODEL, EMBEDDING_DIM } from "../index/lib/models";
 import { runIndex } from "../index/lib/engine";
 import { ensureEmbedded } from "../index/lib/embed";
 import { startWatcher, stopWatcher } from "../index/lib/watcher";
@@ -52,7 +52,7 @@ async function indexAndEmbed(repoId: string, name: string, rootPath: string) {
     console.log(`[RLM] Starting indexing for ${name}...`);
     await runIndex(repoId);
     console.log(`[RLM] Index complete, starting embeddings + purpose summaries...`);
-    await Promise.all([ensureEmbedded(repoId), enrichPurpose(repoId)]);
+    await Promise.all([ensureEmbedded(repoId), enrichPurpose(repoId, true)]);
     console.log(`[RLM] Embeddings + purpose summaries complete for ${name}`);
     startWatcher(repoId, rootPath);
   } catch (err) {
@@ -193,7 +193,7 @@ export const remove = api(
     await db.exec`DELETE FROM file_stats WHERE repo_id = ${id}`;
     await db.exec`DELETE FROM file_imports WHERE repo_id = ${id}`;
     await db.exec`DELETE FROM file_metadata WHERE repo_id = ${id}`;
-    await db.exec`DELETE FROM summaries WHERE repo_id = ${id}`;
+
 
     // Chunks with embeddings — delete in batches to avoid pgvector bottleneck
     while (true) {
@@ -231,7 +231,6 @@ interface DaemonStats {
   repos_count: number;
   total_chunks: number;
   total_embeddings: number;
-  total_summaries: number;
   db_size_mb: number;
   last_maintenance_at: string | null;
   next_maintenance_at: string | null;
@@ -245,14 +244,12 @@ export const daemonStats = api(
       repos_count: number;
       total_chunks: number;
       total_embeddings: number;
-      total_summaries: number;
       db_size_mb: number;
     }>`
       SELECT
         (SELECT count(*)::int FROM repos) AS repos_count,
         (SELECT count(*)::int FROM chunks) AS total_chunks,
         (SELECT count(*) FILTER (WHERE embedding IS NOT NULL)::int FROM chunks) AS total_embeddings,
-        (SELECT count(*)::int FROM summaries) AS total_summaries,
         (SELECT pg_database_size(current_database()) / 1048576)::int AS db_size_mb
     `;
 
@@ -263,7 +260,6 @@ export const daemonStats = api(
       repos_count: row?.repos_count ?? 0,
       total_chunks: row?.total_chunks ?? 0,
       total_embeddings: row?.total_embeddings ?? 0,
-      total_summaries: row?.total_summaries ?? 0,
       db_size_mb: row?.db_size_mb ?? 0,
       last_maintenance_at: lastRun?.toISOString() ?? null,
       next_maintenance_at: nextRun?.toISOString() ?? null,
@@ -314,7 +310,6 @@ interface StatusResponse {
   purpose_count: number;
   purpose_total: number;
   purpose_model_status: string;
-  purpose_model_progress: number;
 }
 
 export const status = api(
@@ -347,7 +342,7 @@ export const status = api(
           count(*) FILTER (WHERE embedding IS NOT NULL)::int AS embedded_count,
           count(*) FILTER (WHERE language IN ('typescript','javascript','python','ruby','go','rust',
                            'java','kotlin','csharp','cpp','c','swift','php','shell')
-                           AND content IS NOT NULL AND trim(content) != '')::int AS embeddable_count
+                           AND content IS NOT NULL AND btrim(content, E' \t\n\r') != '')::int AS embeddable_count
         FROM chunks WHERE repo_id = ${id}
       `,
       db.queryRow<{
@@ -356,13 +351,17 @@ export const status = api(
         git_file_count: number;
         cochange_pairs: number;
         purpose_count: number;
+        purpose_total: number;
       }>`
         SELECT
           (SELECT count(*)::int FROM file_metadata WHERE repo_id = ${id}) AS metadata_count,
           (SELECT count(*)::int FROM file_imports WHERE repo_id = ${id}) AS import_edge_count,
           (SELECT count(*)::int FROM file_stats WHERE repo_id = ${id}) AS git_file_count,
           (SELECT count(*)::int FROM file_cochanges WHERE repo_id = ${id}) AS cochange_pairs,
-          (SELECT count(*) FILTER (WHERE purpose != '' AND purpose IS NOT NULL)::int FROM file_metadata WHERE repo_id = ${id}) AS purpose_count
+          (SELECT count(*) FILTER (WHERE purpose != '' AND purpose IS NOT NULL)::int FROM file_metadata WHERE repo_id = ${id}) AS purpose_count,
+          (SELECT count(*)::int FROM file_metadata WHERE repo_id = ${id}
+            AND language IN ('typescript','javascript','python','ruby','go','rust',
+                            'java','kotlin','csharp','cpp','c','swift','php','shell','sql')) AS purpose_total
       `,
     ]);
 
@@ -389,9 +388,8 @@ export const status = api(
       git_commits_analyzed: structuralStats?.git_file_count ?? 0,
       cochange_pairs: structuralStats?.cochange_pairs ?? 0,
       purpose_count: structuralStats?.purpose_count ?? 0,
-      purpose_total: metadataCount,
+      purpose_total: structuralStats?.purpose_total ?? 0,
       purpose_model_status: purposeModelState.status,
-      purpose_model_progress: purposeModelState.progress,
     };
   },
 );

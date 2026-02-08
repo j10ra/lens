@@ -2,7 +2,7 @@
 
 ## Overview
 
-RLM indexes repos and serves structural context packs to Claude Code. TF-IDF keyword scoring, Voyage semantic boost, local LLM file summaries, structural enrichment. ~150ms cold, ~10ms cached.
+RLM indexes repos and serves structural context packs to Claude Code. TF-IDF keyword scoring, Voyage semantic boost, OpenRouter file summaries, structural enrichment. ~150ms cold, ~10ms cached.
 
 ## System Architecture
 
@@ -31,8 +31,9 @@ Encore.ts Daemon (127.0.0.1:4000)
   │file_stats│ │file_cochanges│
   └──────────┘ └──────────────┘
 
-  External API (optional)
+  External APIs (optional)
   Voyage AI voyage-code-3 (embeddings + vocab clusters, 1024 dim)
+  OpenRouter (purpose summaries, configurable model)
 ```
 
 ## Services
@@ -62,7 +63,7 @@ CLI → POST /repo/register
      f. startWatcher() — chokidar file watcher
   4. Post-index (parallel, fire-and-forget):
      a. ensureEmbedded() — Voyage API vector embeddings
-     b. enrichPurpose() — local ONNX LLM file summaries
+     b. enrichPurpose(fullRun=true) — OpenRouter file summaries (loops until done)
   5. Inject CLAUDE.md into project
   6. Return repo_id
 ```
@@ -138,7 +139,7 @@ runIndex(repoId) — index/lib/engine.ts
 
 Post-index (parallel, fire-and-forget from /index/run and register):
   a. ensureEmbedded() — Voyage API
-  b. enrichPurpose() — local ONNX model
+  b. enrichPurpose(fullRun=true) — OpenRouter API (loops until all files done)
 ```
 
 ### Vocab Clusters
@@ -164,18 +165,20 @@ Per-language regex patterns extract:
 | Docstring | /\*\* ... \*/ | /// summary | \"\"\" ... \"\"\" | // Package | //! or /// |
 | Imports | import from, require() | using, import | import, from import | import | use |
 
-### Purpose Summaries (local LLM)
+### Purpose Summaries (OpenRouter)
 
 LLM-generated 1-sentence file descriptions in `index/lib/enrich-purpose.ts`:
 
-1. Model: `onnx-community/Qwen2.5-Coder-0.5B-Instruct` (q4, ~250MB, code-trained)
-2. Input: first chunk (chunk_index=0) per file — covers imports, class signatures, top-level structure
-3. Sequential processing, max 200 files per run
-4. Staleness: `purpose_hash` tracks `chunk_hash` of chunk 0 — purpose regenerates when content changes
-5. Fallback: if model fails to load, files keep `purpose = ''`, retries on next cron tick
-6. Model cached in `~/.cache/huggingface/` after first download
+1. Model: configurable via `index/lib/models.ts` (currently `qwen/qwen3-coder:free`)
+2. API: OpenRouter (OpenAI-compatible), secret: `OpenRouterApiKey`
+3. Input: first chunk (chunk_index=0) per file — covers imports, class signatures, top-level structure
+4. Only code languages: TS, JS, Python, Ruby, Go, Rust, Java, Kotlin, C#, C++, C, Swift, PHP, Shell, SQL
+5. Concurrency: 10 parallel API calls, 200 files per batch
+6. `fullRun=true` (index/register): loops until all files done. `false` (cron): single 200-batch
+7. Staleness: `purpose_hash` tracks `chunk_hash` of chunk 0 — purpose regenerates when content changes
+8. Fallback: if API key missing, files keep `purpose = ''`, retries on next cron tick
 
-Supplements regex `docstring` (~30-40% coverage) with LLM `purpose` (100% coverage). Scoring uses OR logic: `docstring || purpose` at 1x weight — no double-counting.
+Supplements regex `docstring` (~30-40% coverage) with LLM `purpose` (code files only). Scoring uses OR logic: `docstring || purpose` at 1x weight — no double-counting.
 
 ### Import Graph
 
@@ -195,18 +198,28 @@ Parses `git log --name-only --format="%H %aI" --no-merges -n 2000`:
 ## Background Worker
 
 Every 5 minutes (`index/worker.ts`):
-1. Find repos with stale index, NULL embeddings, or empty purpose
+1. Find repos with stale index, NULL embeddings, or empty purpose (code languages only)
 2. Advisory lock per repo
 3. Re-index if HEAD changed
 4. Embed chunks with NULL embedding (Voyage AI, batch 32)
-5. Enrich files with empty purpose (local ONNX, max 200/run)
+5. Enrich files with empty purpose (OpenRouter, single 200-batch per cron tick)
+6. Runs 30s after startup for immediate catch-up
 
-## Embeddings
+## Model Configuration
 
-- Model: Voyage AI `voyage-code-3` (cloud API, 1024 dim)
-- Lazy: only chunks where `embedding IS NULL`
-- Optional: context degrades gracefully without embeddings (keyword-only, no semantic boost)
-- Secret: `VoyageApiKey` via `encore secret set --type dev`
+All model names, API URLs, batch sizes, and secrets in **`index/lib/models.ts`** (single source of truth):
+
+| Config | Value | Secret |
+| --- | --- | --- |
+| Embeddings | Voyage `voyage-code-3`, 1024 dim, batch 32 | `VoyageApiKey` |
+| Purpose summaries | OpenRouter `qwen/qwen3-coder:free`, batch 200, concurrency 10 | `OpenRouterApiKey` |
+
+```bash
+encore secret set --type dev VoyageApiKey      # embeddings + vocab clusters
+encore secret set --type dev OpenRouterApiKey   # purpose summaries
+```
+
+Both optional — context degrades gracefully without either (keyword-only, no semantic boost, no LLM summaries).
 
 ## File Watcher
 

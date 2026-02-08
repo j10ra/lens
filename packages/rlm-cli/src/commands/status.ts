@@ -21,7 +21,6 @@ interface StatusResponse {
   purpose_count: number;
   purpose_total: number;
   purpose_model_status: string;
-  purpose_model_progress: number;
 }
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
@@ -45,7 +44,7 @@ export async function statusCommand(opts: { json: boolean }): Promise<void> {
   const embLabel = s.embeddable_count > 0
     ? `${s.embedded_count}/${s.embeddable_count} code chunks (${s.embedded_pct}%)`
     : "no code chunks";
-  const embIcon = s.embedded_count >= s.embeddable_count && s.embeddable_count > 0 ? check : pending;
+  const embIcon = s.embedded_pct >= 100 || (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) ? check : pending;
 
   const purposeLabel = s.purpose_total > 0
     ? `${s.purpose_count}/${s.purpose_total} files`
