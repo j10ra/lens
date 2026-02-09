@@ -135,5 +135,19 @@ function createTablesSql(): string {
       UNIQUE(repo_id, path_a, path_b)
     );
     CREATE INDEX IF NOT EXISTS idx_cochanges_lookup ON file_cochanges(repo_id, path_a);
+
+    CREATE TABLE IF NOT EXISTS request_logs (
+      id TEXT PRIMARY KEY,
+      method TEXT NOT NULL,
+      path TEXT NOT NULL,
+      status INTEGER NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      source TEXT NOT NULL DEFAULT 'api',
+      request_body TEXT,
+      response_size INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_request_logs_created ON request_logs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_request_logs_source ON request_logs(source);
   `;
 }

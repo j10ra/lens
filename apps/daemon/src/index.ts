@@ -42,9 +42,21 @@ async function main() {
     // HTTP server mode
     const { createApp } = await import("./server");
     const { serve } = await import("@hono/node-server");
+    const { resolve, dirname } = await import("node:path");
+    const { existsSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
 
     const port = Number(process.env.LENS_PORT) || 4111;
-    const app = createApp(db);
+
+    // Resolve dashboard dist (sibling app in monorepo or bundled)
+    const selfDir = dirname(fileURLToPath(import.meta.url));
+    const candidates = [
+      resolve(selfDir, "../../dashboard/dist"),     // monorepo dev
+      resolve(selfDir, "../dashboard"),              // bundled dist
+    ];
+    const dashboardDist = candidates.find((p) => existsSync(p));
+
+    const app = createApp(db, dashboardDist);
 
     const server = serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, () => {
       console.error(`[LENS] HTTP server listening on 127.0.0.1:${port}`);

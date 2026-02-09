@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: oklch(var(--background));
+  --color-foreground: oklch(var(--foreground));
+  --color-card: oklch(var(--card));
+  --color-card-foreground: oklch(var(--card-foreground));
+  --color-popover: oklch(var(--popover));
+  --color-popover-foreground: oklch(var(--popover-foreground));
+  --color-primary: oklch(var(--primary));
+  --color-primary-foreground: oklch(var(--primary-foreground));
+  --color-secondary: oklch(var(--secondary));
+  --color-secondary-foreground: oklch(var(--secondary-foreground));
+  --color-muted: oklch(var(--muted));
+  --color-muted-foreground: oklch(var(--muted-foreground));
+  --color-accent: oklch(var(--accent));
+  --color-accent-foreground: oklch(var(--accent-foreground));
+  --color-destructive: oklch(var(--destructive));
+  --color-border: oklch(var(--border));
+  --color-input: oklch(var(--input));
+  --color-ring: oklch(var(--ring));
+  --color-success: oklch(var(--success));
+  --color-warning: oklch(var(--warning));
+  --color-sidebar: oklch(var(--sidebar));
+  --color-sidebar-foreground: oklch(var(--sidebar-foreground));
+  --color-sidebar-accent: oklch(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: oklch(var(--sidebar-accent-foreground));
+  --color-sidebar-border: oklch(var(--sidebar-border));
+  --color-sidebar-ring: oklch(var(--sidebar-ring));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --header-height: 3.5rem;
+  --radius: 0.625rem;
+  --background: 0.985 0 0;
+  --foreground: 0.145 0.015 285;
+  --card: 1 0 0;
+  --card-foreground: 0.145 0.015 285;
+  --popover: 1 0 0;
+  --popover-foreground: 0.145 0.015 285;
+  --primary: 0.55 0.18 260;
+  --primary-foreground: 0.985 0 0;
+  --secondary: 0.94 0.01 260;
+  --secondary-foreground: 0.25 0.015 285;
+  --muted: 0.94 0.01 260;
+  --muted-foreground: 0.55 0.015 285;
+  --accent: 0.94 0.01 260;
+  --accent-foreground: 0.25 0.015 285;
+  --destructive: 0.55 0.2 25;
+  --border: 0.922 0.004 260;
+  --input: 0.922 0.004 260;
+  --ring: 0.55 0.18 260;
+  --success: 0.6 0.17 145;
+  --warning: 0.7 0.17 75;
+  --sidebar: 0.98 0.002 260;
+  --sidebar-foreground: 0.145 0.015 285;
+  --sidebar-accent: 0.94 0.01 260;
+  --sidebar-accent-foreground: 0.25 0.015 285;
+  --sidebar-border: 0.922 0.004 260;
+  --sidebar-ring: 0.55 0.18 260;
+}
+
+.dark {
+  --background: 0.12 0.015 260;
+  --foreground: 0.93 0.01 260;
+  --card: 0.16 0.015 260;
+  --card-foreground: 0.93 0.01 260;
+  --popover: 0.16 0.015 260;
+  --popover-foreground: 0.93 0.01 260;
+  --primary: 0.65 0.2 260;
+  --primary-foreground: 0.12 0 0;
+  --secondary: 0.22 0.015 260;
+  --secondary-foreground: 0.93 0.01 260;
+  --muted: 0.22 0.015 260;
+  --muted-foreground: 0.65 0.015 260;
+  --accent: 0.22 0.015 260;
+  --accent-foreground: 0.93 0.01 260;
+  --destructive: 0.6 0.2 25;
+  --border: 0.24 0.006 260;
+  --input: 0.24 0.006 260;
+  --ring: 0.65 0.2 260;
+  --success: 0.65 0.17 145;
+  --warning: 0.75 0.17 75;
+  --sidebar: 0.14 0.012 260;
+  --sidebar-foreground: 0.93 0.01 260;
+  --sidebar-accent: 0.22 0.015 260;
+  --sidebar-accent-foreground: 0.93 0.01 260;
+  --sidebar-border: 0.24 0.006 260;
+  --sidebar-ring: 0.65 0.2 260;
+}
+
+body {
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+}

@@ -11,6 +11,7 @@ import { watchCommand, unwatchCommand, watchStatusCommand } from "./commands/wat
 import { configGetCommand, configSetCommand } from "./commands/config.js";
 import { startCommand, stopCommand } from "./commands/daemon-ctrl.js";
 import { initCommand } from "./commands/init.js";
+import { dashboardCommand } from "./commands/dashboard.js";
 import { error } from "./util/format.js";
 
 const program = new Command().name("lens").description("LENS — Local-first repo context engine").version("0.1.0");
@@ -101,6 +102,12 @@ program
   .command("init")
   .description("Write .mcp.json for Claude Code MCP auto-discovery")
   .action(() => run(() => initCommand()));
+
+// lens dashboard
+program
+  .command("dashboard")
+  .description("Open the LENS dashboard in browser")
+  .action(() => run(() => dashboardCommand()));
 
 // lens config
 const cfg = program.command("config").description("Manage LENS CLI config");

@@ -12,15 +12,12 @@ interface StatusResponse {
   embedded_count: number;
   embeddable_count: number;
   embedded_pct: number;
-  embedder: string;
-  embedding_dim: number;
   metadata_count: number;
   import_edge_count: number;
   git_commits_analyzed: number;
   cochange_pairs: number;
   purpose_count: number;
   purpose_total: number;
-  purpose_model_status: string;
 }
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;

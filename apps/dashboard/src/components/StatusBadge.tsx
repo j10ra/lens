@@ -1,0 +1,26 @@
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+const VARIANTS: Record<string, string> = {
+  ready: "bg-success/15 text-success border-success/25",
+  indexed: "bg-success/15 text-success border-success/25",
+  indexing: "bg-warning/15 text-warning border-warning/25",
+  pending: "bg-muted text-muted-foreground border-border",
+  error: "bg-destructive/15 text-destructive border-destructive/25",
+  active: "bg-success/15 text-success border-success/25",
+  inactive: "bg-muted text-muted-foreground border-border",
+};
+
+interface StatusBadgeProps {
+  status: string;
+  className?: string;
+}
+
+export function StatusBadge({ status, className }: StatusBadgeProps) {
+  const variant = VARIANTS[status] ?? VARIANTS.pending;
+  return (
+    <Badge variant="outline" className={cn(variant, className)}>
+      {status}
+    </Badge>
+  );
+}

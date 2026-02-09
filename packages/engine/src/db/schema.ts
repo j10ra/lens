@@ -121,3 +121,19 @@ export const fileCochanges = sqliteTable(
     index("idx_cochanges_lookup").on(t.repo_id, t.path_a),
   ],
 );
+
+export const requestLogs = sqliteTable(
+  "request_logs",
+  {
+    id: uuid(),
+    method: text("method").notNull(),
+    path: text("path").notNull(),
+    status: integer("status").notNull(),
+    duration_ms: integer("duration_ms").notNull(),
+    source: text("source").notNull().default("api"),
+    request_body: text("request_body"),
+    response_size: integer("response_size"),
+    created_at: now(),
+  },
+  (t) => [index("idx_request_logs_created").on(t.created_at), index("idx_request_logs_source").on(t.source)],
+);

@@ -62,4 +62,12 @@ export {
 } from "./context/structural";
 
 // Query helpers (for advanced usage)
-export { repoQueries, chunkQueries, metadataQueries, importQueries, statsQueries, cochangeQueries } from "./db/queries";
+export {
+  repoQueries,
+  chunkQueries,
+  metadataQueries,
+  importQueries,
+  statsQueries,
+  cochangeQueries,
+  logQueries,
+} from "./db/queries";

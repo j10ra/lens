@@ -1,0 +1,47 @@
+import {
+	Card,
+	CardHeader,
+	CardDescription,
+	CardTitle,
+	CardAction,
+	CardFooter,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+interface StatsCardProps {
+	label: string;
+	value: string | number;
+	description?: string;
+	trend?: string;
+	className?: string;
+}
+
+export function StatsCard({
+	label,
+	value,
+	description,
+	trend,
+	className,
+}: StatsCardProps) {
+	return (
+		<Card className={cn("@container/card", className)}>
+			<CardHeader>
+				<CardDescription>{label}</CardDescription>
+				<CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+					{value}
+				</CardTitle>
+				{trend && (
+					<CardAction>
+						<Badge variant="outline">{trend}</Badge>
+					</CardAction>
+				)}
+			</CardHeader>
+			{description && (
+				<CardFooter className="flex-col items-start gap-1.5 text-sm">
+					<div className="text-muted-foreground">{description}</div>
+				</CardFooter>
+			)}
+		</Card>
+	);
+}

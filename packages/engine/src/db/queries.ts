@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, inArray, or, sql } from "drizzle-orm";
 import type { Db } from "./connection";
-import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos } from "./schema";
+import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos, requestLogs } from "./schema";
 
 // --- Helpers ---
 
@@ -635,6 +635,116 @@ export const cochangeQueries = {
       partner: pathSet.has(r.path_a) ? r.path_b : r.path_a,
       count: r.cochange_count,
     }));
+  },
+};
+
+// --- Request Log Queries ---
+
+export const logQueries = {
+  insert(
+    db: Db,
+    method: string,
+    path: string,
+    status: number,
+    durationMs: number,
+    source: string,
+    requestBody?: string,
+    responseSize?: number,
+  ): void {
+    db.insert(requestLogs)
+      .values({
+        id: randomUUID(),
+        method,
+        path,
+        status,
+        duration_ms: durationMs,
+        source,
+        request_body: requestBody ?? null,
+        response_size: responseSize ?? null,
+      })
+      .run();
+  },
+
+  list(
+    db: Db,
+    opts: { limit?: number; offset?: number; method?: string; path?: string; status?: number; source?: string } = {},
+  ) {
+    const { limit = 50, offset = 0, method, path, status, source } = opts;
+    const conditions = [];
+    if (method) conditions.push(eq(requestLogs.method, method));
+    if (path) conditions.push(sql`${requestLogs.path} LIKE ${"%" + path + "%"}`);
+    if (status) conditions.push(eq(requestLogs.status, status));
+    if (source) conditions.push(eq(requestLogs.source, source));
+
+    const where = conditions.length ? and(...conditions) : undefined;
+    const rows = db
+      .select()
+      .from(requestLogs)
+      .where(where)
+      .orderBy(sql`created_at DESC`)
+      .limit(limit)
+      .offset(offset)
+      .all();
+
+    const total =
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(requestLogs)
+        .where(where)
+        .get()?.count ?? 0;
+
+    return { rows, total };
+  },
+
+  prune(db: Db, keep = 10000): number {
+    const total =
+      db.select({ count: sql<number>`count(*)` }).from(requestLogs).get()?.count ?? 0;
+    if (total <= keep) return 0;
+    const cutoff = db
+      .select({ created_at: requestLogs.created_at })
+      .from(requestLogs)
+      .orderBy(sql`created_at DESC`)
+      .limit(1)
+      .offset(keep - 1)
+      .get();
+    if (!cutoff) return 0;
+    const result = db
+      .delete(requestLogs)
+      .where(sql`created_at < ${cutoff.created_at}`)
+      .run();
+    return result.changes;
+  },
+
+  summary(db: Db) {
+    const today = new Date().toISOString().slice(0, 10);
+    const totalToday =
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(requestLogs)
+        .where(sql`created_at >= ${today}`)
+        .get()?.count ?? 0;
+
+    const bySource = db
+      .select({ source: requestLogs.source, count: sql<number>`count(*)` })
+      .from(requestLogs)
+      .where(sql`created_at >= ${today}`)
+      .groupBy(requestLogs.source)
+      .all();
+
+    const byEndpoint = db
+      .select({
+        method: requestLogs.method,
+        path: requestLogs.path,
+        count: sql<number>`count(*)`,
+      })
+      .from(requestLogs)
+      .where(sql`created_at >= ${today}`)
+      .groupBy(requestLogs.method, requestLogs.path)
+      .orderBy(sql`count(*) DESC`)
+      .limit(10)
+      .all();
+
+    return { total_today: totalToday, by_source: bySource, by_endpoint: byEndpoint };
   },
 };
 
