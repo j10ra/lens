@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { exec } from "node:child_process";
+import { openBrowser } from "../util/browser.js";
 import { output, error } from "../util/format.js";
 
 const PID_FILE = join(homedir(), ".lens", "daemon.pid");
@@ -15,16 +15,6 @@ function isDaemonRunning(): boolean {
   } catch {
     return false;
   }
-}
-
-function openBrowser(url: string): void {
-  const cmd =
-    process.platform === "darwin"
-      ? "open"
-      : process.platform === "win32"
-        ? "start"
-        : "xdg-open";
-  exec(`${cmd} ${url}`);
 }
 
 export async function dashboardCommand(): Promise<void> {

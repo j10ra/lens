@@ -18,6 +18,7 @@ tsconfig.tsbuildinfo
 .lens
 .rlm
 .env
+.dev.vars
 
 # OS
 .DS_Store

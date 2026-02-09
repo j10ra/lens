@@ -12,6 +12,8 @@ import { configGetCommand, configSetCommand } from "./commands/config.js";
 import { startCommand, stopCommand } from "./commands/daemon-ctrl.js";
 import { initCommand } from "./commands/init.js";
 import { dashboardCommand } from "./commands/dashboard.js";
+import { loginCommand } from "./commands/login.js";
+import { logoutCommand } from "./commands/logout.js";
 import { error } from "./util/format.js";
 
 const program = new Command().name("lens").description("LENS — Local-first repo context engine").version("0.1.0");
@@ -108,6 +110,19 @@ program
   .command("dashboard")
   .description("Open the LENS dashboard in browser")
   .action(() => run(() => dashboardCommand()));
+
+// lens login / logout
+program
+  .command("login")
+  .description("Authenticate with LENS cloud via browser OAuth")
+  .option("--github", "Sign in with GitHub directly")
+  .option("--google", "Sign in with Google directly")
+  .action((opts) => run(() => loginCommand(opts)));
+
+program
+  .command("logout")
+  .description("Clear LENS cloud authentication")
+  .action(() => run(() => logoutCommand()));
 
 // lens config
 const cfg = program.command("config").description("Manage LENS CLI config");
