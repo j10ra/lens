@@ -1,0 +1,8 @@
+{
+  "name": "@lens/engine",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Core indexing, scoring, and graph engine (SQLite)",
+  "type": "module",
+  "main": "./src/index.ts"
+}

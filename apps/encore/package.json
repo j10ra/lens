@@ -1,0 +1,14 @@
+{
+  "name": "@lens/encore",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "encore.dev": "^1.53.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.7",
+    "typescript": "^5.2.2"
+  }
+}

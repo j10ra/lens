@@ -1,0 +1,8 @@
+{
+  "name": "@lens/daemon",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local HTTP + MCP server",
+  "type": "module",
+  "main": "./src/index.ts"
+}

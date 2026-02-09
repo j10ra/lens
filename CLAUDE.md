@@ -2,22 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## RLM — Repo Context Daemon
+## LENS — Local-First Repo Context Engine
 
-Local daemon that indexes codebases and serves context packs to Claude Code. Zero LLM calls on the query path.
+Indexes codebases and serves context packs to AI agents. Zero LLM calls on the query path.
 
-### Architecture
+### Monorepo Structure (pnpm workspaces)
 
-- **Services**: `repo/`, `index/`, `context/` (Encore.ts, flat structure at repo root)
-- **CLI**: `packages/rlm-cli/` (TypeScript, compiled to `dist/`)
-- **Database**: Postgres via Encore (Docker), single `rlm` database
-- **Only endpoint**: `POST /context` — everything else is internal
+```
+apps/
+  encore/       ← current working Encore app (Postgres, Docker)
+  daemon/       ← Layer 2: local HTTP + MCP server (planned)
+  cloud/        ← Layer 3: control plane, billing (planned)
+packages/
+  cli/          ← CLI tool (`lens` command)
+  engine/       ← Layer 1: core logic, SQLite (planned)
+  types/        ← shared types (planned)
+docs/           ← architecture, benchmarks
+```
 
 ### Development Commands
 
-**Daemon**: `encore run` (binds to `127.0.0.1:4000`, NOT localhost)
+**Install**: `pnpm install` (from root)
 
-**CLI**: `cd packages/rlm-cli && npm run build`
+**Encore daemon**: `cd apps/encore && encore run` (binds `127.0.0.1:4000`)
+
+**CLI build**: `pnpm --filter @lens/cli build`
+
+**Build all**: `pnpm -r build`
 
 **Testing**: `encore test` (with infra) or `vitest` (without)
 
@@ -25,17 +36,17 @@ Local daemon that indexes codebases and serves context packs to Claude Code. Zer
 
 ### Key Implementation Notes
 
-**Migrations**: No hot-reload. Restart `encore run`. Numbered format: `001_name.up.sql` in `repo/migrations/`
+**Migrations**: No hot-reload. Restart `encore run`. Numbered format: `001_name.up.sql` in `apps/encore/repo/migrations/`
 
-**Database**: `repo/db.ts` exports named `db` — DB resources cannot be default-exported
+**Database**: `apps/encore/repo/db.ts` exports named `db` — DB resources cannot be default-exported
 
 **Secrets**: `encore secret set --type dev <key>` (dev type, not local). `VoyageApiKey` for embeddings + vocab clusters. `OpenRouterApiKey` for purpose summaries
 
-**Model config**: All model names, API URLs, batch sizes, secrets in `index/lib/models.ts` (single source of truth)
+**Model config**: All model names, API URLs, batch sizes, secrets in `apps/encore/index/lib/models.ts` (single source of truth)
 
-**Advisory locks**: `repo/lib/identity.ts` hashes UUID to 32-bit int for `pg_advisory_lock`
+**Advisory locks**: `apps/encore/repo/lib/identity.ts` hashes UUID to 32-bit int for `pg_advisory_lock`
 
-**File watchers**: In-memory per repo — stop on daemon restart, re-enable with `rlm repo watch`
+**File watchers**: In-memory per repo — stop on daemon restart, re-enable with `lens repo watch`
 
 ### Context Pack Pipeline
 
@@ -51,7 +62,7 @@ Local daemon that indexes codebases and serves context packs to Claude Code. Zer
 
 ### Indexing Pipeline
 
-`runIndex()` in `index/lib/engine.ts`:
+`runIndex()` in `apps/encore/index/lib/engine.ts`:
 
 1. Diff scan (or full scan if forced) → chunk files
 2. `extractAndPersistMetadata()` — exports, imports, docstrings per file
@@ -63,14 +74,14 @@ Local daemon that indexes codebases and serves context packs to Claude Code. Zer
 ### Voyage AI Integration
 
 - Model: `voyage-code-3` (1024 dim)
-- Embedder: `index/lib/embedder.ts` — batch size 32 for chunks, 128 for vocab terms
-- Vocab clusters: `index/lib/vocab-clusters.ts` — union-find clustering, max 12 terms/cluster
+- Embedder: `apps/encore/index/lib/embedder.ts` — batch size 32 for chunks, 128 for vocab terms
+- Vocab clusters: `apps/encore/index/lib/vocab-clusters.ts` — union-find clustering, max 12 terms/cluster
 - Lazy embedding: background worker embeds chunks where `embedding IS NULL`
 - Graceful fallback: if `VoyageApiKey` not set, clusters skipped, static synonyms used
 
 ### Query Interpreter
 
-`context/lib/query-interpreter.ts`:
+`apps/encore/context/lib/query-interpreter.ts`:
 
 - Stopwords: natural language + 30 code-domain terms (index, data, value, module, etc.)
 - Noise filtering: vendor/, scripts/, .min.js, .designer.cs, drawable/, layout/ etc.

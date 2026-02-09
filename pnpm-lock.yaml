@@ -1,0 +1,95 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .: {}
+
+  apps/cloud: {}
+
+  apps/daemon: {}
+
+  apps/encore:
+    dependencies:
+      chokidar:
+        specifier: ^5.0.0
+        version: 5.0.0
+      encore.dev:
+        specifier: ^1.53.7
+        version: 1.54.0
+    devDependencies:
+      '@types/node':
+        specifier: ^20.5.7
+        version: 20.19.33
+      typescript:
+        specifier: ^5.2.2
+        version: 5.9.3
+
+  packages/cli:
+    dependencies:
+      commander:
+        specifier: ^13.1.0
+        version: 13.1.0
+    devDependencies:
+      '@types/node':
+        specifier: ^20.5.7
+        version: 20.19.33
+      typescript:
+        specifier: ^5.2.2
+        version: 5.9.3
+
+  packages/engine: {}
+
+  packages/types: {}
+
+packages:
+
+  '@types/node@20.19.33':
+    resolution: {integrity: sha512-Rs1bVAIdBs5gbTIKza/tgpMuG1k3U/UMJLWecIMxNdJFDMzcM5LOiLVRYh3PilWEYDIeUDv7bpiHPLPsbydGcw==}
+
+  chokidar@5.0.0:
+    resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
+    engines: {node: '>= 20.19.0'}
+
+  commander@13.1.0:
+    resolution: {integrity: sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==}
+    engines: {node: '>=18'}
+
+  encore.dev@1.54.0:
+    resolution: {integrity: sha512-c2iONj673pl7C6H5nEbNi/NflckOtYFVe5+YQ2I9qmTCdsin0fkbBZ2paguGh6ueDg5Ud1hrPewYUZXJiy6lpg==}
+    engines: {node: '>=18.0.0'}
+
+  readdirp@5.0.0:
+    resolution: {integrity: sha512-9u/XQ1pvrQtYyMpZe7DXKv2p5CNvyVwzUB6uhLAnQwHMSgKMBR62lc7AHljaeteeHXn11XTAaLLUVZYVZyuRBQ==}
+    engines: {node: '>= 20.19.0'}
+
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
+  undici-types@6.21.0:
+    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+
+snapshots:
+
+  '@types/node@20.19.33':
+    dependencies:
+      undici-types: 6.21.0
+
+  chokidar@5.0.0:
+    dependencies:
+      readdirp: 5.0.0
+
+  commander@13.1.0: {}
+
+  encore.dev@1.54.0: {}
+
+  readdirp@5.0.0: {}
+
+  typescript@5.9.3: {}
+
+  undici-types@6.21.0: {}

@@ -1,10 +1,10 @@
 {
-  "name": "rlm-cli",
+  "name": "@lens/cli",
   "version": "0.1.0",
-  "description": "CLI bridge for the RLM daemon",
+  "description": "LENS CLI",
   "type": "module",
   "bin": {
-    "rlm": "./dist/index.js"
+    "lens": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
