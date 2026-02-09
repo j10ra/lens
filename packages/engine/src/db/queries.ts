@@ -696,21 +696,11 @@ export const logQueries = {
     return { rows, total };
   },
 
-  prune(db: Db, keep = 10000): number {
-    const total =
-      db.select({ count: sql<number>`count(*)` }).from(requestLogs).get()?.count ?? 0;
-    if (total <= keep) return 0;
-    const cutoff = db
-      .select({ created_at: requestLogs.created_at })
-      .from(requestLogs)
-      .orderBy(sql`created_at DESC`)
-      .limit(1)
-      .offset(keep - 1)
-      .get();
-    if (!cutoff) return 0;
+  prune(db: Db, maxAgeDays = 7): number {
+    const cutoff = new Date(Date.now() - maxAgeDays * 86_400_000).toISOString();
     const result = db
       .delete(requestLogs)
-      .where(sql`created_at < ${cutoff.created_at}`)
+      .where(sql`created_at < ${cutoff}`)
       .run();
     return result.changes;
   },

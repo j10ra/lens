@@ -52,7 +52,8 @@ async function main() {
     const selfDir = dirname(fileURLToPath(import.meta.url));
     const candidates = [
       resolve(selfDir, "../../dashboard/dist"),     // monorepo dev
-      resolve(selfDir, "../dashboard"),              // bundled dist
+      resolve(selfDir, "../dashboard"),              // legacy
+      resolve(selfDir, "dashboard"),                 // publish: sibling
     ];
     const dashboardDist = candidates.find((p) => existsSync(p));
 

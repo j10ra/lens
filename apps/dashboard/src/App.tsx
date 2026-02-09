@@ -10,10 +10,10 @@ import { Requests } from "./pages/Requests";
 
 export function App() {
   return (
-    <SidebarProvider className="bg-muted">
+    <SidebarProvider className="bg-muted h-svh">
       <AppSidebar />
       <SidebarInset className="bg-background rounded-xl overflow-hidden md:my-2 md:mr-2 md:border">
-        <div className="@container/main flex flex-1 flex-col">
+        <div className="@container/main flex min-h-0 flex-1 flex-col">
           <Routes>
             <Route path="/" element={<Overview />} />
             <Route path="/repos" element={<Repos />} />

@@ -33,7 +33,7 @@ export function Requests() {
 				offset: page * pageSize,
 				source: source || undefined,
 			}),
-		refetchInterval: 3_000,
+		refetchInterval: 15_000,
 		placeholderData: keepPreviousData,
 	});
 

@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
+    "build:publish": "pnpm -r build && rm -rf publish && tsup --config tsup.config.publish.ts && cp -r apps/dashboard/dist publish/dashboard && cp publish.json publish/package.json",
     "dev:encore": "cd apps/encore && encore run",
     "build:cli": "pnpm --filter @lens/cli build",
     "format": "biome format --write .",
@@ -22,6 +23,7 @@
     "encore.dev": "^1.53.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.14"
+    "@biomejs/biome": "^2.3.14",
+    "tsup": "^8.5.0"
   }
 }

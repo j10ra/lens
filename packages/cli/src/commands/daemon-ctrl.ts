@@ -1,10 +1,10 @@
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { spawn } from "node:child_process";
-import { openSync } from "node:fs";
-import { output, error } from "../util/format.js";
+import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { output, error } from "../util/format.js";
 
 const LENS_DIR = join(homedir(), ".lens");
 const PID_FILE = join(LENS_DIR, "daemon.pid");
@@ -29,13 +29,19 @@ export async function startCommand(): Promise<void> {
     return;
   }
 
-  const require = createRequire(import.meta.url);
+  const selfDir = dirname(fileURLToPath(import.meta.url));
+  const sibling = join(selfDir, "daemon.js");
   let daemonScript: string;
-  try {
-    daemonScript = require.resolve("@lens/daemon");
-  } catch {
-    error("Could not find @lens/daemon. Run `pnpm build` first.");
-    return;
+  if (existsSync(sibling)) {
+    daemonScript = sibling;
+  } else {
+    try {
+      const require = createRequire(import.meta.url);
+      daemonScript = require.resolve("@lens/daemon");
+    } catch {
+      error("Could not find @lens/daemon. Run `pnpm build` first.");
+      return;
+    }
   }
 
   const logFd = openSync(LOG_FILE, "a");

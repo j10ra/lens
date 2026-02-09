@@ -14,7 +14,7 @@ export function Jobs() {
 	const { data, isLoading } = useQuery({
 		queryKey: ["dashboard-jobs"],
 		queryFn: api.jobs,
-		refetchInterval: 3_000,
+		refetchInterval: 15_000,
 		placeholderData: keepPreviousData,
 	});
 
@@ -44,7 +44,7 @@ export function Jobs() {
 				<span className="text-sm font-medium">Jobs</span>
 				<span className="text-xs text-muted-foreground">{repos.length} repos</span>
 			</PageHeader>
-			<div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+			<div className="flex-1 min-h-0 overflow-auto flex flex-col gap-4 py-4 md:gap-6 md:py-6">
 			{repos.length === 0 ? (
 				<p className="text-sm text-muted-foreground py-10 text-center">
 					No repos registered

@@ -19,7 +19,7 @@ export function Repos() {
 	const { data, isLoading } = useQuery({
 		queryKey: ["dashboard-repos"],
 		queryFn: api.repos,
-		refetchInterval: 5_000,
+		refetchInterval: 30_000,
 		placeholderData: keepPreviousData,
 	});
 
@@ -126,7 +126,7 @@ export function Repos() {
 					</div>
 				</PageHeader>
 
-				<div className="grid gap-4 p-4 lg:p-6 @xl/main:grid-cols-2">
+				<div className="flex-1 min-h-0 overflow-auto grid gap-4 p-4 lg:p-6 @xl/main:grid-cols-2 content-start">
 					<Card>
 						<CardHeader className="pb-2">
 							<CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

@@ -1,0 +1,22 @@
+{
+	"name": "lens-engine",
+	"version": "0.1.0",
+	"description": "LENS — Local-first repo context engine for AI agents",
+	"type": "module",
+	"bin": {
+		"lens": "./cli.js",
+		"lens-daemon": "./daemon.js"
+	},
+	"files": ["cli.js", "daemon.js", "dashboard"],
+	"dependencies": {
+		"better-sqlite3": "^12.6.2"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/j10ra/lens"
+	}
+}

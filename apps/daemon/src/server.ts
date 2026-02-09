@@ -75,6 +75,7 @@ export function createApp(db: Db, dashboardDist?: string): Hono {
 
   // --- Request Logging Middleware ---
 
+  let lastPrune = 0;
   app.use("*", async (c, next) => {
     const start = performance.now();
     await next();
@@ -87,7 +88,12 @@ export function createApp(db: Db, dashboardDist?: string): Hono {
 
     try {
       logQueries.insert(db, c.req.method, path, c.res.status, duration, source);
-      logQueries.prune(db);
+      // Prune at most once per hour
+      const now = Date.now();
+      if (now - lastPrune > 3_600_000) {
+        lastPrune = now;
+        logQueries.prune(db);
+      }
     } catch {}
   });
 
