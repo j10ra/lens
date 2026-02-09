@@ -9,20 +9,19 @@ import { removeCommand } from "./commands/remove.js";
 import { daemonStatsCommand } from "./commands/daemon-stats.js";
 import { watchCommand, unwatchCommand, watchStatusCommand } from "./commands/watch.js";
 import { configGetCommand, configSetCommand } from "./commands/config.js";
+import { startCommand, stopCommand } from "./commands/daemon-ctrl.js";
+import { initCommand } from "./commands/init.js";
 import { error } from "./util/format.js";
 
-const program = new Command()
-  .name("rlm")
-  .description("RLM — Local Repo Language Model Daemon CLI")
-  .version("0.1.0");
+const program = new Command().name("lens").description("LENS — Local-first repo context engine").version("0.1.0");
 
-// rlm repo register | list | remove
+// lens repo register | list | remove
 const repo = program.command("repo").description("Repo management");
 repo
   .command("register")
   .description("Register current repo with the daemon")
   .option("--json", "Output as JSON", false)
-  .option("--inject", "Inject RLM instructions into existing CLAUDE.md", false)
+  .option("--inject", "Inject LENS instructions into existing CLAUDE.md", false)
   .action((opts) => run(() => registerCommand(opts)));
 
 repo
@@ -56,14 +55,14 @@ repo
   .option("--json", "Output as JSON", false)
   .action((opts) => run(() => watchStatusCommand(opts)));
 
-// rlm context "<goal>" — primary command
+// lens context "<goal>" — primary command
 program
   .command("context <goal>")
   .description("Build an intelligent context pack for a goal")
   .option("--json", "Output as JSON", false)
   .action((goal, opts) => run(() => contextCommand(goal, opts)));
 
-// rlm index
+// lens index
 program
   .command("index")
   .description("Index the current repo")
@@ -72,14 +71,14 @@ program
   .option("--status", "Show index status", false)
   .action((opts) => run(() => indexCommand(opts)));
 
-// rlm status
+// lens status
 program
   .command("status")
   .description("Show repo index/embedding status")
   .option("--json", "Output as JSON", false)
   .action((opts) => run(() => statusCommand(opts)));
 
-// rlm daemon stats
+// lens daemon stats
 const daemon = program.command("daemon").description("Daemon management");
 daemon
   .command("stats")
@@ -87,15 +86,31 @@ daemon
   .option("--json", "Output as JSON", false)
   .action((opts) => run(() => daemonStatsCommand(opts)));
 
-// rlm config
-const cfg = program.command("config").description("Manage RLM CLI config");
+daemon
+  .command("start")
+  .description("Start the LENS daemon")
+  .action(() => run(() => startCommand()));
+
+daemon
+  .command("stop")
+  .description("Stop the LENS daemon")
+  .action(() => run(() => stopCommand()));
+
+// lens init
+program
+  .command("init")
+  .description("Write .mcp.json for Claude Code MCP auto-discovery")
+  .action(() => run(() => initCommand()));
+
+// lens config
+const cfg = program.command("config").description("Manage LENS CLI config");
 cfg
   .command("get <key>")
   .description("Get config value (inject_behavior, show_progress)")
   .action((key) => run(() => configGetCommand(key)));
 cfg
   .command("set <key> <value>")
-  .description('Set config value (e.g. show_progress true, inject_behavior once)')
+  .description("Set config value (e.g. show_progress true, inject_behavior once)")
   .action((key, value) => run(() => configSetCommand(key, value)));
 
 program.parse();

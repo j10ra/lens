@@ -1,22 +1,22 @@
-import type { Db } from "../db/connection";
 import type { Capabilities } from "../capabilities";
-import type { ContextResponse, ContextData } from "../types";
+import type { Db } from "../db/connection";
 import { repoQueries } from "../db/queries";
 import { ensureIndexed } from "../index/engine";
-import {
-  loadFileMetadata,
-  getAllFileStats,
-  loadVocabClusters,
-  getReverseImports,
-  getForwardImports,
-  get2HopReverseDeps,
-  getCochanges,
-  getIndegrees,
-  getCochangePartners,
-} from "./structural";
-import { interpretQuery, isNoisePath } from "./query-interpreter";
-import { vectorSearch } from "./vector";
+import type { ContextData, ContextResponse } from "../types";
 import { formatContextPack } from "./formatter";
+import { interpretQuery, isNoisePath } from "./query-interpreter";
+import {
+  get2HopReverseDeps,
+  getAllFileStats,
+  getCochangePartners,
+  getCochanges,
+  getForwardImports,
+  getIndegrees,
+  getReverseImports,
+  loadFileMetadata,
+  loadVocabClusters,
+} from "./structural";
+import { vectorSearch } from "./vector";
 
 // --- Cache ---
 interface CacheEntry {

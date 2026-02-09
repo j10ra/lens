@@ -19,16 +19,14 @@ export async function daemonStatsCommand(opts: { json: boolean }): Promise<void>
     return;
   }
 
-  const embedPct = s.total_chunks > 0
-    ? Math.round((s.total_embeddings / s.total_chunks) * 100)
-    : 0;
+  const embedPct = s.total_chunks > 0 ? Math.round((s.total_embeddings / s.total_chunks) * 100) : 0;
 
   const maintResult = s.last_maintenance_result
     ? `${s.last_maintenance_result.processed} processed, ${s.last_maintenance_result.errors} errors`
     : "—";
 
   const lines = [
-    "## RLM Daemon",
+    "## LENS Daemon",
     "",
     `  Repos:      ${s.repos_count}`,
     `  Chunks:     ${s.total_chunks.toLocaleString()}`,

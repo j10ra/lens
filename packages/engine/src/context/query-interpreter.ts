@@ -1,4 +1,4 @@
-import type { FileMetadataRow, VocabCluster, InterpretedQuery } from "../types";
+import type { FileMetadataRow, InterpretedQuery, VocabCluster } from "../types";
 
 const STOPWORDS = new Set([
   "the",

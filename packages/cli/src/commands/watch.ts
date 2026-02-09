@@ -50,10 +50,10 @@ export async function watchStatusCommand(opts: { json: boolean }): Promise<void>
   } else if (res.watching) {
     output(
       `${name}: watching since ${res.started_at}\n` +
-      `  Changed: ${res.changed_files} files | Deleted: ${res.deleted_files} files`,
+        `  Changed: ${res.changed_files} files | Deleted: ${res.deleted_files} files`,
       false,
     );
   } else {
-    output(`${name}: not watching. Run \`rlm repo watch\` to start.`, false);
+    output(`${name}: not watching. Run \`lens repo watch\` to start.`, false);
   }
 }

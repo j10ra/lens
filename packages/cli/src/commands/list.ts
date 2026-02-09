@@ -25,12 +25,19 @@ export async function listCommand(opts: { json: boolean }): Promise<void> {
   }
 
   if (res.repos.length === 0) {
-    output("No repos registered. Run `rlm repo register` to add one.", false);
+    output("No repos registered. Run `lens repo register` to add one.", false);
     return;
   }
 
   // Table header
-  const header = pad("ID", 10) + pad("Name", 20) + pad("Status", 10) + pad("Files", 8) + pad("Chunks", 10) + pad("Embed%", 8) + "Last Indexed";
+  const header =
+    pad("ID", 10) +
+    pad("Name", 20) +
+    pad("Status", 10) +
+    pad("Files", 8) +
+    pad("Chunks", 10) +
+    pad("Embed%", 8) +
+    "Last Indexed";
   const sep = "-".repeat(header.length);
 
   const lines = [header, sep];
@@ -39,12 +46,12 @@ export async function listCommand(opts: { json: boolean }): Promise<void> {
     const indexed = r.last_indexed_at ? timeAgo(r.last_indexed_at) : "never";
     lines.push(
       pad(id, 10) +
-      pad(r.name, 20) +
-      pad(r.index_status, 10) +
-      pad(String(r.files_indexed), 8) +
-      pad(r.chunk_count.toLocaleString(), 10) +
-      pad(`${r.embedded_pct}%`, 8) +
-      indexed,
+        pad(r.name, 20) +
+        pad(r.index_status, 10) +
+        pad(String(r.files_indexed), 8) +
+        pad(r.chunk_count.toLocaleString(), 10) +
+        pad(`${r.embedded_pct}%`, 8) +
+        indexed,
     );
   }
 

@@ -41,14 +41,14 @@ export async function statusCommand(opts: { json: boolean }): Promise<void> {
   const check = green("✓");
   const pending = dim("○");
 
-  const embLabel = s.embeddable_count > 0
-    ? `${s.embedded_count}/${s.embeddable_count} code chunks (${s.embedded_pct}%)`
-    : "no code chunks";
-  const embIcon = s.embedded_pct >= 100 || (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) ? check : pending;
+  const embLabel =
+    s.embeddable_count > 0
+      ? `${s.embedded_count}/${s.embeddable_count} code chunks (${s.embedded_pct}%)`
+      : "no code chunks";
+  const embIcon =
+    s.embedded_pct >= 100 || (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) ? check : pending;
 
-  const purposeLabel = s.purpose_total > 0
-    ? `${s.purpose_count}/${s.purpose_total} files`
-    : "no files";
+  const purposeLabel = s.purpose_total > 0 ? `${s.purpose_count}/${s.purpose_total} files` : "no files";
   const purposeIcon = s.purpose_count > 0 && s.purpose_count >= s.purpose_total ? check : pending;
 
   const lines = [

@@ -2,7 +2,26 @@
   "name": "@lens/daemon",
   "private": true,
   "version": "0.1.0",
-  "description": "Local HTTP + MCP server",
+  "description": "LENS local HTTP + MCP server",
   "type": "module",
-  "main": "./src/index.ts"
+  "main": "dist/index.js",
+  "bin": {
+    "lens-daemon": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@lens/engine": "workspace:*",
+    "hono": "^4.7.0",
+    "@hono/node-server": "^1.14.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.7.0"
+  }
 }

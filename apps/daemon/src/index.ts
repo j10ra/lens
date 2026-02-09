@@ -1,0 +1,71 @@
+import { writeFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { openDb, closeDb } from "@lens/engine";
+
+const PID_FILE = join(homedir(), ".lens", "daemon.pid");
+
+function writePid() {
+  writeFileSync(PID_FILE, String(process.pid));
+}
+
+function removePid() {
+  try {
+    unlinkSync(PID_FILE);
+  } catch {}
+}
+
+async function main() {
+  const db = openDb();
+
+  if (process.argv.includes("--stdio")) {
+    // MCP stdio mode — stdout reserved for JSON-RPC
+    const { createMcpServer } = await import("./mcp");
+    const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
+
+    const mcpServer = createMcpServer(db);
+    const transport = new StdioServerTransport();
+
+    process.on("SIGTERM", () => {
+      closeDb();
+      process.exit(0);
+    });
+    process.on("SIGINT", () => {
+      closeDb();
+      process.exit(0);
+    });
+
+    console.error("[LENS] MCP stdio server starting...");
+    await mcpServer.connect(transport);
+    console.error("[LENS] MCP stdio server connected");
+  } else {
+    // HTTP server mode
+    const { createApp } = await import("./server");
+    const { serve } = await import("@hono/node-server");
+
+    const port = Number(process.env.LENS_PORT) || 4111;
+    const app = createApp(db);
+
+    const server = serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, () => {
+      console.error(`[LENS] HTTP server listening on 127.0.0.1:${port}`);
+    });
+
+    writePid();
+
+    function shutdown() {
+      console.error("[LENS] Shutting down...");
+      server.close();
+      closeDb();
+      removePid();
+      process.exit(0);
+    }
+
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
+  }
+}
+
+main().catch((e) => {
+  console.error("[LENS] Fatal:", e);
+  process.exit(1);
+});

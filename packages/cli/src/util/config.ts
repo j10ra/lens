@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 
-const CONFIG_DIR = path.join(os.homedir(), ".rlm");
+const CONFIG_DIR = path.join(os.homedir(), ".lens");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 
 export interface Config {

@@ -11,10 +11,7 @@ interface ContextResponse {
   };
 }
 
-export async function contextCommand(
-  goal: string,
-  opts: { json: boolean },
-): Promise<void> {
+export async function contextCommand(goal: string, opts: { json: boolean }): Promise<void> {
   const { repo_id } = await ensureRepo();
   const res = await post<ContextResponse>("/context", { repo_id, goal });
 

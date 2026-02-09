@@ -3,17 +3,10 @@ import path from "node:path";
 import { get } from "./client.js";
 import { readConfig } from "./config.js";
 
-const RLM_MARKER = "RLM — Repo Context Daemon";
+const RLM_MARKER = "LENS — Repo Context Engine";
 
 // Search order: root files first (more likely to be user's main file), then .claude/
-const CANDIDATE_PATHS = [
-  "CLAUDE.md",
-  "agents.md",
-  "AGENTS.md",
-  ".CLAUDE.md",
-  ".agents.md",
-  ".AGENTS.md",
-];
+const CANDIDATE_PATHS = ["CLAUDE.md", "agents.md", "AGENTS.md", ".CLAUDE.md", ".agents.md", ".AGENTS.md"];
 
 async function findTargetFile(repoRoot: string): Promise<string | null> {
   for (const relPath of CANDIDATE_PATHS) {
@@ -38,7 +31,7 @@ export async function injectClaudeMd(repoRoot: string): Promise<void> {
   try {
     existingContent = await fs.readFile(targetFile, "utf-8");
     if (existingContent.includes(RLM_MARKER)) {
-      return; // Already has RLM content
+      return; // Already has LENS content
     }
   } catch {
     // File doesn't exist — will create new
@@ -57,7 +50,7 @@ export async function injectClaudeMd(repoRoot: string): Promise<void> {
 
   // Write content
   if (existingContent) {
-    // Prepend RLM content to existing
+    // Prepend LENS content to existing
     await fs.writeFile(targetFile, `${content}\n\n${existingContent}`);
   } else {
     // Create new file in root

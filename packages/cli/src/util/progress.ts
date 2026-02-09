@@ -28,11 +28,7 @@ const TOTAL_LINES = 16;
 const POLL_INTERVAL = 5000;
 const RENDER_INTERVAL = 33; // ~30fps
 
-export async function showProgress(
-  repoId: string,
-  name: string,
-  timeoutMs = 1800000,
-): Promise<void> {
+export async function showProgress(repoId: string, name: string, timeoutMs = 1800000): Promise<void> {
   const start = Date.now();
   const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   let frame = 0;
@@ -50,8 +46,10 @@ export async function showProgress(
       } catch {
         connFailures++;
         if (connFailures >= MAX_CONN_FAILURES) {
-          process.stdout.write(`\n  ${red("✗")} ${bold("Daemon unavailable")} — ${dim("connection lost after " + connFailures + " retries")}\n`);
-          process.stdout.write(`  ${dim("Restart with: encore run")}\n\n`);
+          process.stdout.write(
+            `\n  ${red("✗")} ${bold("Daemon unavailable")} — ${dim("connection lost after " + connFailures + " retries")}\n`,
+          );
+          process.stdout.write(`  ${dim("Restart with: lens start")}\n\n`);
           process.exit(1);
         }
       }
@@ -95,11 +93,21 @@ export async function showProgress(
       lines.push(`  ${dim("○")} Embeddings      ${dim("...")}`);
       lines.push(`  ${dim("○")} Summaries       ${dim("...")}`);
     } else {
-      lines.push(`  ${s.chunk_count > 0 ? green("✓") : cyan(f)} Chunks          ${dim(s.chunk_count > 0 ? s.chunk_count.toLocaleString() : "scanning...")}`);
-      lines.push(`  ${s.metadata_count > 0 ? green("✓") : cyan(f)} Metadata        ${dim(s.metadata_count > 0 ? `${s.metadata_count.toLocaleString()} files` : "extracting...")}`);
-      lines.push(`  ${s.git_commits_analyzed > 0 ? green("✓") : cyan(f)} Git history     ${dim(s.git_commits_analyzed > 0 ? `${s.git_commits_analyzed.toLocaleString()} files` : "analyzing...")}`);
-      lines.push(`  ${s.import_edge_count > 0 ? green("✓") : cyan(f)} Import graph    ${dim(s.import_edge_count > 0 ? `${s.import_edge_count.toLocaleString()} edges` : "building...")}`);
-      lines.push(`  ${s.cochange_pairs > 0 ? green("✓") : dim("○")} Co-changes      ${dim(s.cochange_pairs > 0 ? `${s.cochange_pairs.toLocaleString()} pairs` : "...")}`);
+      lines.push(
+        `  ${s.chunk_count > 0 ? green("✓") : cyan(f)} Chunks          ${dim(s.chunk_count > 0 ? s.chunk_count.toLocaleString() : "scanning...")}`,
+      );
+      lines.push(
+        `  ${s.metadata_count > 0 ? green("✓") : cyan(f)} Metadata        ${dim(s.metadata_count > 0 ? `${s.metadata_count.toLocaleString()} files` : "extracting...")}`,
+      );
+      lines.push(
+        `  ${s.git_commits_analyzed > 0 ? green("✓") : cyan(f)} Git history     ${dim(s.git_commits_analyzed > 0 ? `${s.git_commits_analyzed.toLocaleString()} files` : "analyzing...")}`,
+      );
+      lines.push(
+        `  ${s.import_edge_count > 0 ? green("✓") : cyan(f)} Import graph    ${dim(s.import_edge_count > 0 ? `${s.import_edge_count.toLocaleString()} edges` : "building...")}`,
+      );
+      lines.push(
+        `  ${s.cochange_pairs > 0 ? green("✓") : dim("○")} Co-changes      ${dim(s.cochange_pairs > 0 ? `${s.cochange_pairs.toLocaleString()} pairs` : "...")}`,
+      );
       // Embeddings
       const embDone = s.embedded_count >= s.embeddable_count && s.embeddable_count > 0;
       if (embDone) {
@@ -107,22 +115,26 @@ export async function showProgress(
       } else if (s.embeddable_count === 0) {
         lines.push(`  ${dim("○")} Embeddings      ${dim("no code chunks")}`);
       } else {
-        lines.push(`  ${cyan(f)} Embeddings      ${createBar(s.embedded_pct, 20)} ${dim(`${s.embedded_count}/${s.embeddable_count}`)}`);
+        lines.push(
+          `  ${cyan(f)} Embeddings      ${createBar(s.embedded_pct, 20)} ${dim(`${s.embedded_count}/${s.embeddable_count}`)}`,
+        );
       }
       // Summaries
       const sumDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;
       if (sumDone) {
         lines.push(`  ${green("✓")} Summaries       ${dim(`${s.purpose_count}/${s.purpose_total} files`)}`);
       } else if (s.purpose_total > 0) {
-        lines.push(`  ${cyan(f)} Summaries       ${createBar(Math.round((s.purpose_count / s.purpose_total) * 100), 20)} ${dim(`${s.purpose_count}/${s.purpose_total}`)}`);
+        lines.push(
+          `  ${cyan(f)} Summaries       ${createBar(Math.round((s.purpose_count / s.purpose_total) * 100), 20)} ${dim(`${s.purpose_count}/${s.purpose_total}`)}`,
+        );
       } else {
         lines.push(`  ${dim("○")} Summaries       ${dim("...")}`);
       }
     }
 
     // Completion checks
-    const structuralDone = !indexing && s.metadata_count > 0 && s.chunk_count > 0
-      && s.git_commits_analyzed > 0 && s.import_edge_count > 0;
+    const structuralDone =
+      !indexing && s.metadata_count > 0 && s.chunk_count > 0 && s.git_commits_analyzed > 0 && s.import_edge_count > 0;
     const embDone = (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) || s.embeddable_count === 0;
     const sumDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;
     const allDone = structuralDone && embDone && sumDone;
@@ -131,16 +143,16 @@ export async function showProgress(
     lines.push(``);
     if (indexing) {
       lines.push(`  ${dim("Runs in background — Ctrl+C to exit")}`);
-      lines.push(`  ${dim("Check progress:")} ${cyan("rlm status")}`);
+      lines.push(`  ${dim("Check progress:")} ${cyan("lens status")}`);
     } else if (allDone) {
-      lines.push(`  ${green("✓")} ${bold("Ready")} — ${cyan('rlm context "<goal>"')}`);
+      lines.push(`  ${green("✓")} ${bold("Ready")} — ${cyan('lens context "<goal>"')}`);
       lines.push(``);
     } else if (structuralDone) {
-      lines.push(`  ${green("✓")} ${bold("Ready")} — ${cyan('rlm context "<goal>"')}`);
-      lines.push(`  ${dim("Background tasks continue — Ctrl+C to exit, check:")} ${cyan("rlm status")}`);
+      lines.push(`  ${green("✓")} ${bold("Ready")} — ${cyan('lens context "<goal>"')}`);
+      lines.push(`  ${dim("Background tasks continue — Ctrl+C to exit, check:")} ${cyan("lens status")}`);
     } else {
       lines.push(`  ${dim("Runs in background — Ctrl+C to exit")}`);
-      lines.push(`  ${dim("Check progress:")} ${cyan("rlm status")}`);
+      lines.push(`  ${dim("Check progress:")} ${cyan("lens status")}`);
     }
 
     while (lines.length < TOTAL_LINES) lines.push(``);
@@ -152,7 +164,10 @@ export async function showProgress(
     process.stdout.write(output + "\n");
     lastRendered = output;
 
-    if (allDone) { done = true; return; }
+    if (allDone) {
+      done = true;
+      return;
+    }
 
     frame++;
     await sleep(RENDER_INTERVAL);

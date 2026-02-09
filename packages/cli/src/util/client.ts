@@ -1,5 +1,5 @@
-const BASE_URL = process.env.RLM_HOST ?? "http://127.0.0.1:4000";
-const VERBOSE = process.env.RLM_VERBOSE === "1" || process.argv.includes("--verbose") || process.argv.includes("-v");
+const BASE_URL = process.env.LENS_HOST ?? "http://127.0.0.1:4111";
+const VERBOSE = process.env.LENS_VERBOSE === "1" || process.argv.includes("--verbose") || process.argv.includes("-v");
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -15,15 +15,10 @@ class DaemonError extends Error {
   }
 }
 
-export async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-  retries = 3,
-): Promise<T> {
+export async function request<T>(method: string, path: string, body?: unknown, retries = 3): Promise<T> {
   const url = `${BASE_URL}${path}`;
   if (VERBOSE) {
-    process.stderr.write(`[RLM] ${method} ${url}\n`);
+    process.stderr.write(`[LENS] ${method} ${url}\n`);
   }
 
   for (let i = 0; i < retries; i++) {
@@ -37,9 +32,7 @@ export async function request<T>(
       });
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ECONNREFUSED") {
-        throw new Error(
-          "RLM daemon is not running.\n  Start it with: cd /path/to/RLM && encore run",
-        );
+        throw new Error("LENS daemon is not running. Start with: lens start");
       }
       if (i === retries - 1) throw err;
       await sleep(500);
@@ -49,7 +42,7 @@ export async function request<T>(
     const data = await res.json();
 
     if (VERBOSE) {
-      process.stderr.write(`[RLM] ${res.status} ${res.statusText}\n`);
+      process.stderr.write(`[LENS] ${res.status} ${res.statusText}\n`);
     }
 
     if (!res.ok) {
