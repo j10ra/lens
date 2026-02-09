@@ -8,10 +8,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface Column<T> {
   key: string;
-  label: string;
+  label: React.ReactNode;
   className?: string;
   render?: (row: T) => React.ReactNode;
 }
@@ -24,6 +25,12 @@ interface DataTableProps<T extends Record<string, unknown>> {
   pageSize?: number;
   onPageChange?: (page: number) => void;
   emptyMessage?: string;
+  title?: string;
+  description?: string;
+  toolbar?: React.ReactNode;
+  className?: string;
+  tableClassName?: string;
+  headerClassName?: string;
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -34,16 +41,45 @@ export function DataTable<T extends Record<string, unknown>>({
   pageSize = 50,
   onPageChange,
   emptyMessage = "No data",
+  title,
+  description,
+  toolbar,
+  className,
+  tableClassName,
+  headerClassName,
 }: DataTableProps<T>) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <div className="space-y-2">
-      <Table>
-        <TableHeader>
-          <TableRow>
+    <div className={cn("rounded-lg border bg-card", className)}>
+      {(title || description || toolbar) && (
+        <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            {title && <h3 className="text-sm font-semibold">{title}</h3>}
+            {description && (
+              <p className="text-xs text-muted-foreground">{description}</p>
+            )}
+          </div>
+          {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
+        </div>
+      )}
+
+      <Table className={cn("min-w-full", tableClassName)}>
+      <TableHeader
+        className={cn(
+          "sticky top-0 z-10 bg-background",
+          headerClassName,
+        )}
+      >
+          <TableRow className="hover:bg-muted/40">
             {columns.map((col) => (
-              <TableHead key={col.key} className={col.className}>
+              <TableHead
+                key={col.key}
+                className={cn(
+                  "text-xs font-medium text-muted-foreground",
+                  col.className,
+                )}
+              >
                 {col.label}
               </TableHead>
             ))}
@@ -54,16 +90,19 @@ export function DataTable<T extends Record<string, unknown>>({
             <TableRow>
               <TableCell
                 colSpan={columns.length}
-                className="text-center py-8 text-muted-foreground"
+                className="py-10 text-center text-sm text-muted-foreground"
               >
                 {emptyMessage}
               </TableCell>
             </TableRow>
           ) : (
             rows.map((row, i) => (
-              <TableRow key={i}>
+              <TableRow key={i} className="odd:bg-muted/20">
                 {columns.map((col) => (
-                  <TableCell key={col.key} className={col.className}>
+                  <TableCell
+                    key={col.key}
+                    className={cn("text-xs", col.className)}
+                  >
                     {col.render ? col.render(row) : renderCell(row[col.key])}
                   </TableCell>
                 ))}
@@ -74,14 +113,14 @@ export function DataTable<T extends Record<string, unknown>>({
       </Table>
 
       {total > pageSize && onPageChange && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center justify-between border-t px-4 py-3 text-xs text-muted-foreground">
           <span>
             {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of{" "}
             {total}
           </span>
           <div className="flex items-center gap-1">
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               onClick={() => onPageChange(page - 1)}
               disabled={page === 0}
@@ -92,7 +131,7 @@ export function DataTable<T extends Record<string, unknown>>({
               {page + 1} / {totalPages}
             </span>
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               onClick={() => onPageChange(page + 1)}
               disabled={page >= totalPages - 1}

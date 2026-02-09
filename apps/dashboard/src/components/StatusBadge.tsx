@@ -19,7 +19,10 @@ interface StatusBadgeProps {
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const variant = VARIANTS[status] ?? VARIANTS.pending;
   return (
-    <Badge variant="outline" className={cn(variant, className)}>
+    <Badge
+      variant="outline"
+      className={cn("rounded-md px-2 py-0.5 text-[11px]", variant, className)}
+    >
       {status}
     </Badge>
   );

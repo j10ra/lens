@@ -26,14 +26,16 @@ export function StatsCard({
 }: StatsCardProps) {
 	return (
 		<Card className={cn("@container/card", className)}>
-			<CardHeader>
+			<CardHeader className="relative">
 				<CardDescription>{label}</CardDescription>
 				<CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
 					{value}
 				</CardTitle>
 				{trend && (
 					<CardAction>
-						<Badge variant="outline">{trend}</Badge>
+						<Badge variant="outline" className="rounded-lg text-xs">
+							{trend}
+						</Badge>
 					</CardAction>
 				)}
 			</CardHeader>

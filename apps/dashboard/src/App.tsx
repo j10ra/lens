@@ -1,20 +1,18 @@
-import { Routes, Route, Navigate } from "react-router-dom";
-import { SidebarProvider, SidebarInset } from "./components/ui/sidebar";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { AppSidebar } from "./components/AppSidebar";
-import { SiteHeader } from "./components/SiteHeader";
+import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
+import { Context } from "./pages/Context";
+import { Data } from "./pages/Data";
+import { Jobs } from "./pages/Jobs";
 import { Overview } from "./pages/Overview";
 import { Repos } from "./pages/Repos";
 import { Requests } from "./pages/Requests";
-import { Data } from "./pages/Data";
-import { Jobs } from "./pages/Jobs";
-import { Context } from "./pages/Context";
 
 export function App() {
   return (
-    <SidebarProvider>
+    <SidebarProvider className="bg-muted">
       <AppSidebar />
-      <SidebarInset>
-        <SiteHeader />
+      <SidebarInset className="bg-background rounded-xl overflow-hidden md:my-2 md:mr-2 md:border">
         <div className="@container/main flex flex-1 flex-col">
           <Routes>
             <Route path="/" element={<Overview />} />

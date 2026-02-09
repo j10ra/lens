@@ -4,8 +4,12 @@ import { StatsCard } from "@/components/StatsCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { timeAgo } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { PageHeader } from "@/components/PageHeader";
 
 export function Overview() {
+	const navigate = useNavigate();
 	const { data: stats, isLoading } = useQuery({
 		queryKey: ["dashboard-stats"],
 		queryFn: api.stats,
@@ -20,7 +24,7 @@ export function Overview() {
 		placeholderData: keepPreviousData,
 	});
 
-	if (isLoading) return <Loading />;
+	if (!stats && isLoading) return <Loading />;
 
 	const uptime = stats?.uptime_seconds ?? 0;
 	const uptimeStr =
@@ -31,7 +35,11 @@ export function Overview() {
 				: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`;
 
 	return (
-		<div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+		<>
+			<PageHeader>
+				<span className="text-sm font-medium">Overview</span>
+			</PageHeader>
+			<div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
 			{/* Stats grid */}
 			<div className="*:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:shadow-xs grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-5">
 				<StatsCard
@@ -64,14 +72,26 @@ export function Overview() {
 			{/* Repos */}
 			{repoData?.repos && repoData.repos.length > 0 && (
 				<div className="space-y-3 px-4 lg:px-6">
-					<h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-						Repositories
-					</h2>
+					<div className="flex items-center justify-between">
+						<div>
+							<h2 className="text-sm font-semibold">Repositories</h2>
+							<p className="text-xs text-muted-foreground">
+								Tracked codebases and index status
+							</p>
+						</div>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => navigate("/repos")}
+						>
+							View all
+						</Button>
+					</div>
 					<div className="grid gap-3 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
 						{repoData.repos.map((repo) => (
 							<Card key={repo.id} className="py-4">
 								<CardHeader className="pb-2">
-									<div className="flex items-start justify-between">
+									<div className="flex items-start justify-between gap-3">
 										<div className="min-w-0">
 											<CardTitle className="text-sm truncate">
 												{repo.name}
@@ -83,7 +103,7 @@ export function Overview() {
 										<StatusBadge status={repo.index_status} />
 									</div>
 								</CardHeader>
-								<CardContent>
+								<CardContent className="space-y-2">
 									<div className="grid grid-cols-3 gap-2 text-xs">
 										<div>
 											<p className="text-muted-foreground">Files</p>
@@ -104,7 +124,7 @@ export function Overview() {
 											</p>
 										</div>
 									</div>
-									<p className="text-xs text-muted-foreground mt-2">
+									<p className="text-xs text-muted-foreground">
 										Indexed {timeAgo(repo.last_indexed_at)}
 									</p>
 								</CardContent>
@@ -114,6 +134,7 @@ export function Overview() {
 				</div>
 			)}
 		</div>
+		</>
 	);
 }
 

@@ -1,8 +1,10 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { DataTable } from "@/components/DataTable";
 import { formatDuration } from "@/lib/utils";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 
 const STATUS_COLORS: Record<string, string> = {
 	"2": "text-success",
@@ -21,8 +23,7 @@ const SOURCE_COLORS: Record<string, string> = {
 export function Requests() {
 	const [page, setPage] = useState(0);
 	const [source, setSource] = useState<string>("");
-	const [autoRefresh, setAutoRefresh] = useState(false);
-	const pageSize = 50;
+	const pageSize = 100;
 
 	const { data, isLoading } = useQuery({
 		queryKey: ["dashboard-logs", page, source],
@@ -32,21 +33,39 @@ export function Requests() {
 				offset: page * pageSize,
 				source: source || undefined,
 			}),
-		refetchInterval: autoRefresh ? 2_000 : false,
+		refetchInterval: 3_000,
 		placeholderData: keepPreviousData,
 	});
 
+	const total = data?.total ?? 0;
+	const totalPages = Math.max(1, Math.ceil(total / pageSize));
+	const rows = data?.rows ?? [];
+
 	return (
-		<div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-			<div className="flex items-center justify-between px-4 lg:px-6">
-				<div className="flex items-center gap-3">
+		<>
+			<PageHeader>
+				<span className="text-sm font-medium">Requests</span>
+				{data?.summary && (
+					<div className="hidden items-center gap-2 text-xs text-muted-foreground md:flex">
+						<span className="tabular-nums">{data.summary.total_today} today</span>
+						{data.summary.by_source.map((s) => (
+							<span key={s.source} className="tabular-nums">
+								<span className={`inline-block rounded px-1 py-0.5 ${SOURCE_COLORS[s.source] ?? ""}`}>
+									{s.source}
+								</span>{" "}
+								{s.count}
+							</span>
+						))}
+					</div>
+				)}
+				<div className="ml-auto">
 					<select
 						value={source}
 						onChange={(e) => {
 							setSource(e.target.value);
 							setPage(0);
 						}}
-						className="rounded-md border border-border bg-card px-2 py-1 text-xs"
+						className="h-7 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
 					>
 						<option value="">All sources</option>
 						<option value="cli">CLI</option>
@@ -54,126 +73,110 @@ export function Requests() {
 						<option value="api">API</option>
 						<option value="dashboard">Dashboard</option>
 					</select>
-					<label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-						<input
-							type="checkbox"
-							checked={autoRefresh}
-							onChange={(e) => setAutoRefresh(e.target.checked)}
-							className="rounded border-border"
-						/>
-						Auto-refresh
-					</label>
 				</div>
-			</div>
+			</PageHeader>
 
-			{/* Summary cards */}
-			{data?.summary && (
-				<div className="flex flex-wrap gap-3 px-4 lg:px-6">
-					<MiniStat label="Today" value={data.summary.total_today} />
-					{data.summary.by_source.map((s) => (
-						<MiniStat key={s.source} label={s.source} value={s.count} />
-					))}
-				</div>
-			)}
-
-			<div className="px-4 lg:px-6">
-				{isLoading ? (
+			{/* Grid */}
+			<div className="flex-1 min-h-0 overflow-auto">
+				{isLoading && !data ? (
 					<Spinner />
 				) : (
-					<DataTable
-						columns={[
-							{
-								key: "created_at",
-								label: "Time",
-								className: "w-36",
-								render: (r) => {
-									const d = new Date((r.created_at as string) + "Z");
+					<table className="w-full border-collapse text-xs">
+						<thead className="sticky top-0 z-10">
+							<tr className="bg-muted/60 text-left">
+								<th className="w-12 border-b border-r border-border bg-muted/60 px-2 py-2 text-center font-medium text-muted-foreground">#</th>
+								<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Time</th>
+								<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Source</th>
+								<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Method</th>
+								<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Path</th>
+								<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Status</th>
+								<th className="border-b border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground text-right">Duration</th>
+							</tr>
+						</thead>
+						<tbody>
+							{rows.length === 0 ? (
+								<tr>
+									<td colSpan={7} className="py-12 text-center text-muted-foreground">
+										No requests logged yet
+									</td>
+								</tr>
+							) : (
+								rows.map((r, i) => {
+									const d = new Date(r.created_at + "Z");
+									const statusColor = STATUS_COLORS[String(r.status)[0]] ?? "";
+									const srcColor = SOURCE_COLORS[r.source] ?? "";
 									return (
-										<span className="text-xs font-mono text-muted-foreground">
-											{d.toLocaleTimeString()}
-										</span>
+										<tr key={r.id} className="group hover:bg-accent/30">
+											<td className="border-b border-r border-border bg-muted/20 px-2 py-1.5 text-center font-mono text-[10px] text-muted-foreground tabular-nums">
+												{page * pageSize + i + 1}
+											</td>
+											<td className="border-b border-r border-border px-3 py-1.5 font-mono text-muted-foreground tabular-nums">
+												{d.toLocaleTimeString()}
+											</td>
+											<td className="border-b border-r border-border px-3 py-1.5">
+												<span className={`inline-block rounded px-1.5 py-0.5 font-medium ${srcColor}`}>
+													{r.source}
+												</span>
+											</td>
+											<td className="border-b border-r border-border px-3 py-1.5 font-mono">
+												{r.method}
+											</td>
+											<td className="border-b border-r border-border px-3 py-1.5 font-mono max-w-xs truncate">
+												{r.path}
+											</td>
+											<td className="border-b border-r border-border px-3 py-1.5 font-mono">
+												<span className={`font-medium ${statusColor}`}>{r.status}</span>
+											</td>
+											<td className="border-b border-border px-3 py-1.5 font-mono text-right text-muted-foreground tabular-nums">
+												{formatDuration(r.duration_ms)}
+											</td>
+										</tr>
 									);
-								},
-							},
-							{
-								key: "source",
-								label: "Source",
-								render: (r) => {
-									const src = r.source as string;
-									return (
-										<span
-											className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${SOURCE_COLORS[src] ?? ""}`}
-										>
-											{src}
-										</span>
-									);
-								},
-							},
-							{
-								key: "method",
-								label: "Method",
-								className: "w-16 font-mono text-xs",
-							},
-							{
-								key: "path",
-								label: "Path",
-								render: (r) => (
-									<span className="font-mono text-xs">
-										{r.path as string}
-									</span>
-								),
-							},
-							{
-								key: "status",
-								label: "Status",
-								className: "w-16",
-								render: (r) => {
-									const s = String(r.status);
-									const color = STATUS_COLORS[s[0]] ?? "";
-									return (
-										<span className={`font-mono font-medium ${color}`}>
-											{s}
-										</span>
-									);
-								},
-							},
-							{
-								key: "duration_ms",
-								label: "Duration",
-								className: "w-20 text-right",
-								render: (r) => (
-									<span className="font-mono text-xs text-muted-foreground">
-										{formatDuration(r.duration_ms as number)}
-									</span>
-								),
-							},
-						]}
-						rows={(data?.rows ?? []) as Record<string, unknown>[]}
-						total={data?.total ?? 0}
-						page={page}
-						pageSize={pageSize}
-						onPageChange={setPage}
-						emptyMessage="No requests logged yet"
-					/>
+								})
+							)}
+						</tbody>
+					</table>
 				)}
 			</div>
-		</div>
-	);
-}
 
-function MiniStat({ label, value }: { label: string; value: number }) {
-	return (
-		<div className="rounded-md border border-border bg-card px-3 py-1.5 text-xs">
-			<span className="text-muted-foreground">{label}: </span>
-			<span className="font-mono font-medium">{value}</span>
-		</div>
+			{/* Footer pagination */}
+			{total > pageSize && (
+				<div className="flex items-center justify-between border-t bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground">
+					<span className="tabular-nums">
+						{page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of{" "}
+						{total.toLocaleString()}
+					</span>
+					<div className="flex items-center gap-1">
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							onClick={() => setPage(page - 1)}
+							disabled={page === 0}
+						>
+							<ChevronLeft className="h-3.5 w-3.5" />
+						</Button>
+						<span className="px-1.5 tabular-nums">
+							{page + 1} / {totalPages}
+						</span>
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							onClick={() => setPage(page + 1)}
+							disabled={page >= totalPages - 1}
+						>
+							<ChevronRight className="h-3.5 w-3.5" />
+						</Button>
+					</div>
+				</div>
+			)}
+		</>
 	);
 }
 
 function Spinner() {
 	return (
-		<div className="flex items-center justify-center py-20">
-			<div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+		<div className="flex flex-1 items-center justify-center py-20">
+			<div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
 		</div>
 	);
 }

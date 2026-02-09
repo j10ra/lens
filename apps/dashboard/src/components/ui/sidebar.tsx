@@ -1,8 +1,8 @@
-import * as React from "react";
 import { PanelLeft } from "lucide-react";
-import { cn } from "@/lib/utils";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
@@ -19,7 +19,8 @@ const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
 function useSidebar() {
   const context = React.useContext(SidebarContext);
-  if (!context) throw new Error("useSidebar must be used within SidebarProvider.");
+  if (!context)
+    throw new Error("useSidebar must be used within SidebarProvider.");
   return context;
 }
 
@@ -75,12 +76,14 @@ function SidebarProvider({
 function Sidebar({
   side = "left",
   collapsible = "icon",
+  variant = "default",
   className,
   children,
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right";
   collapsible?: "offcanvas" | "icon" | "none";
+  variant?: "default" | "inset";
 }) {
   const { state } = useSidebar();
 
@@ -105,6 +108,7 @@ function Sidebar({
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-side={side}
+      data-variant={variant}
       data-slot="sidebar"
     >
       {/* Gap element */}
@@ -124,8 +128,9 @@ function Sidebar({
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-          "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
-          "group-data-[side=left]:border-r group-data-[side=right]:border-l",
+          variant === "inset"
+            ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1rem)]"
+            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
           className,
         )}
         {...props}
@@ -133,7 +138,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="bg-sidebar flex h-full w-full flex-col"
+          className="bg-transparent flex h-full w-full flex-col py-2"
         >
           {children}
         </div>
@@ -172,7 +177,11 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   return (
     <main
       data-slot="sidebar-inset"
-      className={cn("bg-background relative flex w-full flex-1 flex-col", className)}
+      className={cn(
+        "bg-background relative flex w-full flex-1 flex-col",
+        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
+        className,
+      )}
       {...props}
     />
   );
@@ -225,13 +234,16 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function SidebarGroupLabel({ className, ...props }: React.ComponentProps<"div">) {
+function SidebarGroupLabel({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sidebar-group-label"
       data-sidebar="group-label"
       className={cn(
-        "text-sidebar-foreground/70 flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium",
+        "text-sidebar-foreground/70 flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium transition-[margin,opacity] duration-200 ease-linear",
         "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
         className,
       )}
@@ -240,7 +252,10 @@ function SidebarGroupLabel({ className, ...props }: React.ComponentProps<"div">)
   );
 }
 
-function SidebarGroupContent({ className, ...props }: React.ComponentProps<"div">) {
+function SidebarGroupContent({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sidebar-group-content"
@@ -291,7 +306,7 @@ function SidebarMenuButton({
       data-size={size}
       data-active={isActive}
       className={cn(
-        "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden transition-[width,height,padding]",
+        "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden transition-[width,height,padding] duration-200 ease-linear",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "disabled:pointer-events-none disabled:opacity-50",
         "data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground",
@@ -309,7 +324,10 @@ function SidebarMenuButton({
   );
 }
 
-function SidebarSeparator({ className, ...props }: React.ComponentProps<typeof Separator>) {
+function SidebarSeparator({
+  className,
+  ...props
+}: React.ComponentProps<typeof Separator>) {
   return (
     <Separator
       data-slot="sidebar-separator"

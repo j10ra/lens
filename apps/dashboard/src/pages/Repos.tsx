@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProgressBar } from "@/components/ProgressBar";
 import { timeAgo } from "@/lib/utils";
 import { RefreshCw, Eye, EyeOff, ArrowLeft, Plus, Trash2, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/PageHeader";
 
 export function Repos() {
 	const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -58,8 +59,6 @@ export function Repos() {
 		},
 	});
 
-	if (isLoading) return <Spinner />;
-
 	const repos = data?.repos ?? [];
 	const selected = selectedId
 		? repos.find((r) => r.id === selectedId)
@@ -67,25 +66,19 @@ export function Repos() {
 
 	if (selected) {
 		return (
-			<div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-				<div className="px-4 lg:px-6">
-					<button
-						type="button"
+			<>
+				<PageHeader>
+					<Button
+						variant="ghost"
+						size="sm"
 						onClick={() => setSelectedId(null)}
-						className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+						className="gap-1 -ml-2"
 					>
-						<ArrowLeft className="h-4 w-4" /> Back
-					</button>
-				</div>
-
-				<div className="flex items-start justify-between px-4 lg:px-6">
-					<div>
-						<p className="text-lg font-semibold">{selected.name}</p>
-						<p className="text-sm text-muted-foreground">
-							{selected.root_path}
-						</p>
-					</div>
-					<div className="flex gap-2">
+						<ArrowLeft className="h-3.5 w-3.5" /> Back
+					</Button>
+					<span className="text-sm font-medium">{selected.name}</span>
+					<span className="text-xs text-muted-foreground truncate hidden md:inline">{selected.root_path}</span>
+					<div className="ml-auto flex gap-2">
 						<ActionBtn
 							onClick={() => reindex.mutate(selected.id)}
 							icon={RefreshCw}
@@ -131,14 +124,17 @@ export function Repos() {
 							/>
 						)}
 					</div>
-				</div>
+				</PageHeader>
 
-				<div className="grid gap-4 px-4 lg:px-6 @xl/main:grid-cols-2">
-					<div className="rounded-lg border border-border bg-card p-4 space-y-3">
-						<h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-							Index
-						</h3>
-						<div className="grid grid-cols-2 gap-3 text-sm">
+				<div className="grid gap-4 p-4 lg:p-6 @xl/main:grid-cols-2">
+					<Card>
+						<CardHeader className="pb-2">
+							<CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+								Index
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<div className="grid grid-cols-2 gap-3 text-sm">
 							<Stat
 								label="Status"
 								value={<StatusBadge status={selected.index_status} />}
@@ -153,77 +149,84 @@ export function Repos() {
 							<Stat label="Import depth" value={selected.max_import_depth} />
 							<Stat label="Indexed" value={timeAgo(selected.last_indexed_at)} />
 						</div>
-					</div>
+						</CardContent>
+					</Card>
 
-					<div className="rounded-lg border border-border bg-card p-4 space-y-3">
-						<h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-							Enrichment
-						</h3>
-						<ProgressBar
-							label="Embeddings"
-							value={selected.embedded_count}
-							max={selected.embeddable_count}
-						/>
-						<ProgressBar
-							label="Purpose"
-							value={selected.purpose_count}
-							max={selected.purpose_total}
-						/>
-						<div className="pt-1">
-							<Stat
-								label="Watcher"
-								value={
-									<StatusBadge
-										status={selected.watcher.active ? "active" : "inactive"}
-									/>
-								}
+					<Card>
+						<CardHeader className="pb-2">
+							<CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+								Enrichment
+							</CardTitle>
+						</CardHeader>
+						<CardContent className="space-y-3">
+							<ProgressBar
+								label="Embeddings"
+								value={selected.embedded_count}
+								max={selected.embeddable_count}
 							/>
-							{selected.watcher.active &&
-								selected.watcher.changed_files > 0 && (
-									<p className="text-xs text-muted-foreground mt-1">
-										{selected.watcher.changed_files} changed files pending
-									</p>
-								)}
-						</div>
-					</div>
+							<ProgressBar
+								label="Purpose"
+								value={selected.purpose_count}
+								max={selected.purpose_total}
+							/>
+							<div className="pt-1">
+								<Stat
+									label="Watcher"
+									value={
+										<StatusBadge
+											status={selected.watcher.active ? "active" : "inactive"}
+										/>
+									}
+								/>
+								{selected.watcher.active &&
+									selected.watcher.changed_files > 0 && (
+										<p className="text-xs text-muted-foreground mt-1">
+											{selected.watcher.changed_files} changed files pending
+										</p>
+									)}
+							</div>
+						</CardContent>
+					</Card>
 				</div>
-			</div>
+			</>
 		);
 	}
 
 	return (
-		<div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-			<div className="flex items-center justify-between px-4 lg:px-6">
+		<>
+			<PageHeader>
 				{showRegister ? (
 					<form
 						onSubmit={(e) => {
 							e.preventDefault();
 							if (registerPath.trim()) register.mutate(registerPath.trim());
 						}}
-						className="flex flex-1 gap-2"
+						className="flex flex-1 items-center gap-2"
 					>
 						<div className="relative flex-1">
-							<FolderPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+							<FolderPlus className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
 							<input
 								type="text"
 								value={registerPath}
 								onChange={(e) => setRegisterPath(e.target.value)}
 								placeholder="/absolute/path/to/repo"
-								className="w-full rounded-md border border-border bg-card pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground"
+								className="h-7 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 								autoFocus
 							/>
 						</div>
 						<Button
 							type="submit"
 							size="sm"
+							className="h-7 text-xs"
 							disabled={!registerPath.trim() || register.isPending}
 						>
 							{register.isPending ? "Registering..." : "Register"}
 						</Button>
 						<Button
 							type="button"
-							variant="outline"
+							variant="ghost"
 							size="sm"
+							className="h-7 text-xs"
 							onClick={() => {
 								setShowRegister(false);
 								setRegisterPath("");
@@ -231,68 +234,77 @@ export function Repos() {
 						>
 							Cancel
 						</Button>
+						{register.isError && (
+							<span className="text-xs text-destructive">{(register.error as Error).message}</span>
+						)}
 					</form>
 				) : (
 					<>
-						<div />
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => setShowRegister(true)}
-						>
-							<Plus className="h-4 w-4" />
-							Register Repo
-						</Button>
+						<span className="text-sm font-medium">Repositories</span>
+						<span className="text-xs text-muted-foreground">{repos.length} total</span>
+						<div className="ml-auto">
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-7 gap-1.5 text-xs"
+								onClick={() => setShowRegister(true)}
+							>
+								<Plus className="h-3.5 w-3.5" />
+								Register
+							</Button>
+						</div>
 					</>
 				)}
-			</div>
+			</PageHeader>
 
-			{register.isError && (
-				<div className="mx-4 lg:mx-6 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-					{(register.error as Error).message}
-				</div>
-			)}
-
-			<div className="px-4 lg:px-6">
-				<DataTable
-					columns={[
-						{
-							key: "name",
-							label: "Name",
-							render: (r) => (
-								<button
-									onClick={() => setSelectedId(r.id as string)}
-									className="text-primary hover:underline font-medium"
-								>
-									{r.name as string}
-								</button>
-							),
-						},
-						{
-							key: "index_status",
-							label: "Status",
-							render: (r) => (
-								<StatusBadge status={r.index_status as string} />
-							),
-						},
-						{ key: "files_indexed", label: "Files" },
-						{ key: "chunk_count", label: "Chunks" },
-						{
-							key: "embedded_pct",
-							label: "Embed%",
-							render: (r) => `${r.embedded_pct}%`,
-						},
-						{
-							key: "last_indexed_at",
-							label: "Indexed",
-							render: (r) => timeAgo(r.last_indexed_at as string | null),
-						},
-					]}
-					rows={repos as Record<string, unknown>[]}
-					emptyMessage="No repos registered. Run: lens repo register"
-				/>
+			{/* Grid */}
+			<div className="flex-1 min-h-0 overflow-auto">
+				<table className="w-full border-collapse text-xs">
+					<thead className="sticky top-0 z-10">
+						<tr className="bg-muted/60 text-left">
+							<th className="w-12 border-b border-r border-border bg-muted/60 px-2 py-2 text-center font-medium text-muted-foreground">#</th>
+							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Name</th>
+							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Status</th>
+							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground text-right">Files</th>
+							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground text-right">Chunks</th>
+							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground text-right">Embed%</th>
+							<th className="border-b border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Indexed</th>
+						</tr>
+					</thead>
+					<tbody>
+						{repos.length === 0 ? (
+							<tr>
+								<td colSpan={7} className="py-12 text-center text-muted-foreground">
+									No repos registered. Run: lens repo register
+								</td>
+							</tr>
+						) : (
+							repos.map((r, i) => (
+								<tr key={r.id} className="group hover:bg-accent/30">
+									<td className="border-b border-r border-border bg-muted/20 px-2 py-1.5 text-center font-mono text-[10px] text-muted-foreground tabular-nums">{i + 1}</td>
+									<td className="border-b border-r border-border px-3 py-1.5">
+										<button
+											type="button"
+											onClick={() => setSelectedId(r.id)}
+											className="text-primary hover:underline font-medium"
+										>
+											{r.name}
+										</button>
+									</td>
+									<td className="border-b border-r border-border px-3 py-1.5">
+										<StatusBadge status={r.index_status} />
+									</td>
+									<td className="border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums">{r.files_indexed}</td>
+									<td className="border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums">{r.chunk_count}</td>
+									<td className="border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums">{r.embedded_pct}%</td>
+									<td className="border-b border-border px-3 py-1.5 text-muted-foreground">{timeAgo(r.last_indexed_at)}</td>
+								</tr>
+							))
+						)}
+					</tbody>
+				</table>
 			</div>
-		</div>
+		</>
 	);
 }
 
@@ -323,14 +335,16 @@ function ActionBtn({
 	loading?: boolean;
 }) {
 	return (
-		<button
+		<Button
+			variant="outline"
+			size="sm"
 			onClick={onClick}
 			disabled={loading}
-			className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+			className="gap-1.5"
 		>
 			<Icon className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
 			{label}
-		</button>
+		</Button>
 	);
 }
 
