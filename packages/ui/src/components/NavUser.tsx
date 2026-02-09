@@ -1,14 +1,16 @@
-import { CircleUser, MoreVertical } from "lucide-react";
+import { CircleUser, MoreVertical, LogOut } from "lucide-react";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "./ui/sidebar";
 
 export function NavUser({
   user,
+  onSignOut,
 }: {
   user: { name: string; email: string };
+  onSignOut?: () => void;
 }) {
   return (
     <SidebarMenu>
@@ -21,7 +23,19 @@ export function NavUser({
               {user.email}
             </span>
           </div>
-          <MoreVertical className="ml-auto" />
+          {onSignOut ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSignOut();
+              }}
+              className="ml-auto text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="size-4" />
+            </button>
+          ) : (
+            <MoreVertical className="ml-auto" />
+          )}
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>

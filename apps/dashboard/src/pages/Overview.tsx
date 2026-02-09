@@ -1,10 +1,10 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Activity, Cpu, Database, FolderGit2, type LucideIcon, Shapes } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { PageHeader } from "@/components/PageHeader";
+import { useNavigate } from "@tanstack/react-router";
+import { PageHeader } from "@lens/ui";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@lens/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@lens/ui";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
 
@@ -124,7 +124,7 @@ export function Overview() {
                 <h2 className="text-sm font-semibold">Repositories</h2>
                 <p className="text-xs text-muted-foreground">Tracked codebases and index status</p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => navigate("/repos")}>
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/repos" })}>
                 View all
               </Button>
             </div>

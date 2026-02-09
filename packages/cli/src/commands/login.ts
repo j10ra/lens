@@ -128,6 +128,7 @@ export async function loginCommand(opts: LoginOpts): Promise<void> {
             output(`Logged in as ${user_email}`, false);
             cleanup();
             resolve();
+            setTimeout(() => process.exit(0), 100);
           } catch (err) {
             res.writeHead(400);
             res.end("Bad request");

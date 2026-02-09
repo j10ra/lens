@@ -2,8 +2,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { api } from "@/lib/api";
 import { Database, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/PageHeader";
+import { Button, PageHeader } from "@lens/ui";
 
 export function Data() {
 	const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -279,7 +278,7 @@ function CellValue({ value }: { value: unknown }) {
 		return (
 			<span className="cursor-help" title={s}>
 				{s.slice(0, 120)}
-				<span className="text-muted-foreground">…</span>
+				<span className="text-muted-foreground">...</span>
 			</span>
 		);
 	}

@@ -142,4 +142,12 @@ export const api = {
 
   removeRepo: (id: string) =>
     request<{ removed: boolean }>(`/repo/${id}`, { method: "DELETE" }),
+
+  authStatus: () =>
+    request<{
+      authenticated: boolean;
+      email?: string;
+      expires_at?: number;
+      expired?: boolean;
+    }>("/api/auth/status"),
 };

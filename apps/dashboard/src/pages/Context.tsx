@@ -1,8 +1,7 @@
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { Send } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/PageHeader";
-import { Button } from "@/components/ui/button";
+import { PageHeader, Button } from "@lens/ui";
 import { api } from "@/lib/api";
 
 export function Context() {

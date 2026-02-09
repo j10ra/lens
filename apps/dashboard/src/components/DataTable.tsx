@@ -1,14 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@lens/ui";
 
 interface Column<T> {
   key: string;

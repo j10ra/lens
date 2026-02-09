@@ -5,9 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ProgressBar } from "@/components/ProgressBar";
 import { timeAgo } from "@/lib/utils";
 import { RefreshCw, Eye, EyeOff, ArrowLeft, Plus, Trash2, FolderPlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageHeader } from "@/components/PageHeader";
+import { Button, Card, CardContent, CardHeader, CardTitle, PageHeader } from "@lens/ui";
 
 export function Repos() {
 	const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -141,7 +139,7 @@ export function Repos() {
 							/>
 							<Stat
 								label="Last commit"
-								value={selected.last_indexed_commit?.slice(0, 8) ?? "—"}
+								value={selected.last_indexed_commit?.slice(0, 8) ?? "\u2014"}
 								mono
 							/>
 							<Stat label="Files" value={selected.files_indexed} />

@@ -5,9 +5,9 @@ import {
 	CardTitle,
 	CardAction,
 	CardFooter,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+	Badge,
+	cn,
+} from "@lens/ui";
 
 interface StatsCardProps {
 	label: string;

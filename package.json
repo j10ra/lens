@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
-    "build:publish": "pnpm -r build && rm -rf publish && tsup --config tsup.config.publish.ts && cp -r apps/dashboard/dist publish/dashboard && cp publish.json publish/package.json",
+    "build:publish": "pnpm -r build && rm -rf publish && tsup --config tsup.config.publish.ts && cp -r apps/dashboard/dist publish/dashboard && cp publish.json publish/package.json && cd publish && npm install --omit=dev",
     "dev:encore": "cd apps/encore && encore run",
     "build:cli": "pnpm --filter @lens/cli build",
     "format": "biome format --write .",

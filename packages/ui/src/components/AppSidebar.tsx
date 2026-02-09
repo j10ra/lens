@@ -1,0 +1,94 @@
+import type { LucideIcon } from "lucide-react";
+import { Logo } from "./Logo";
+import { ModeToggle } from "./ModeToggle";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from "./ui/sidebar";
+
+export interface NavItem {
+  icon: LucideIcon;
+  label: string;
+  href: string;
+}
+
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  navItems: NavItem[];
+  currentPath: string;
+  renderLink: (props: { href: string; className?: string; children: React.ReactNode }) => React.ReactNode;
+  brand?: { title: string; subtitle: string };
+  healthy?: boolean;
+  footer?: React.ReactNode;
+}
+
+export function AppSidebar({
+  navItems,
+  currentPath,
+  renderLink,
+  brand = { title: "LENS", subtitle: "Workspace" },
+  healthy,
+  footer,
+  ...props
+}: AppSidebarProps) {
+  return (
+    <Sidebar collapsible="icon" className="shadow-none" {...props}>
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" className="hover:bg-transparent">
+              <Logo healthy={healthy} title={brand.title} subtitle={brand.subtitle} />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map(({ href, icon: Icon, label }) => {
+                const isActive =
+                  href === "/" || href === "/dashboard"
+                    ? currentPath === href
+                    : currentPath.startsWith(href);
+                return (
+                  <SidebarMenuItem key={href}>
+                    {renderLink({
+                      href,
+                      children: (
+                        <SidebarMenuButton isActive={isActive}>
+                          <Icon />
+                          <span>{label}</span>
+                        </SidebarMenuButton>
+                      ),
+                    })}
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <ModeToggle variant="sidebar" />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      {footer && <SidebarFooter>{footer}</SidebarFooter>}
+    </Sidebar>
+  );
+}

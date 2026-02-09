@@ -1,5 +1,4 @@
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { Badge, cn } from "@lens/ui";
 
 const VARIANTS: Record<string, string> = {
   ready: "bg-success/15 text-success border-success/25",

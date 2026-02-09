@@ -13,9 +13,9 @@
   "iconLibrary": "lucide",
   "rtl": false,
   "aliases": {
-    "components": "@lens/ui/src/components",
-    "utils": "@lens/ui/src/lib/utils",
-    "ui": "@lens/ui/src/components/ui",
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

@@ -4,9 +4,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ProgressBar } from "@/components/ProgressBar";
 import { timeAgo } from "@/lib/utils";
 import { RefreshCw, Eye, EyeOff } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/PageHeader";
+import { Card, CardContent, CardHeader, Button, PageHeader } from "@lens/ui";
 
 export function Jobs() {
 	const queryClient = useQueryClient();
@@ -108,7 +106,7 @@ export function Jobs() {
 										</div>
 									</div>
 									<p className="text-xs font-mono text-muted-foreground">
-										{repo.last_indexed_commit?.slice(0, 8) ?? "—"}
+										{repo.last_indexed_commit?.slice(0, 8) ?? "\u2014"}
 										{repo.current_head &&
 											repo.last_indexed_commit !== repo.current_head && (
 												<span> → {repo.current_head.slice(0, 8)}</span>

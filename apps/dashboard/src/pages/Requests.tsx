@@ -3,8 +3,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { formatDuration } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/PageHeader";
+import { Button, PageHeader } from "@lens/ui";
 
 const STATUS_COLORS: Record<string, string> = {
 	"2": "text-success",

@@ -1,6 +1,6 @@
 import * as React from "react"
 import { createContext, useContext, useState } from "react"
-import { cn } from "@/lib/utils"
+import { cn } from "../../lib/utils"
 
 const TabsContext = createContext<{ value: string; onChange: (v: string) => void }>({ value: "", onChange: () => {} })
 

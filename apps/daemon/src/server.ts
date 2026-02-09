@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, statSync, watch } from "node:fs";
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import type { Db } from "@lens/engine";
@@ -313,6 +313,104 @@ export function createApp(db: Db, dashboardDist?: string): Hono {
       });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
+    }
+  });
+
+  // --- Auth Status ---
+
+  const SUPABASE_URL = "https://kuvsaycpvbbmyyxiklap.supabase.co";
+  const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dnNheWNwdmJibXl5eGlrbGFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2MzIxNzQsImV4cCI6MjA4NjIwODE3NH0.yllrNUWVHUyFBwegoIeBkiHiIiWcsspHL9126nT2o2Q";
+
+  interface AuthTokens {
+    access_token: string;
+    refresh_token: string;
+    user_email: string;
+    expires_at: number;
+  }
+
+  function readAuthSync(): AuthTokens | null {
+    const authPath = join(homedir(), ".lens", "auth.json");
+    try {
+      return JSON.parse(readFileSync(authPath, "utf-8"));
+    } catch {
+      return null;
+    }
+  }
+
+  function writeAuthSync(tokens: AuthTokens): void {
+    const authPath = join(homedir(), ".lens", "auth.json");
+    writeFileSync(authPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
+  }
+
+  async function tryRefreshToken(token: string): Promise<AuthTokens | null> {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ refresh_token: token }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      user_email: data.user?.email ?? "unknown",
+      expires_at: Math.floor(Date.now() / 1000) + (data.expires_in ?? 3600),
+    };
+  }
+
+  // SSE: watch ~/.lens/auth.json and push changes to connected clients
+  const authClients = new Set<ReadableStreamDefaultController>();
+  const authDir = join(homedir(), ".lens");
+  try {
+    watch(authDir, (_, filename) => {
+      if (filename !== "auth.json") return;
+      for (const ctrl of authClients) {
+        try { ctrl.enqueue(new TextEncoder().encode("data: auth-changed\n\n")); }
+        catch { authClients.delete(ctrl); }
+      }
+    });
+  } catch {}
+
+  track("GET", "/api/auth/events");
+  app.get("/api/auth/events", (c) => {
+    const stream = new ReadableStream({
+      start(ctrl) { authClients.add(ctrl); },
+      cancel(ctrl) { authClients.delete(ctrl as ReadableStreamDefaultController); },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  });
+
+  track("GET", "/api/auth/status");
+  app.get("/api/auth/status", async (c) => {
+    try {
+      let auth = readAuthSync();
+      if (!auth) return c.json({ authenticated: false });
+
+      const now = Math.floor(Date.now() / 1000);
+      if (auth.expires_at <= now && auth.refresh_token) {
+        const refreshed = await tryRefreshToken(auth.refresh_token);
+        if (refreshed) {
+          writeAuthSync(refreshed);
+          auth = refreshed;
+        } else {
+          return c.json({ authenticated: false, expired: true });
+        }
+      }
+
+      return c.json({
+        authenticated: true,
+        email: auth.user_email,
+        expires_at: auth.expires_at,
+      });
+    } catch {
+      return c.json({ authenticated: false });
     }
   });
 
