@@ -41,17 +41,17 @@ function UsageBar({
 }) {
   const pct = Math.min((used / limit) * 100, 100);
   const color =
-    pct > 90 ? "bg-red-500" : pct > 70 ? "bg-yellow-500" : "bg-blue-500";
+    pct > 90 ? "bg-destructive" : pct > 70 ? "bg-warning" : "bg-primary";
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+    <div className="rounded-xl border bg-card p-6">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-zinc-400">{label}</p>
-        <p className="text-xs text-zinc-500">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground/70">
           {used.toLocaleString()} / {limit.toLocaleString()}
         </p>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-800">
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
         <div
           className={`h-full rounded-full ${color}`}
           style={{ width: `${pct}%` }}
@@ -75,6 +75,7 @@ function UsagePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!userId) return;
     (async () => {
       const p = await getUsageCurrent({ data: { userId } });
       setPeriod(p);
@@ -99,7 +100,7 @@ function UsagePage() {
   if (loading || !period) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -108,7 +109,7 @@ function UsagePage() {
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Usage</h2>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           Current billing period: {fmtPeriod(period.periodStart, period.periodEnd)}
         </p>
       </div>
@@ -134,23 +135,23 @@ function UsagePage() {
 
       {/* Daily breakdown */}
       <div>
-        <h3 className="mb-4 text-sm font-semibold text-zinc-300">
+        <h3 className="mb-4 text-sm font-semibold text-foreground">
           Daily Breakdown
         </h3>
-        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+        <div className="overflow-x-auto rounded-xl border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-900">
-                <th className="px-4 py-3 text-left font-medium text-zinc-300">
+              <tr className="border-b bg-muted">
+                <th className="px-4 py-3 text-left font-medium text-foreground">
                   Date
                 </th>
-                <th className="px-4 py-3 text-right font-medium text-zinc-300">
+                <th className="px-4 py-3 text-right font-medium text-foreground">
                   Queries
                 </th>
-                <th className="px-4 py-3 text-right font-medium text-zinc-300">
+                <th className="px-4 py-3 text-right font-medium text-foreground">
                   Embeddings
                 </th>
-                <th className="px-4 py-3 text-right font-medium text-zinc-300">
+                <th className="px-4 py-3 text-right font-medium text-foreground">
                   Summaries
                 </th>
               </tr>
@@ -160,7 +161,7 @@ function UsagePage() {
                 <tr>
                   <td
                     colSpan={4}
-                    className="px-4 py-8 text-center text-zinc-500"
+                    className="px-4 py-8 text-center text-muted-foreground"
                   >
                     No usage data for this period.
                   </td>
@@ -169,18 +170,18 @@ function UsagePage() {
                 daily.map((day) => (
                   <tr
                     key={day.date}
-                    className="border-b border-zinc-800/50 last:border-0"
+                    className="border-b border-border/50 last:border-0"
                   >
-                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-400">
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                       {day.date}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-zinc-300">
+                    <td className="px-4 py-2.5 text-right text-foreground">
                       {(day.contextQueries ?? 0).toLocaleString()}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-zinc-300">
+                    <td className="px-4 py-2.5 text-right text-foreground">
                       {(day.embeddingRequests ?? 0).toLocaleString()}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-zinc-300">
+                    <td className="px-4 py-2.5 text-right text-foreground">
                       {(day.purposeRequests ?? 0).toLocaleString()}
                     </td>
                   </tr>

@@ -15,7 +15,7 @@ function Section({
   return (
     <section className="mt-10">
       <h2 className="text-xl font-semibold">{title}</h2>
-      <div className="mt-4 space-y-3 text-zinc-400 leading-relaxed">
+      <div className="mt-4 space-y-3 text-muted-foreground leading-relaxed">
         {children}
       </div>
     </section>
@@ -29,11 +29,11 @@ function PrivacyPage() {
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Privacy Policy
         </h1>
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="mt-2 text-sm text-muted-foreground/70">
           Last updated: February 10, 2026
         </p>
 
-        <div className="mt-8 text-zinc-400 leading-relaxed">
+        <div className="mt-8 text-muted-foreground leading-relaxed">
           <p>
             LENS ("we", "us", "our") operates the lens.dev website and the LENS
             CLI tool. This policy describes how we collect, use, and protect your
@@ -43,17 +43,17 @@ function PrivacyPage() {
 
         <Section title="Information We Collect">
           <p>
-            <strong className="text-zinc-200">Account data.</strong> When you
+            <strong className="text-foreground">Account data.</strong> When you
             sign up, we collect your email address, name, and authentication
             provider profile (GitHub or Google). We do not store passwords.
           </p>
           <p>
-            <strong className="text-zinc-200">Usage data.</strong> We log API
+            <strong className="text-foreground">Usage data.</strong> We log API
             request counts, embedding quotas, and error rates. We do not log
             your source code, repository contents, or context pack payloads.
           </p>
           <p>
-            <strong className="text-zinc-200">Payment data.</strong> Billing
+            <strong className="text-foreground">Payment data.</strong> Billing
             information is processed and stored by Stripe. We never see or store
             your full card number.
           </p>
@@ -75,23 +75,23 @@ function PrivacyPage() {
           <p>We use the following third-party services:</p>
           <ul className="ml-4 list-disc space-y-1">
             <li>
-              <strong className="text-zinc-200">Supabase</strong> &mdash;
+              <strong className="text-foreground">Supabase</strong> &mdash;
               Authentication and database hosting
             </li>
             <li>
-              <strong className="text-zinc-200">Stripe</strong> &mdash; Payment
+              <strong className="text-foreground">Stripe</strong> &mdash; Payment
               processing
             </li>
             <li>
-              <strong className="text-zinc-200">Cloudflare</strong> &mdash; CDN,
+              <strong className="text-foreground">Cloudflare</strong> &mdash; CDN,
               DDoS protection, Workers runtime
             </li>
             <li>
-              <strong className="text-zinc-200">Sentry</strong> &mdash; Error
+              <strong className="text-foreground">Sentry</strong> &mdash; Error
               tracking and performance monitoring
             </li>
             <li>
-              <strong className="text-zinc-200">Voyage AI</strong> &mdash; Code
+              <strong className="text-foreground">Voyage AI</strong> &mdash; Code
               embedding generation (text sent is code snippets only, not full
               files)
             </li>
@@ -127,7 +127,7 @@ function PrivacyPage() {
             For privacy-related questions or data requests, contact us at{" "}
             <a
               href="mailto:privacy@lens.dev"
-              className="text-blue-400 hover:text-blue-300"
+              className="text-primary hover:text-primary/80"
             >
               privacy@lens.dev
             </a>

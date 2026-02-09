@@ -1,3 +1,5 @@
+import { Check as CheckIcon } from "lucide-react";
+
 const tiers = [
   {
     name: "Free",
@@ -37,32 +39,18 @@ const tiers = [
   },
 ];
 
-function Check() {
-  return (
-    <svg
-      className="h-4 w-4 text-emerald-500"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2.5}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-
 function Dash() {
-  return <span className="text-zinc-600">&mdash;</span>;
+  return <span className="text-muted-foreground/50">&mdash;</span>;
 }
 
 export function Pricing() {
   return (
-    <section id="pricing" className="border-t border-zinc-800 py-24">
+    <section id="pricing" className="border-t border-border py-24">
       <div className="mx-auto max-w-4xl px-6">
         <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           Pricing
         </h2>
-        <p className="mx-auto mt-4 max-w-xl text-center text-zinc-400">
+        <p className="mx-auto mt-4 max-w-xl text-center text-muted-foreground">
           Free forever for local-only workflows. Upgrade for cloud-powered
           features.
         </p>
@@ -73,28 +61,32 @@ export function Pricing() {
               key={tier.name}
               className={`rounded-xl border p-8 ${
                 tier.highlight
-                  ? "border-blue-500/50 bg-zinc-900 ring-1 ring-blue-500/20"
-                  : "border-zinc-800 bg-zinc-900"
+                  ? "border-primary/50 bg-card ring-1 ring-primary/20"
+                  : "border-border bg-card"
               }`}
             >
               <div className="mb-6">
-                <h3 className="text-lg font-semibold">{tier.name}</h3>
+                <h3 className="text-lg font-semibold text-card-foreground">{tier.name}</h3>
                 <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">{tier.price}</span>
-                  <span className="text-sm text-zinc-400">{tier.period}</span>
+                  <span className="text-4xl font-bold text-card-foreground">{tier.price}</span>
+                  <span className="text-sm text-muted-foreground">{tier.period}</span>
                 </div>
               </div>
 
               <ul className="mb-8 space-y-3">
                 {tier.features.map((feature) => (
                   <li key={feature.name} className="flex items-center gap-3">
-                    {feature.included ? <Check /> : <Dash />}
+                    {feature.included ? (
+                      <CheckIcon className="size-4 text-success" />
+                    ) : (
+                      <Dash />
+                    )}
                     <span
-                      className={`text-sm ${feature.included ? "text-zinc-300" : "text-zinc-500"}`}
+                      className={`text-sm ${feature.included ? "text-card-foreground" : "text-muted-foreground"}`}
                     >
                       {feature.name}
                       {feature.value && feature.included && (
-                        <span className="ml-1 text-zinc-500">
+                        <span className="ml-1 text-muted-foreground">
                           ({feature.value})
                         </span>
                       )}
@@ -107,8 +99,8 @@ export function Pricing() {
                 href={tier.ctaHref}
                 className={`block w-full rounded-lg py-3 text-center text-sm font-semibold transition-colors ${
                   tier.highlight
-                    ? "bg-blue-600 text-white hover:bg-blue-500"
-                    : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-secondary text-secondary-foreground hover:bg-accent"
                 }`}
               >
                 {tier.cta}

@@ -50,11 +50,16 @@ function RootComponent() {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var d=document.documentElement,t=localStorage.getItem("theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme:dark)").matches))d.classList.add("dark");else d.classList.remove("dark")}catch(e){}})()`,
+          }}
+        />
       </head>
-      <body className="bg-zinc-950 text-zinc-100 font-sans antialiased">
+      <body className="min-h-screen bg-background text-foreground font-sans antialiased">
         {children}
         <Scripts />
       </body>

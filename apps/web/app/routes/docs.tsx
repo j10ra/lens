@@ -15,15 +15,15 @@ function DocsLayout() {
       <div className="mx-auto flex max-w-6xl gap-8 px-6 py-16">
         <aside className="hidden w-56 shrink-0 md:block">
           <nav className="sticky top-24 space-y-1">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Documentation
             </p>
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
-                className="block rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
-                activeProps={{ className: "block rounded-lg px-3 py-2 text-sm bg-zinc-800 text-zinc-100" }}
+                className="block rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                activeProps={{ className: "block rounded-lg px-3 py-2 text-sm bg-accent text-accent-foreground" }}
                 activeOptions={{ exact: true }}
               >
                 {item.label}

@@ -6,8 +6,8 @@ export const Route = createFileRoute("/docs/")({
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <div className="overflow-hidden rounded-lg bg-zinc-800 p-4">
-      <pre className="overflow-x-auto font-mono text-sm leading-relaxed text-zinc-300">
+    <div className="overflow-hidden rounded-lg bg-card p-4">
+      <pre className="overflow-x-auto font-mono text-sm leading-relaxed text-card-foreground">
         {children}
       </pre>
     </div>
@@ -36,7 +36,7 @@ function DocsIndex() {
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Getting Started
         </h1>
-        <p className="mt-4 text-zinc-400 leading-relaxed">
+        <p className="mt-4 text-muted-foreground leading-relaxed">
           LENS indexes your codebase locally and serves context packs to AI
           agents. No API keys required for local-only usage.
         </p>
@@ -45,7 +45,7 @@ function DocsIndex() {
       {/* Install */}
       <section>
         <h2 className="text-xl font-semibold">Install</h2>
-        <p className="mt-3 text-sm text-zinc-400">
+        <p className="mt-3 text-sm text-muted-foreground">
           Install LENS globally via npm.
         </p>
         <div className="mt-4">
@@ -56,7 +56,7 @@ function DocsIndex() {
       {/* Quick Start */}
       <section>
         <h2 className="text-xl font-semibold">Quick Start</h2>
-        <p className="mt-3 text-sm text-zinc-400">
+        <p className="mt-3 text-sm text-muted-foreground">
           Initialize, register your repo, and query in seconds.
         </p>
         <div className="mt-4 space-y-3">
@@ -84,7 +84,7 @@ Context pack: 12 files, 3.2KB
       {/* Daemon */}
       <section>
         <h2 className="text-xl font-semibold">Daemon Mode</h2>
-        <p className="mt-3 text-sm text-zinc-400">
+        <p className="mt-3 text-sm text-muted-foreground">
           Start the HTTP daemon for persistent access on port 4111.
         </p>
         <div className="mt-4">
@@ -100,9 +100,9 @@ $ curl http://localhost:4111/context \\
       {/* MCP Setup */}
       <section>
         <h2 className="text-xl font-semibold">MCP Integration</h2>
-        <p className="mt-3 text-sm text-zinc-400">
+        <p className="mt-3 text-sm text-muted-foreground">
           Claude Code auto-discovers LENS via{" "}
-          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs">.mcp.json</code>{" "}
+          <code className="rounded bg-card px-1.5 py-0.5 text-xs">.mcp.json</code>{" "}
           in your project root. Create the file:
         </p>
         <div className="mt-4">
@@ -115,7 +115,7 @@ $ curl http://localhost:4111/context \\
   }
 }`}</CodeBlock>
         </div>
-        <p className="mt-3 text-sm text-zinc-400">
+        <p className="mt-3 text-sm text-muted-foreground">
           Claude Code will spawn the daemon in MCP stdio mode and use it for
           context lookups automatically. No manual configuration needed.
         </p>
@@ -124,17 +124,17 @@ $ curl http://localhost:4111/context \\
       {/* CLI Reference */}
       <section>
         <h2 className="text-xl font-semibold">CLI Reference</h2>
-        <p className="mt-3 text-sm text-zinc-400">
+        <p className="mt-3 text-sm text-muted-foreground">
           All available commands.
         </p>
-        <div className="mt-4 overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="mt-4 overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-900">
-                <th className="px-4 py-3 text-left font-medium text-zinc-300">
+              <tr className="border-b bg-muted">
+                <th className="px-4 py-3 text-left font-medium text-foreground">
                   Command
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-zinc-300">
+                <th className="px-4 py-3 text-left font-medium text-foreground">
                   Description
                 </th>
               </tr>
@@ -143,12 +143,12 @@ $ curl http://localhost:4111/context \\
               {cliCommands.map((cmd) => (
                 <tr
                   key={cmd.command}
-                  className="border-b border-zinc-800/50 last:border-0"
+                  className="border-b border-border/50 last:border-0"
                 >
-                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-emerald-400">
+                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-success">
                     {cmd.command}
                   </td>
-                  <td className="px-4 py-2.5 text-zinc-400">
+                  <td className="px-4 py-2.5 text-muted-foreground">
                     {cmd.description}
                   </td>
                 </tr>

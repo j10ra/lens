@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "../dashboard";
 import { getApiKeys, createApiKey, revokeApiKey } from "@/lib/server-fns";
+import { Plus, Copy, Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/keys")({
   component: ApiKeysPage,
@@ -27,6 +28,7 @@ function ApiKeysPage() {
   const [copied, setCopied] = useState(false);
 
   async function loadKeys() {
+    if (!userId) return;
     const rows = await getApiKeys({ data: { userId } });
     setKeys(rows.filter((k: ApiKey) => !k.revokedAt));
     setLoading(false);
@@ -69,38 +71,40 @@ function ApiKeysPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">API Keys</h2>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage keys for the LENS cloud API.
           </p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
         >
+          <Plus className="size-4" />
           Create Key
         </button>
       </div>
 
       {/* Revealed key alert */}
       {revealedKey && (
-        <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
-          <p className="mb-2 text-sm font-medium text-yellow-400">
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4">
+          <p className="mb-2 text-sm font-medium text-warning">
             Copy your API key now. It won't be shown again.
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 overflow-x-auto rounded-lg bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-200">
+            <code className="flex-1 overflow-x-auto rounded-lg bg-background px-3 py-2 font-mono text-xs text-foreground">
               {revealedKey}
             </code>
             <button
               onClick={handleCopy}
-              className="shrink-0 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-700"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground transition-colors hover:bg-accent"
             >
+              {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
           <button
             onClick={() => setRevealedKey(null)}
-            className="mt-2 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
+            className="mt-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             Dismiss
           </button>
@@ -111,10 +115,10 @@ function ApiKeysPage() {
       {showCreate && (
         <form
           onSubmit={handleCreate}
-          className="flex items-end gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4"
+          className="flex items-end gap-3 rounded-xl border bg-card p-4"
         >
           <div className="flex-1">
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
               Key Name
             </label>
             <input
@@ -122,45 +126,46 @@ function ApiKeysPage() {
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               placeholder="e.g. Production"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-blue-500"
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder-muted-foreground outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring"
               autoFocus
             />
           </div>
           <button
             type="submit"
             disabled={creating}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             {creating ? "Creating..." : "Create"}
           </button>
           <button
             type="button"
             onClick={() => setShowCreate(false)}
-            className="rounded-lg bg-zinc-800 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-4 py-2 text-sm text-secondary-foreground transition-colors hover:bg-accent"
           >
+            <X className="size-3" />
             Cancel
           </button>
         </form>
       )}
 
       {/* Keys table */}
-      <div className="overflow-x-auto rounded-xl border border-zinc-800">
+      <div className="overflow-x-auto rounded-xl border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-900">
-              <th className="px-4 py-3 text-left font-medium text-zinc-300">
+            <tr className="border-b bg-muted">
+              <th className="px-4 py-3 text-left font-medium text-foreground">
                 Name
               </th>
-              <th className="px-4 py-3 text-left font-medium text-zinc-300">
+              <th className="px-4 py-3 text-left font-medium text-foreground">
                 Key Prefix
               </th>
-              <th className="px-4 py-3 text-left font-medium text-zinc-300">
+              <th className="px-4 py-3 text-left font-medium text-foreground">
                 Created
               </th>
-              <th className="px-4 py-3 text-left font-medium text-zinc-300">
+              <th className="px-4 py-3 text-left font-medium text-foreground">
                 Last Used
               </th>
-              <th className="px-4 py-3 text-right font-medium text-zinc-300">
+              <th className="px-4 py-3 text-right font-medium text-foreground">
                 Actions
               </th>
             </tr>
@@ -168,7 +173,7 @@ function ApiKeysPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                   Loading...
                 </td>
               </tr>
@@ -177,24 +182,24 @@ function ApiKeysPage() {
                 {keys.map((key) => (
                   <tr
                     key={key.id}
-                    className="border-b border-zinc-800/50 last:border-0"
+                    className="border-b border-border/50 last:border-0"
                   >
-                    <td className="px-4 py-3 font-medium text-zinc-200">
+                    <td className="px-4 py-3 font-medium text-foreground">
                       {key.name ?? "Unnamed"}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-zinc-400">
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                       {key.keyPrefix}...
                     </td>
-                    <td className="px-4 py-3 text-zinc-400">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {fmtDate(key.createdAt)}
                     </td>
-                    <td className="px-4 py-3 text-zinc-400">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {fmtDate(key.lastUsedAt) ?? "Never"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => handleRevoke(key.id)}
-                        className="text-xs text-red-400 transition-colors hover:text-red-300"
+                        className="text-xs text-destructive transition-colors hover:text-destructive/80"
                       >
                         Revoke
                       </button>
@@ -205,7 +210,7 @@ function ApiKeysPage() {
                   <tr>
                     <td
                       colSpan={5}
-                      className="px-4 py-8 text-center text-zinc-500"
+                      className="px-4 py-8 text-center text-muted-foreground"
                     >
                       No API keys. Create one to get started.
                     </td>

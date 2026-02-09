@@ -15,7 +15,7 @@ function Section({
   return (
     <section className="mt-10">
       <h2 className="text-xl font-semibold">{title}</h2>
-      <div className="mt-4 space-y-3 text-zinc-400 leading-relaxed">
+      <div className="mt-4 space-y-3 text-muted-foreground leading-relaxed">
         {children}
       </div>
     </section>
@@ -29,11 +29,11 @@ function TermsPage() {
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Terms of Service
         </h1>
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="mt-2 text-sm text-muted-foreground/70">
           Last updated: February 10, 2026
         </p>
 
-        <div className="mt-8 text-zinc-400 leading-relaxed">
+        <div className="mt-8 text-muted-foreground leading-relaxed">
           <p>
             These Terms of Service ("Terms") govern your use of the LENS CLI
             tool, cloud services, and website (collectively, the "Service")
@@ -50,13 +50,13 @@ function TermsPage() {
             billing management.
           </p>
           <p>
-            <strong className="text-zinc-200">Local components</strong> &mdash;
+            <strong className="text-foreground">Local components</strong> &mdash;
             The LENS engine, CLI, and daemon operate locally. Your source code
             never leaves your machine unless you explicitly opt into cloud
             features.
           </p>
           <p>
-            <strong className="text-zinc-200">Cloud components</strong> &mdash;
+            <strong className="text-foreground">Cloud components</strong> &mdash;
             When enabled, the cloud tier proxies requests to third-party AI
             services (Voyage AI for embeddings, OpenRouter for purpose
             summaries). Only code snippets and metadata are transmitted, not full
@@ -117,12 +117,12 @@ function TermsPage() {
 
         <Section title="Data Handling">
           <p>
-            <strong className="text-zinc-200">Local data.</strong> All indexed
+            <strong className="text-foreground">Local data.</strong> All indexed
             data, SQLite databases, and context packs remain on your machine. We
             have no access to locally stored data.
           </p>
           <p>
-            <strong className="text-zinc-200">Cloud data.</strong> When using
+            <strong className="text-foreground">Cloud data.</strong> When using
             cloud features, code snippets are sent to third-party AI providers
             for processing. We do not store the content of these requests beyond
             transient processing. Usage metadata (request counts, timestamps) is
@@ -195,7 +195,7 @@ function TermsPage() {
             For questions about these Terms, contact us at{" "}
             <a
               href="mailto:legal@lens.dev"
-              className="text-blue-400 hover:text-blue-300"
+              className="text-primary hover:text-primary/80"
             >
               legal@lens.dev
             </a>

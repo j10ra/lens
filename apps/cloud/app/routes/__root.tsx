@@ -4,7 +4,6 @@ import {
   Scripts,
   createRootRoute,
 } from "@tanstack/react-router";
-import * as Sentry from "@sentry/react";
 import appCss from "@/global.css?url";
 
 export const Route = createRootRoute({
@@ -14,27 +13,36 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "LENS Cloud" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
+      },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+      },
+    ],
   }),
   component: RootComponent,
 });
 
 function RootComponent() {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var d=document.documentElement,t=localStorage.getItem("theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme:dark)").matches))d.classList.add("dark");else d.classList.remove("dark")}catch(e){}})()`,
+          }}
+        />
       </head>
-      <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-        <Sentry.ErrorBoundary
-          fallback={
-            <div className="flex min-h-screen items-center justify-center">
-              <p className="text-zinc-400">Something went wrong.</p>
-            </div>
-          }
-        >
-          <Outlet />
-        </Sentry.ErrorBoundary>
+      <body className="min-h-screen bg-background text-foreground font-sans antialiased">
+        <Outlet />
         <Scripts />
       </body>
     </html>

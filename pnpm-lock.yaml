@@ -45,6 +45,9 @@ importers:
       hono:
         specifier: ^4.7.0
         version: 4.11.9
+      lucide-react:
+        specifier: ^0.513.0
+        version: 0.513.0(react@19.2.4)
       postgres:
         specifier: ^3.4.5
         version: 3.4.8
@@ -202,6 +205,9 @@ importers:
       '@tanstack/react-start':
         specifier: ^1.159.5
         version: 1.159.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.10)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.0)(tsx@4.21.0))
+      lucide-react:
+        specifier: ^0.513.0
+        version: 0.513.0(react@19.2.4)
       react:
         specifier: ^19.0.0
         version: 19.2.4

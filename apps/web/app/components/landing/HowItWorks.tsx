@@ -35,12 +35,12 @@ Context pack: 12 files, 3.2KB
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="border-t border-zinc-800 py-24">
+    <section id="how-it-works" className="border-t border-border py-24">
       <div className="mx-auto max-w-6xl px-6">
         <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           How It Works
         </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-center text-zinc-400">
+        <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
           Three steps. No API keys required. Everything runs locally.
         </p>
 
@@ -48,15 +48,15 @@ export function HowItWorks() {
           {steps.map((step) => (
             <div
               key={step.number}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-6"
+              className="rounded-xl border bg-card p-6"
             >
-              <div className="mb-4 inline-block rounded-lg bg-blue-600/10 px-3 py-1 font-mono text-sm font-bold text-blue-500">
+              <div className="mb-4 inline-block rounded-lg bg-primary/10 px-3 py-1 font-mono text-sm font-bold text-primary">
                 {step.number}
               </div>
-              <h3 className="mb-2 text-lg font-semibold">{step.title}</h3>
-              <p className="mb-4 text-sm text-zinc-400">{step.description}</p>
-              <div className="overflow-hidden rounded-lg bg-zinc-950 p-4">
-                <pre className="overflow-x-auto font-mono text-xs leading-relaxed text-zinc-300">
+              <h3 className="mb-2 text-lg font-semibold text-card-foreground">{step.title}</h3>
+              <p className="mb-4 text-sm text-muted-foreground">{step.description}</p>
+              <div className="overflow-hidden rounded-lg bg-background p-4">
+                <pre className="overflow-x-auto font-mono text-xs leading-relaxed text-foreground/80">
                   {step.code}
                 </pre>
               </div>

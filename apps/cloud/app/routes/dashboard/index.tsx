@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "../dashboard";
 import { getUsageCurrent, getSubscription } from "@/lib/server-fns";
+import { ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/")({
   component: DashboardOverview,
@@ -27,6 +28,7 @@ function DashboardOverview() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!userId) return;
     (async () => {
       const [usage, sub] = await Promise.all([
         getUsageCurrent({ data: { userId } }),
@@ -45,7 +47,7 @@ function DashboardOverview() {
   if (loading || !data) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -72,14 +74,14 @@ function DashboardOverview() {
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Welcome back</h2>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           Here's an overview of your LENS usage.
         </p>
       </div>
 
       {/* Plan badge */}
-      <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5">
-        <span className="text-sm font-medium capitalize text-blue-400">
+      <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5">
+        <span className="text-sm font-medium capitalize text-primary">
           {data.plan} Plan
         </span>
       </div>
@@ -89,18 +91,18 @@ function DashboardOverview() {
         {stats.map((stat) => (
           <div
             key={stat.label}
-            className="rounded-xl border border-zinc-800 bg-zinc-900 p-6"
+            className="rounded-xl border bg-card p-6"
           >
-            <p className="text-sm text-zinc-400">{stat.label}</p>
-            <p className="mt-2 text-3xl font-bold">{stat.value}</p>
-            <p className="mt-1 text-xs text-zinc-500">{stat.period}</p>
+            <p className="text-sm text-muted-foreground">{stat.label}</p>
+            <p className="mt-2 text-3xl font-bold text-card-foreground">{stat.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground/70">{stat.period}</p>
           </div>
         ))}
       </div>
 
       {/* Quick links */}
       <div>
-        <h3 className="mb-4 text-sm font-semibold text-zinc-300">
+        <h3 className="mb-4 text-sm font-semibold text-foreground">
           Quick Links
         </h3>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -108,22 +110,10 @@ function DashboardOverview() {
             <Link
               key={link.href}
               to={link.href}
-              className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-800"
+              className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 text-sm text-card-foreground transition-colors hover:bg-accent"
             >
               {link.label}
-              <svg
-                className="h-4 w-4 text-zinc-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
+              <ChevronRight className="size-4 text-muted-foreground" />
             </Link>
           ))}
         </div>
