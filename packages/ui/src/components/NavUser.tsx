@@ -15,12 +15,7 @@ export function NavUser({
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <div
-          data-slot="sidebar-menu-button"
-          data-sidebar="menu-button"
-          data-size="lg"
-          className="peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm h-12"
-        >
+        <SidebarMenuButton as="div" size="lg">
           <CircleUser className="!size-8 text-muted-foreground" />
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium">{user.name}</span>
@@ -39,7 +34,7 @@ export function NavUser({
           ) : (
             <MoreVertical className="ml-auto" />
           )}
-        </div>
+        </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
   );

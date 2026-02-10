@@ -289,18 +289,20 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 function SidebarMenuButton({
+  as: Comp = "button",
   isActive = false,
   size = "default",
   className,
   children,
   ...props
 }: React.ComponentProps<"button"> & {
+  as?: "button" | "div";
   isActive?: boolean;
   size?: "default" | "sm" | "lg";
 }) {
   return (
-    <button
-      type="button"
+    <Comp
+      {...(Comp === "button" ? { type: "button" as const } : {})}
       data-slot="sidebar-menu-button"
       data-sidebar="menu-button"
       data-size={size}
@@ -317,10 +319,10 @@ function SidebarMenuButton({
         size === "lg" && "h-12 text-sm group-data-[collapsible=icon]:!p-0",
         className,
       )}
-      {...props}
+      {...(props as Record<string, unknown>)}
     >
       {children}
-    </button>
+    </Comp>
   );
 }
 

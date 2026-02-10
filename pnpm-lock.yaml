@@ -303,8 +303,6 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/types: {}
-
   packages/ui:
     dependencies:
       '@fontsource-variable/inter':
@@ -334,6 +332,13 @@ importers:
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.13
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.13)
 
 packages:
 
