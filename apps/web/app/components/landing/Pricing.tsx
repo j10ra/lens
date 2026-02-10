@@ -16,7 +16,6 @@ const tiers = [
       { name: "Voyage embeddings", value: null, included: false },
       { name: "Purpose summaries", value: null, included: false },
       { name: "Vocab clusters", value: null, included: false },
-      { name: "API keys", value: "1", included: true },
     ],
   },
   {
@@ -34,7 +33,6 @@ const tiers = [
       { name: "Voyage embeddings", value: null, included: true },
       { name: "Purpose summaries", value: null, included: true },
       { name: "Vocab clusters", value: null, included: true },
-      { name: "API keys", value: "5", included: true },
     ],
   },
 ];

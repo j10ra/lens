@@ -9,7 +9,6 @@ import {
   CreditCard,
   Database,
   FolderGit2,
-  Key,
   LayoutDashboard,
   Send,
 } from "lucide-react";
@@ -36,7 +35,6 @@ const CLOUD_GROUPS: NavGroup[] = [
   {
     label: "Cloud",
     items: [
-      { href: "/keys", icon: Key, label: "API Keys" },
       { href: "/usage", icon: BarChart3, label: "Usage" },
       { href: "/billing", icon: CreditCard, label: "Billing" },
     ],

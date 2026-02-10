@@ -6,7 +6,7 @@ import { Requests } from "./pages/Requests";
 import { Data } from "./pages/Data";
 import { Jobs } from "./pages/Jobs";
 import { Context } from "./pages/Context";
-import { Keys } from "./pages/Keys";
+
 import { Usage } from "./pages/Usage";
 import { Billing } from "./pages/Billing";
 
@@ -50,12 +50,6 @@ const contextRoute = createRoute({
   component: Context,
 });
 
-const keysRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/keys",
-  component: Keys,
-});
-
 const usageRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/usage",
@@ -75,7 +69,6 @@ const routeTree = rootRoute.addChildren([
   dataRoute,
   jobsRoute,
   contextRoute,
-  keysRoute,
   usageRoute,
   billingRoute,
 ]);

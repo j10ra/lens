@@ -19,11 +19,18 @@ authed.post("/checkout", async (c) => {
 
   const sub = await subscriptionQueries.getByUserId(db, userId);
 
+  const body = await c.req.json().catch(() => ({}));
+  const interval = body.interval === "yearly" ? "yearly" : "monthly";
+  const priceId =
+    interval === "yearly" ? c.env.STRIPE_PRICE_YEARLY : c.env.STRIPE_PRICE_MONTHLY;
+
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: sub?.stripeCustomerId ?? undefined,
     client_reference_id: userId,
-    line_items: [{ price: "price_lens_pro", quantity: 1 }],
+    line_items: [{ price: priceId, quantity: 1 }],
+    allow_promotion_codes: true,
+    subscription_data: { metadata: { userId } },
     success_url: "https://lens.dev/billing?success=true",
     cancel_url: "https://lens.dev/billing?canceled=true",
     metadata: { userId },

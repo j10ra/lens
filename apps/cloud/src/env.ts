@@ -10,6 +10,8 @@ export interface Env {
   SUPABASE_SERVICE_KEY: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
+  STRIPE_PRICE_MONTHLY: string;
+  STRIPE_PRICE_YEARLY: string;
   VOYAGE_API_KEY: string;
   OPENROUTER_API_KEY: string;
   SENTRY_DSN: string;

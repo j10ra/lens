@@ -502,21 +502,6 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     });
   }
 
-  // Keys
-  track("GET", "/api/cloud/keys");
-  app.get("/api/cloud/keys", async () => cloudProxy("GET", "/api/keys"));
-
-  track("POST", "/api/cloud/keys");
-  app.post("/api/cloud/keys", async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    return cloudProxy("POST", "/api/keys", body);
-  });
-
-  track("DELETE", "/api/cloud/keys/:id");
-  app.delete("/api/cloud/keys/:id", async (c) =>
-    cloudProxy("DELETE", `/api/keys/${c.req.param("id")}`),
-  );
-
   // Usage
   track("GET", "/api/cloud/usage");
   app.get("/api/cloud/usage", async (c) => {
@@ -538,9 +523,10 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   // Billing
   track("POST", "/api/cloud/billing/checkout");
-  app.post("/api/cloud/billing/checkout", async () =>
-    cloudProxy("POST", "/api/billing/checkout"),
-  );
+  app.post("/api/cloud/billing/checkout", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    return cloudProxy("POST", "/api/billing/checkout", body);
+  });
 
   track("GET", "/api/cloud/billing/portal");
   app.get("/api/cloud/billing/portal", async () =>

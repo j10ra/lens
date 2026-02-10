@@ -1,24 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check } from "lucide-react";
+import { Check, Mail } from "lucide-react";
 import { api } from "@/lib/api";
 import { CloudAuthGuard } from "@/components/CloudAuthGuard";
 import { PageHeader } from "@lens/ui";
 
-const PLANS = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    features: ["Unlimited local context queries", "TF-IDF + Import graph", "MCP integration", "1 API key"],
-  },
-  {
-    name: "Pro",
-    price: "$9",
-    period: "/mo",
-    features: ["Everything in Free", "Voyage embeddings", "Purpose summaries", "Vocab clusters", "5 API keys"],
-  },
-];
+type Interval = "monthly" | "yearly";
+
+const PRO_FEATURES = ["Everything in Free", "Voyage embeddings", "Purpose summaries", "Vocab clusters"];
 
 function BillingContent() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -43,10 +32,10 @@ function BillingContent() {
     ? new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
     : null;
 
-  async function handleUpgrade() {
-    setActionLoading("checkout");
+  async function handleUpgrade(interval: Interval) {
+    setActionLoading(interval);
     try {
-      const result = await api.cloudCheckout();
+      const result = await api.cloudCheckout(interval);
       if (result.url) window.location.href = result.url;
     } finally {
       setActionLoading(null);
@@ -63,6 +52,9 @@ function BillingContent() {
     }
   }
 
+  const isFree = currentPlan === "free";
+  const isPro = currentPlan === "pro";
+
   return (
     <div className="space-y-8">
       <div>
@@ -76,7 +68,7 @@ function BillingContent() {
             <p className="text-sm text-muted-foreground">Current Plan</p>
             <p className="mt-1 text-xl font-bold capitalize">
               {currentPlan}{" "}
-              {currentPlan === "pro" && <span className="text-sm font-normal text-muted-foreground">&mdash; $9/mo</span>}
+              {isPro && <span className="text-sm font-normal text-muted-foreground">&mdash; $9/mo</span>}
             </p>
           </div>
           <div className={`inline-flex items-center rounded-full border px-3 py-1 ${isActive ? "border-success/30 bg-success/10" : "border-border bg-muted"}`}>
@@ -93,7 +85,7 @@ function BillingContent() {
             </p>
           </div>
         )}
-        {currentPlan === "pro" && sub?.stripeCustomerId && (
+        {isPro && sub?.stripeCustomerId && (
           <div className="mt-4 flex gap-3">
             <button onClick={handleManage} disabled={actionLoading !== null} className="rounded-lg bg-secondary px-4 py-2 text-sm hover:bg-accent disabled:opacity-50">
               {actionLoading === "portal" ? "Loading..." : "Manage Subscription"}
@@ -104,41 +96,94 @@ function BillingContent() {
 
       <div>
         <h3 className="mb-4 text-sm font-semibold">Available Plans</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {PLANS.map((plan) => {
-            const isCurrent = plan.name.toLowerCase() === currentPlan;
-            return (
-              <div key={plan.name} className={`rounded-xl border p-6 ${isCurrent ? "border-primary/50 bg-card ring-1 ring-primary/20" : "border-border bg-card"}`}>
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold">{plan.name}</h4>
-                  {isCurrent && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">Current</span>}
-                </div>
-                <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold">{plan.price}</span>
-                  <span className="text-sm text-muted-foreground">{plan.period}</span>
-                </div>
-                <ul className="mt-4 space-y-2">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Check className="size-4 text-success" /> {f}
-                    </li>
-                  ))}
-                </ul>
-                {!isCurrent && plan.name === "Pro" && (
-                  <button onClick={handleUpgrade} disabled={actionLoading !== null} className="mt-6 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-                    {actionLoading === "checkout" ? "Loading..." : "Upgrade to Pro"}
-                  </button>
-                )}
-                {!isCurrent && plan.name === "Free" && (
-                  <button onClick={handleManage} disabled={actionLoading !== null} className="mt-6 w-full rounded-lg bg-secondary py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50">
-                    {actionLoading === "portal" ? "Loading..." : "Downgrade to Free"}
-                  </button>
-                )}
-              </div>
-            );
-          })}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Free */}
+          <div className={`rounded-xl border p-6 ${isFree ? "border-primary/50 ring-1 ring-primary/20" : "border-border"} bg-card`}>
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold">Free</h4>
+              {isFree && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">Current</span>}
+            </div>
+            <div className="mt-2 flex items-baseline gap-1">
+              <span className="text-3xl font-bold">$0</span>
+              <span className="text-sm text-muted-foreground">forever</span>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {["Unlimited local context queries", "TF-IDF + Import graph", "MCP integration"].map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="size-4 text-success" /> {f}
+                </li>
+              ))}
+            </ul>
+            {isPro && (
+              <button onClick={handleManage} disabled={actionLoading !== null} className="mt-6 w-full rounded-lg bg-secondary py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50">
+                {actionLoading === "portal" ? "Loading..." : "Downgrade to Free"}
+              </button>
+            )}
+          </div>
+
+          {/* Pro Monthly */}
+          <div className={`rounded-xl border p-6 ${isPro ? "border-primary/50 ring-1 ring-primary/20" : "border-border"} bg-card`}>
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold">Pro</h4>
+              {isPro && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">Current</span>}
+            </div>
+            <div className="mt-2 flex items-baseline gap-1">
+              <span className="text-3xl font-bold">$9</span>
+              <span className="text-sm text-muted-foreground">/mo</span>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {PRO_FEATURES.map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="size-4 text-success" /> {f}
+                </li>
+              ))}
+            </ul>
+            {isFree && (
+              <button onClick={() => handleUpgrade("monthly")} disabled={actionLoading !== null} className="mt-6 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                {actionLoading === "monthly" ? "Loading..." : "Go Monthly"}
+              </button>
+            )}
+          </div>
+
+          {/* Pro Yearly */}
+          <div className="rounded-xl border border-border bg-card p-6">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold">Pro Yearly</h4>
+              <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-semibold text-success">Save 17%</span>
+            </div>
+            <div className="mt-2 flex items-baseline gap-1">
+              <span className="text-3xl font-bold">$90</span>
+              <span className="text-sm text-muted-foreground">/yr</span>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {PRO_FEATURES.map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="size-4 text-success" /> {f}
+                </li>
+              ))}
+            </ul>
+            {isFree && (
+              <button onClick={() => handleUpgrade("yearly")} disabled={actionLoading !== null} className="mt-6 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                {actionLoading === "yearly" ? "Loading..." : "Go Yearly"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Enterprise */}
+      <a
+        href="mailto:support@lens.dev?subject=LENS Enterprise Inquiry"
+        className="flex items-center justify-between rounded-xl border border-border bg-card p-5 transition-colors hover:bg-accent"
+      >
+        <div>
+          <p className="text-sm font-semibold">Enterprise</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Dedicated support, custom integrations, SLA guarantee</p>
+        </div>
+        <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <Mail className="size-4" /> Contact Sales
+        </span>
+      </a>
     </div>
   );
 }
