@@ -20,6 +20,8 @@ interface StatusResponse {
   purpose_total: number;
   vocab_cluster_count: number;
   has_capabilities?: boolean;
+  embedding_quota_exceeded?: boolean;
+  purpose_quota_exceeded?: boolean;
 }
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
@@ -53,18 +55,26 @@ export async function statusCommand(opts: { json: boolean }): Promise<void> {
   ];
 
   if (hasCaps) {
-    const embLabel =
-      s.embeddable_count > 0
+    const warn = yellow("⚠");
+
+    const embDone = s.embedded_pct >= 100 || (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0);
+    const embLabel = s.embedding_quota_exceeded
+      ? `quota exceeded — ${s.embedded_count}/${s.embeddable_count}`
+      : s.embeddable_count > 0
         ? `${s.embedded_count}/${s.embeddable_count} code chunks (${s.embedded_pct}%)`
         : "no code chunks";
-    const embIcon =
-      s.embedded_pct >= 100 || (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) ? check : pending;
+    const embIcon = s.embedding_quota_exceeded ? warn : embDone ? check : pending;
 
     const vocabLabel = s.vocab_cluster_count > 0 ? `${s.vocab_cluster_count} clusters` : "...";
     const vocabIcon = s.vocab_cluster_count > 0 ? check : pending;
 
-    const purposeLabel = s.purpose_total > 0 ? `${s.purpose_count}/${s.purpose_total} files` : "no files";
-    const purposeIcon = s.purpose_count > 0 && s.purpose_count >= s.purpose_total ? check : pending;
+    const purDone = s.purpose_count > 0 && s.purpose_count >= s.purpose_total;
+    const purposeLabel = s.purpose_quota_exceeded
+      ? `quota exceeded — ${s.purpose_count}/${s.purpose_total}`
+      : s.purpose_total > 0
+        ? `${s.purpose_count}/${s.purpose_total} files`
+        : "no files";
+    const purposeIcon = s.purpose_quota_exceeded ? warn : purDone ? check : pending;
 
     lines.push(`  ${vocabIcon} Vocab clust.  ${dim(vocabLabel)}`);
     lines.push(`  ${embIcon} Embeddings    ${dim(embLabel)}`);

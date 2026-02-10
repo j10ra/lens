@@ -2,8 +2,13 @@ import type { Capabilities } from "@lens/engine";
 import { getCloudUrl } from "./config";
 
 export type UsageTracker = (counter: string, amount?: number) => void;
+export type RequestLogger = (method: string, path: string, status: number, durationMs: number, source: string) => void;
 
-export function createCloudCapabilities(apiKey: string, trackUsage?: UsageTracker): Capabilities {
+export function createCloudCapabilities(
+  apiKey: string,
+  trackUsage?: UsageTracker,
+  logRequest?: RequestLogger,
+): Capabilities {
   const CLOUD_API_URL = getCloudUrl();
   const headers = {
     Authorization: `Bearer ${apiKey}`,
@@ -12,6 +17,7 @@ export function createCloudCapabilities(apiKey: string, trackUsage?: UsageTracke
 
   return {
     async embedTexts(texts: string[], isQuery?: boolean): Promise<number[][]> {
+      const start = performance.now();
       const res = await fetch(`${CLOUD_API_URL}/api/proxy/embed`, {
         method: "POST",
         headers,
@@ -21,6 +27,9 @@ export function createCloudCapabilities(apiKey: string, trackUsage?: UsageTracke
           input_type: isQuery ? "query" : "document",
         }),
       });
+
+      const duration = Math.round(performance.now() - start);
+      logRequest?.("POST", "/api/proxy/embed", res.status, duration, "cloud");
 
       if (!res.ok) {
         const err = await res.text().catch(() => "");
@@ -44,6 +53,7 @@ export function createCloudCapabilities(apiKey: string, trackUsage?: UsageTracke
         .filter(Boolean)
         .join("\n");
 
+      const start = performance.now();
       const res = await fetch(`${CLOUD_API_URL}/api/proxy/chat`, {
         method: "POST",
         headers,
@@ -55,6 +65,9 @@ export function createCloudCapabilities(apiKey: string, trackUsage?: UsageTracke
           max_tokens: 128,
         }),
       });
+
+      const duration = Math.round(performance.now() - start);
+      logRequest?.("POST", "/api/proxy/chat", res.status, duration, "cloud");
 
       if (!res.ok) {
         const err = await res.text().catch(() => "");

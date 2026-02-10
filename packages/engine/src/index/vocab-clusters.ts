@@ -3,7 +3,7 @@ import type { Capabilities } from "../capabilities";
 import type { VocabCluster } from "../types";
 import { metadataQueries, repoQueries, jsonParse } from "../db/queries";
 
-const TERM_BATCH_SIZE = 128;
+const TERM_BATCH_SIZE = 32;
 const SIMILARITY_THRESHOLD = 0.75;
 const MAX_TERMS = 1500;
 const MAX_CLUSTERS = 200;
@@ -229,17 +229,28 @@ export function agglomerativeCluster(terms: string[], embeddings: number[][]): n
 }
 
 export async function buildVocabClusters(db: Db, repoId: string, caps?: Capabilities): Promise<void> {
-  if (!caps?.embedTexts) return;
+  if (!caps?.embedTexts) {
+    console.error("[LENS] Vocab clusters: skipped (no embedTexts capability)");
+    return;
+  }
 
   const rows = metadataQueries.getByRepo(db, repoId).map((r) => ({
     path: r.path,
     exports: Array.isArray(r.exports) ? r.exports : jsonParse(r.exports, [] as string[]),
   }));
 
-  if (rows.length === 0) return;
+  if (rows.length === 0) {
+    console.error("[LENS] Vocab clusters: skipped (no metadata rows)");
+    return;
+  }
 
   const { terms, termToFiles } = extractVocab(rows);
-  if (terms.length < 4) return;
+  if (terms.length < 4) {
+    console.error(`[LENS] Vocab clusters: skipped (only ${terms.length} terms, need ≥4)`);
+    return;
+  }
+
+  console.error(`[LENS] Vocab clusters: embedding ${terms.length} terms in ${Math.ceil(terms.length / TERM_BATCH_SIZE)} batches...`);
 
   let embeddings: number[][];
   try {
@@ -250,11 +261,13 @@ export async function buildVocabClusters(db: Db, repoId: string, caps?: Capabili
       results.push(...vecs);
     }
     embeddings = results;
-  } catch {
+  } catch (err) {
+    console.error(`[LENS] Vocab clusters: embed failed (${terms.length} terms):`, (err as Error).message);
     return;
   }
 
   const rawClusters = agglomerativeCluster(terms, embeddings);
+  console.error(`[LENS] Vocab clusters: ${rawClusters.length} clusters from ${terms.length} terms`);
 
   const clusters: VocabCluster[] = rawClusters
     .map((indices) => {

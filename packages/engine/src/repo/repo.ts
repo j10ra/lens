@@ -1,37 +1,19 @@
 import type { Db } from "../db/connection";
-import type { Capabilities } from "../capabilities";
 import type { RegisterResponse, StatusResponse } from "../types";
 import { repoQueries, chunkQueries, metadataQueries } from "../db/queries";
 import type { VocabCluster } from "../types";
 import { deriveIdentityKey } from "./identity";
 import { getHeadCommit } from "../index/discovery";
-import { runIndex } from "../index/engine";
-import { ensureEmbedded } from "../index/embed";
-import { enrichPurpose } from "../index/enrich-purpose";
 
 export function registerRepo(
   db: Db,
   rootPath: string,
   name?: string,
   remoteUrl?: string,
-  caps?: Capabilities,
 ): RegisterResponse {
   const identityKey = deriveIdentityKey(rootPath, remoteUrl);
   const repoName = name ?? rootPath.split("/").pop() ?? "unknown";
   const { id, created } = repoQueries.upsert(db, identityKey, repoName, rootPath, remoteUrl ?? null);
-
-  if (created) {
-    // Fire-and-forget indexing
-    (async () => {
-      try {
-        await runIndex(db, id, caps);
-        await Promise.all([ensureEmbedded(db, id, caps), enrichPurpose(db, id, caps, true)]);
-      } catch (err) {
-        console.error(`[LENS] Indexing failed for ${repoName}:`, err);
-      }
-    })();
-  }
-
   return { repo_id: id, identity_key: identityKey, name: repoName, created };
 }
 

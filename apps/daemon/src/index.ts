@@ -43,12 +43,17 @@ async function ensureApiKey(data: Record<string, unknown>): Promise<string | und
   }
 }
 
-async function loadCapabilities(db: ReturnType<typeof openDb>): Promise<Capabilities | undefined> {
+interface CapabilitiesResult {
+  caps?: Capabilities;
+  planData?: { plan: string; usage: Record<string, number>; quota: Record<string, number> };
+}
+
+async function loadCapabilities(db: ReturnType<typeof openDb>): Promise<CapabilitiesResult> {
   try {
     const authPath = join(homedir(), ".lens", "auth.json");
     const data = JSON.parse(readFileSync(authPath, "utf-8"));
     const apiKey = await ensureApiKey(data);
-    if (!apiKey) return undefined;
+    if (!apiKey) return {};
 
     // Check plan — only Pro users get cloud capabilities
     const cloudUrl = getCloudUrl();
@@ -57,29 +62,37 @@ async function loadCapabilities(db: ReturnType<typeof openDb>): Promise<Capabili
     });
     if (!res.ok) {
       console.error(`[LENS] Plan check failed (${res.status}), capabilities disabled`);
-      return undefined;
+      return {};
     }
-    const usage = await res.json() as { plan?: string };
-    if (usage.plan !== "pro") {
-      console.error(`[LENS] Plan: ${usage.plan ?? "free"} — Pro features disabled`);
-      return undefined;
+    const usageData = await res.json() as { plan?: string; usage?: Record<string, number>; quota?: Record<string, number> };
+    const planData = {
+      plan: usageData.plan ?? "free",
+      usage: usageData.usage ?? {},
+      quota: usageData.quota ?? {},
+    };
+
+    if (usageData.plan !== "pro") {
+      console.error(`[LENS] Plan: ${usageData.plan ?? "free"} — Pro features disabled`);
+      return { planData };
     }
 
     const { createCloudCapabilities } = await import("./cloud-capabilities");
-    const { usageQueries } = await import("@lens/engine");
-    const caps = createCloudCapabilities(apiKey, (counter, amount) => {
-      try { usageQueries.increment(db, counter as any, amount); } catch {}
-    });
+    const { usageQueries, logQueries } = await import("@lens/engine");
+    const caps = createCloudCapabilities(
+      apiKey,
+      (counter, amount) => { try { usageQueries.increment(db, counter as any, amount); } catch {} },
+      (method, path, status, duration, source) => { try { logQueries.insert(db, method, path, status, duration, source); } catch {} },
+    );
     console.error("[LENS] Cloud capabilities enabled (Pro plan)");
-    return caps;
+    return { caps, planData };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
 async function main() {
   const db = openDb();
-  const caps = await loadCapabilities(db);
+  const { caps, planData } = await loadCapabilities(db);
 
   if (process.argv.includes("--stdio")) {
     // MCP stdio mode — stdout reserved for JSON-RPC
@@ -120,7 +133,7 @@ async function main() {
     ];
     const dashboardDist = candidates.find((p) => existsSync(p));
 
-    const app = createApp(db, dashboardDist, caps);
+    const app = createApp(db, dashboardDist, caps, planData);
 
     const server = serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, () => {
       console.error(`[LENS] HTTP server listening on 127.0.0.1:${port}`);

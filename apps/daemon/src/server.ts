@@ -89,7 +89,18 @@ function quotaRemaining(key: string): number {
   return Math.max(0, limit - (used ?? 0));
 }
 
-export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): Hono & { stopTelemetrySync?: () => void } {
+export function createApp(
+  db: Db,
+  dashboardDist?: string,
+  initialCaps?: Capabilities,
+  initialPlanData?: { plan: string; usage: Record<string, number>; quota: Record<string, number> },
+): Hono & { stopTelemetrySync?: () => void } {
+  let caps = initialCaps;
+
+  // Seed quota cache from startup plan check — eliminates race on first dashboard load
+  if (initialPlanData) {
+    quotaCache = { ...initialPlanData, fetchedAt: Date.now() };
+  }
   const app = new Hono() as Hono & { stopTelemetrySync?: () => void };
 
   // --- Telemetry Init ---
@@ -275,7 +286,12 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
   app.get("/repo/:id/status", async (c) => {
     try {
       const status = await getRepoStatus(db, c.req.param("id"));
-      return c.json({ ...status, has_capabilities: !!caps });
+      return c.json({
+        ...status,
+        has_capabilities: !!caps,
+        embedding_quota_exceeded: quotaRemaining("embeddingRequests") <= 0 && quotaRemaining("embeddingChunks") <= 0,
+        purpose_quota_exceeded: quotaRemaining("purposeRequests") <= 0,
+      });
     } catch (e: any) {
       if (e.message === "repo not found") return c.json({ error: "repo not found" }, 404);
       return c.json({ error: e.message }, 500);
@@ -548,18 +564,28 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   const CLOUD_API_URL = getCloudUrl();
 
-  function readApiKey(): string | null {
+  async function readApiKey(): Promise<string | null> {
     const authPath = join(homedir(), ".lens", "auth.json");
     try {
       const data = JSON.parse(readFileSync(authPath, "utf-8"));
-      return data.api_key ?? null;
+      if (data.api_key) return data.api_key;
+      // Auto-provision if access_token exists but api_key missing
+      if (!data.access_token) return null;
+      const res = await fetch(`${CLOUD_API_URL}/auth/key`, {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      });
+      if (!res.ok) return null;
+      const { api_key } = (await res.json()) as { api_key: string };
+      data.api_key = api_key;
+      writeFileSync(authPath, JSON.stringify(data, null, 2), { mode: 0o600 });
+      return api_key;
     } catch {
       return null;
     }
   }
 
   async function cloudProxy(method: string, path: string, body?: unknown): Promise<Response> {
-    const apiKey = readApiKey();
+    const apiKey = await readApiKey();
     if (!apiKey) {
       return Response.json({ error: "Not authenticated. Run: lens login" }, { status: 401 });
     }
@@ -825,16 +851,23 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
   app.get("/api/dashboard/usage", (c) => {
     try {
       const today = usageQueries.getToday(db);
+      const local = {
+        context_queries: today?.context_queries ?? 0,
+        embedding_requests: today?.embedding_requests ?? 0,
+        embedding_chunks: today?.embedding_chunks ?? 0,
+        purpose_requests: today?.purpose_requests ?? 0,
+        repos_indexed: today?.repos_indexed ?? 0,
+      };
+      // For quota-enforced features, use cloud usage (source of truth for quota checks)
+      const cloud = quotaCache?.usage;
       return c.json({
-        today: today
-          ? {
-              context_queries: today.context_queries,
-              embedding_requests: today.embedding_requests,
-              embedding_chunks: today.embedding_chunks,
-              purpose_requests: today.purpose_requests,
-              repos_indexed: today.repos_indexed,
-            }
-          : { context_queries: 0, embedding_requests: 0, embedding_chunks: 0, purpose_requests: 0, repos_indexed: 0 },
+        today: {
+          context_queries: local.context_queries,
+          embedding_requests: Math.max(local.embedding_requests, cloud?.embeddingRequests ?? 0),
+          embedding_chunks: Math.max(local.embedding_chunks, cloud?.embeddingChunks ?? 0),
+          purpose_requests: Math.max(local.purpose_requests, cloud?.purposeRequests ?? 0),
+          repos_indexed: local.repos_indexed,
+        },
         synced_at: today?.synced_at ?? null,
         plan: quotaCache?.plan ?? null,
         quota: quotaCache?.quota ?? null,
@@ -893,6 +926,19 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
           quota: data.quota ?? {},
           fetchedAt: Date.now(),
         };
+        // Lazy capability recovery — if caps failed at startup but plan is Pro now
+        if (!caps && data.plan === "pro") {
+          const apiKey = await readApiKey();
+          if (apiKey) {
+            const { createCloudCapabilities } = await import("./cloud-capabilities");
+            caps = createCloudCapabilities(
+              apiKey,
+              (counter, amount) => { try { usageQueries.increment(db, counter as any, amount); } catch {} },
+              (method, path, status, duration, source) => { try { logQueries.insert(db, method, path, status, duration, source); } catch {} },
+            );
+            console.error("[LENS] Cloud capabilities recovered (Pro plan)");
+          }
+        }
       }
     } catch {}
   }

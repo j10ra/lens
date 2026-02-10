@@ -15,6 +15,8 @@ interface StatusResponse {
   purpose_total: number;
   vocab_cluster_count: number;
   has_capabilities?: boolean;
+  embedding_quota_exceeded?: boolean;
+  purpose_quota_exceeded?: boolean;
 }
 
 // ANSI
@@ -133,6 +135,8 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
         const embDone = s.embedded_count >= s.embeddable_count && s.embeddable_count > 0;
         if (embDone) {
           lines.push(`  ${green("✓")} Embeddings      ${dim(`${s.embedded_count}/${s.embeddable_count} code chunks`)}`);
+        } else if (s.embedding_quota_exceeded) {
+          lines.push(`  ${yellow("⚠")} Embeddings      ${dim(`quota exceeded — ${s.embedded_count}/${s.embeddable_count}`)}`);
         } else if (s.embeddable_count === 0) {
           lines.push(`  ${dim("○")} Embeddings      ${dim("no code chunks")}`);
         } else {
@@ -144,6 +148,8 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
         const sumDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;
         if (sumDone) {
           lines.push(`  ${green("✓")} Summaries       ${dim(`${s.purpose_count}/${s.purpose_total} files`)}`);
+        } else if (s.purpose_quota_exceeded) {
+          lines.push(`  ${yellow("⚠")} Summaries       ${dim(`quota exceeded — ${s.purpose_count}/${s.purpose_total}`)}`);
         } else if (s.purpose_total > 0) {
           lines.push(
             `  ${cyan(f)} Summaries       ${createBar(Math.round((s.purpose_count / s.purpose_total) * 100), 20)} ${dim(`${s.purpose_count}/${s.purpose_total}`)}`,
@@ -168,8 +174,8 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
 
     let allDone: boolean;
     if (hasCaps) {
-      const embDone = (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) || s.embeddable_count === 0;
-      const sumDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;
+      const embDone = (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) || s.embeddable_count === 0 || !!s.embedding_quota_exceeded;
+      const sumDone = (s.purpose_count >= s.purpose_total && s.purpose_total > 0) || !!s.purpose_quota_exceeded;
       allDone = structuralDone && embDone && sumDone;
     } else {
       // Without caps, structural completion = done

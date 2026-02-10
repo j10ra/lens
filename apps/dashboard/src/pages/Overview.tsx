@@ -32,13 +32,12 @@ export function Overview() {
     placeholderData: keepPreviousData,
   });
 
-  const auth = useQuery({ queryKey: ["auth-status"], queryFn: api.authStatus });
-  const { data: cloud } = useQuery({
-    queryKey: ["cloud-usage-current"],
-    queryFn: api.cloudUsageCurrent,
-    enabled: !!auth.data?.authenticated,
+  const { data: usage } = useQuery({
+    queryKey: ["dashboard-usage"],
+    queryFn: api.localUsage,
+    refetchInterval: 30_000,
   });
-  const isPro = (cloud?.plan ?? "free") === "pro";
+  const isPro = (usage?.plan ?? "free") === "pro" || usage?.has_capabilities === true;
 
   if (!stats && isLoading) return <Loading />;
 
@@ -54,10 +53,10 @@ export function Overview() {
 
   const statCards: StatCardItem[] = [
     { label: "Repos", value: stats?.repos_count ?? 0, description: "Registered repositories", icon: FolderGit2, iconClassName: ic },
-    { label: "Chunks", value: (stats?.total_chunks ?? 0).toLocaleString(), description: "Indexed code segments", icon: Shapes, iconClassName: ic },
-    { label: "Embeddings", value: (stats?.total_embeddings ?? 0).toLocaleString(), description: "Vector embeddings", icon: Cpu, iconClassName: ic, pro: true },
-    { label: "Summaries", value: (stats?.total_summaries ?? 0).toLocaleString(), description: "File purpose summaries", icon: BookText, iconClassName: ic, pro: true },
-    { label: "Vocab", value: (stats?.total_vocab_clusters ?? 0).toLocaleString(), description: "Vocabulary clusters", icon: Network, iconClassName: ic, pro: true },
+    { label: "Chunks", value: (stats?.total_chunks ?? 0).toLocaleString(), description: "Code segments across all repos", icon: Shapes, iconClassName: ic },
+    { label: "Embeddings", value: (stats?.total_embeddings ?? 0).toLocaleString(), description: "Chunks with vector embeddings stored locally", icon: Cpu, iconClassName: ic, pro: true },
+    { label: "Summaries", value: (stats?.total_summaries ?? 0).toLocaleString(), description: "Files with a purpose summary in local DB", icon: BookText, iconClassName: ic, pro: true },
+    { label: "Vocab", value: (stats?.total_vocab_clusters ?? 0).toLocaleString(), description: "Term clusters for concept expansion", icon: Network, iconClassName: ic, pro: true },
     { label: "DB Size", value: `${stats?.db_size_mb ?? 0} MB`, description: "SQLite database", icon: Database, iconClassName: ic },
     { label: "Uptime", value: uptimeStr, description: "Daemon process", icon: Activity, iconClassName: ic },
   ];
