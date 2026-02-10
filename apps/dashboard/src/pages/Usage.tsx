@@ -1,7 +1,7 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageHeader } from "@lens/ui";
-import { Card, CardContent, CardHeader, CardTitle } from "@lens/ui";
+import { Badge, Card, CardContent, CardHeader, CardTitle } from "@lens/ui";
 
 function UsageBar({ label, used, limit }: { label: string; used: number; limit?: number }) {
   if (!limit || limit <= 0) {
@@ -36,6 +36,75 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit?:
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function timeUntil(iso: string): string {
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return "now";
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `in ${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  return `in ${hrs}h ${mins % 60}m`;
+}
+
+const RESULT_STYLES: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+  success: { variant: "default", label: "OK" },
+  partial: { variant: "secondary", label: "Partial" },
+  error: { variant: "destructive", label: "Failed" },
+  skipped: { variant: "outline", label: "Skipped" },
+};
+
+function SyncStatusCard() {
+  const { data: sync } = useQuery({
+    queryKey: ["sync-status"],
+    queryFn: api.syncStatus,
+    refetchInterval: 30_000,
+    placeholderData: keepPreviousData,
+  });
+
+  if (!sync) return null;
+
+  const result = sync.lastResult ? RESULT_STYLES[sync.lastResult] : null;
+
+  return (
+    <section className="px-4 lg:px-6">
+      <Card className="border-border bg-background shadow-none">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm font-medium">Cloud Sync</CardTitle>
+            {result && <Badge variant={result.variant}>{result.label}</Badge>}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-1.5 text-xs text-muted-foreground">
+          <div className="flex gap-6">
+            <span>Last run: {sync.lastRunAt ? timeAgo(sync.lastRunAt) : "never"}</span>
+            <span>Next: {timeUntil(sync.nextRunAt)}</span>
+          </div>
+          {sync.lastResult === "success" && sync.rowsSynced > 0 && (
+            <p>{sync.rowsSynced} row{sync.rowsSynced > 1 ? "s" : ""} synced</p>
+          )}
+          {sync.unsyncedRows > 0 && (
+            <p className="text-yellow-600 dark:text-yellow-400">
+              {sync.unsyncedRows} unsynced: {sync.unsyncedDates.join(", ")}
+            </p>
+          )}
+          {sync.lastError && (
+            <p className="text-destructive">{sync.lastError}</p>
+          )}
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -90,6 +159,8 @@ export function Usage() {
             <UsageBar label="Repos Indexed" used={today.repos_indexed} limit={quota?.reposIndexed} />
           </section>
         )}
+
+        <SyncStatusCard />
 
         {!isAuthed && (
           <section className="px-4 lg:px-6">

@@ -159,6 +159,18 @@ export const api = {
       synced_at: string | null;
     }>("/api/dashboard/usage"),
 
+  syncStatus: () =>
+    request<{
+      lastRunAt: string | null;
+      lastResult: "success" | "partial" | "error" | "skipped" | null;
+      lastError: string | null;
+      rowsSynced: number;
+      rowsFailed: number;
+      nextRunAt: string;
+      unsyncedRows: number;
+      unsyncedDates: string[];
+    }>("/api/dashboard/sync"),
+
   authStatus: () =>
     request<{
       authenticated: boolean;

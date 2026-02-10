@@ -779,6 +779,16 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
+  track("GET", "/api/dashboard/sync");
+  app.get("/api/dashboard/sync", (c) => {
+    const unsynced = usageQueries.getUnsynced(db);
+    return c.json({
+      ...syncState,
+      unsyncedRows: unsynced.length,
+      unsyncedDates: unsynced.map((r) => r.date),
+    });
+  });
+
   track("GET", "/api/dashboard/routes");
   app.get("/api/dashboard/routes", (c) => {
     return c.json({ routes: registeredRoutes });
@@ -818,11 +828,35 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   const SYNC_INTERVAL = 3_600_000; // 1 hour
 
+  const syncState = {
+    lastRunAt: null as string | null,
+    lastResult: null as "success" | "partial" | "error" | "skipped" | null,
+    lastError: null as string | null,
+    rowsSynced: 0,
+    rowsFailed: 0,
+    nextRunAt: new Date(Date.now() + SYNC_INTERVAL).toISOString(),
+  };
+
   async function syncUsageToCloud() {
+    syncState.lastRunAt = new Date().toISOString();
+    syncState.rowsSynced = 0;
+    syncState.rowsFailed = 0;
+    syncState.lastError = null;
+
     const apiKey = readApiKey();
-    if (!apiKey) return;
+    if (!apiKey) {
+      syncState.lastResult = "skipped";
+      syncState.nextRunAt = new Date(Date.now() + SYNC_INTERVAL).toISOString();
+      return;
+    }
 
     const unsynced = usageQueries.getUnsynced(db);
+    if (unsynced.length === 0) {
+      syncState.lastResult = "success";
+      syncState.nextRunAt = new Date(Date.now() + SYNC_INTERVAL).toISOString();
+      return;
+    }
+
     for (const row of unsynced) {
       try {
         const res = await fetch(`${CLOUD_API_URL}/api/usage/sync`, {
@@ -842,9 +876,26 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
             },
           }),
         });
-        if (res.ok) usageQueries.markSynced(db, row.date);
-      } catch {}
+        if (res.ok) {
+          usageQueries.markSynced(db, row.date);
+          syncState.rowsSynced++;
+        } else {
+          syncState.rowsFailed++;
+          syncState.lastError = `HTTP ${res.status} for ${row.date}`;
+        }
+      } catch (e: any) {
+        syncState.rowsFailed++;
+        syncState.lastError = e?.message ?? "Unknown error";
+      }
     }
+
+    syncState.lastResult =
+      syncState.rowsFailed === 0
+        ? "success"
+        : syncState.rowsSynced === 0
+          ? "error"
+          : "partial";
+    syncState.nextRunAt = new Date(Date.now() + SYNC_INTERVAL).toISOString();
   }
 
   const syncTimer = setInterval(syncUsageToCloud, SYNC_INTERVAL);

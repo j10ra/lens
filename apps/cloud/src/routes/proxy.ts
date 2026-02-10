@@ -3,12 +3,14 @@ import { subscriptionQueries, usageQueries } from "@lens/cloud-db";
 import type { Env } from "../env";
 import { apiKeyAuth } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
+import { quotaCheck } from "../middleware/quota";
 import { getDb } from "../lib/db";
 import { proxyVoyage, proxyOpenRouter } from "../lib/proxy";
 
 const proxy = new Hono<{ Bindings: Env }>();
 proxy.use("*", apiKeyAuth);
 proxy.use("*", rateLimit);
+proxy.use("*", quotaCheck);
 
 async function requirePro(
   db: ReturnType<typeof getDb>,
@@ -33,6 +35,16 @@ proxy.post("/voyage/embed", async (c) => {
 
   if (!body.input || body.input.length > 32) {
     return c.json({ error: "Max 32 chunks per request" }, 400);
+  }
+
+  // Quota check
+  const usage = c.get("usageTotals") as Record<string, number> | null;
+  const quota = c.get("usageQuota") as Record<string, number>;
+  if ((usage?.embeddingRequests ?? 0) >= quota.embeddingRequests) {
+    return c.json({ error: "Quota exceeded: embedding requests", limit: quota.embeddingRequests }, 429);
+  }
+  if ((usage?.embeddingChunks ?? 0) + body.input.length > quota.embeddingChunks) {
+    return c.json({ error: "Quota exceeded: embedding chunks", limit: quota.embeddingChunks }, 429);
   }
 
   const upstream = await proxyVoyage(c.env.VOYAGE_API_KEY, {
@@ -70,6 +82,13 @@ proxy.post("/openrouter/chat", async (c) => {
 
   if (body.max_tokens && body.max_tokens > 4096) {
     return c.json({ error: "Max 4096 tokens per request" }, 400);
+  }
+
+  // Quota check
+  const usage = c.get("usageTotals") as Record<string, number> | null;
+  const quota = c.get("usageQuota") as Record<string, number>;
+  if ((usage?.purposeRequests ?? 0) >= quota.purposeRequests) {
+    return c.json({ error: "Quota exceeded: purpose requests", limit: quota.purposeRequests }, 429);
   }
 
   const upstream = await proxyOpenRouter(c.env.OPENROUTER_API_KEY, {
