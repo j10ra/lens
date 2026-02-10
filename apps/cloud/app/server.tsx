@@ -37,6 +37,7 @@ function buildEnv(): Env {
   const e = process.env;
   return {
     DATABASE_URL: e.DATABASE_URL ?? "",
+    APP_URL: e.APP_URL ?? "http://localhost:3001",
     SUPABASE_URL: e.SUPABASE_URL ?? "",
     SUPABASE_SERVICE_KEY: e.SUPABASE_SERVICE_KEY ?? "",
     STRIPE_SECRET_KEY: e.STRIPE_SECRET_KEY ?? "",

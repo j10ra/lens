@@ -6,6 +6,7 @@ export interface KVStore {
 
 export interface Env {
   DATABASE_URL: string;
+  APP_URL: string;
   SUPABASE_URL: string;
   SUPABASE_SERVICE_KEY: string;
   STRIPE_SECRET_KEY: string;
