@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { Button, Checkbox, PageHeader } from "@lens/ui";
 import { DataTable } from "@/components/DataTable";
 import { adminGetAllKeys, adminGetUsers, adminDeleteKeys } from "@/lib/server-fns";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/dashboard/keys")({
   component: AdminKeysPage,
@@ -15,6 +16,7 @@ const fmtDate = (d: unknown) =>
   d ? new Date(d as string).toLocaleDateString("en-CA") : null;
 
 function AdminKeysPage() {
+  const { accessToken } = useAuth();
   const [keys, setKeys] = useState<KeyRow[]>([]);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -22,10 +24,11 @@ function AdminKeysPage() {
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(() => {
+    if (!accessToken) return;
     setLoading(true);
     Promise.all([
-      adminGetAllKeys().catch(() => []),
-      adminGetUsers().catch(() => ({ users: [] })),
+      adminGetAllKeys({ data: { accessToken } }).catch(() => []),
+      adminGetUsers({ data: { accessToken } }).catch(() => ({ users: [] })),
     ]).then(([allKeys, users]) => {
       setKeys(allKeys as KeyRow[]);
       const map: Record<string, string> = {};
@@ -34,7 +37,7 @@ function AdminKeysPage() {
       setSelected(new Set());
       setLoading(false);
     });
-  }, []);
+  }, [accessToken]);
 
   useEffect(load, [load]);
 
@@ -61,10 +64,10 @@ function AdminKeysPage() {
   }
 
   async function handleDelete() {
-    if (selectedRevoked.length === 0) return;
+    if (selectedRevoked.length === 0 || !accessToken) return;
     setDeleting(true);
     try {
-      await adminDeleteKeys({ data: { ids: selectedRevoked } });
+      await adminDeleteKeys({ data: { accessToken, ids: selectedRevoked } });
       load();
     } catch {} finally {
       setDeleting(false);

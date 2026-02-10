@@ -3,7 +3,7 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 export function createDb(connectionString: string) {
-  const client = postgres(connectionString, { prepare: false });
+  const client = postgres(connectionString, { prepare: false, max: 5 });
   return drizzle(client, { schema });
 }
 

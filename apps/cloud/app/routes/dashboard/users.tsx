@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@lens/ui";
 import { DataTable } from "@/components/DataTable";
 import { adminGetUsers } from "@/lib/server-fns";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/dashboard/users")({
   component: UsersPage,
@@ -30,15 +31,17 @@ const columns = [
 ];
 
 function UsersPage() {
+  const { accessToken } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminGetUsers()
+    if (!accessToken) return;
+    adminGetUsers({ data: { accessToken } })
       .then((data) => setUsers(data.users))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [accessToken]);
 
   return (
     <>

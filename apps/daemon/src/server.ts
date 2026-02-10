@@ -69,8 +69,28 @@ const MIME_TYPES: Record<string, string> = {
   ".ttf": "font/ttf",
 };
 
-export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): Hono & { stopSync?: () => void; stopTelemetrySync?: () => void } {
-  const app = new Hono() as Hono & { stopSync?: () => void; stopTelemetrySync?: () => void };
+// --- Quota Cache (5-min TTL) ---
+
+interface QuotaSnapshot {
+  plan: string;
+  usage: Record<string, number>;
+  quota: Record<string, number>;
+  fetchedAt: number;
+}
+
+const QUOTA_TTL = 5 * 60_000;
+let quotaCache: QuotaSnapshot | null = null;
+
+function quotaRemaining(key: string): number {
+  if (!quotaCache) return Infinity;
+  const limit = quotaCache.quota[key];
+  const used = quotaCache.usage[key];
+  if (limit === undefined || limit === 0) return 0;
+  return Math.max(0, limit - (used ?? 0));
+}
+
+export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): Hono & { stopTelemetrySync?: () => void } {
+  const app = new Hono() as Hono & { stopTelemetrySync?: () => void };
 
   // --- Telemetry Init ---
   const telemetryEnabled = isTelemetryEnabled();
@@ -148,20 +168,36 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       const { root_path, name, remote_url } = await c.req.json();
       if (!root_path) return c.json({ error: "root_path required" }, 400);
 
+      // Registration limit check
+      const currentRepos = listRepos(db).length;
+      const maxRepos = quotaCache?.quota?.maxRepos ?? 50;
+      if (currentRepos >= maxRepos) {
+        return c.json({
+          error: "Repo limit reached",
+          current: currentRepos,
+          limit: maxRepos,
+          plan: quotaCache?.plan ?? "unknown",
+        }, 429);
+      }
+
       const result = registerRepo(db, root_path, name, remote_url);
 
       if (result.created) {
         runIndex(db, result.repo_id, caps, false, emitRepoEvent)
           .then((r) => {
             if (r.files_scanned > 0) usageQueries.increment(db, "repos_indexed");
-            return Promise.all([ensureEmbedded(db, result.repo_id, caps), enrichPurpose(db, result.repo_id, caps)]);
-          })
-          .then(([embedRes, purposeRes]) => {
-            if (embedRes.embedded_count > 0) {
-              usageQueries.increment(db, "embedding_requests");
-              usageQueries.increment(db, "embedding_chunks", embedRes.embedded_count);
+            const tasks: Promise<any>[] = [];
+            if (quotaRemaining("embeddingChunks") > 0) {
+              tasks.push(ensureEmbedded(db, result.repo_id, caps));
+            } else {
+              console.log("[LENS] Skipping embeddings: quota exceeded");
             }
-            if (purposeRes.enriched > 0) usageQueries.increment(db, "purpose_requests");
+            if (quotaRemaining("purposeRequests") > 0) {
+              tasks.push(enrichPurpose(db, result.repo_id, caps));
+            } else {
+              console.log("[LENS] Skipping purpose enrichment: quota exceeded");
+            }
+            return Promise.all(tasks);
           })
           .catch((e) => console.error("[LENS] post-register index failed:", e));
       }
@@ -255,9 +291,6 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       if (!repo_id || !goal) return c.json({ error: "repo_id and goal required" }, 400);
       const result = await buildContext(db, repo_id, goal, caps);
       usageQueries.increment(db, "context_queries");
-      if (chunkQueries.hasEmbeddings(db, repo_id)) {
-        usageQueries.increment(db, "embedding_requests");
-      }
       return c.json(result);
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -273,15 +306,20 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       if (!repo_id) return c.json({ error: "repo_id required" }, 400);
       const result = await runIndex(db, repo_id, caps, force ?? false, emitRepoEvent);
       if (result.files_scanned > 0) usageQueries.increment(db, "repos_indexed");
-      Promise.all([ensureEmbedded(db, repo_id, caps), enrichPurpose(db, repo_id, caps)])
-        .then(([embedRes, purposeRes]) => {
-          if (embedRes.embedded_count > 0) {
-            usageQueries.increment(db, "embedding_requests");
-            usageQueries.increment(db, "embedding_chunks", embedRes.embedded_count);
-          }
-          if (purposeRes.enriched > 0) usageQueries.increment(db, "purpose_requests");
-        })
-        .catch((e) => console.error("[LENS] post-index embed/enrich failed:", e));
+
+      const tasks: Promise<any>[] = [];
+      if (quotaRemaining("embeddingChunks") > 0) {
+        tasks.push(ensureEmbedded(db, repo_id, caps));
+      } else {
+        console.log("[LENS] Skipping embeddings: quota exceeded");
+      }
+      if (quotaRemaining("purposeRequests") > 0) {
+        tasks.push(enrichPurpose(db, repo_id, caps));
+      } else {
+        console.log("[LENS] Skipping purpose enrichment: quota exceeded");
+      }
+      Promise.all(tasks).catch((e) => console.error("[LENS] post-index embed/enrich failed:", e));
+
       return c.json(result);
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -390,6 +428,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     access_token: string;
     refresh_token: string;
     user_email: string;
+    user_id?: string;
     expires_at: number;
   }
 
@@ -419,6 +458,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       access_token: data.access_token,
       refresh_token: data.refresh_token,
       user_email: data.user?.email ?? "unknown",
+      user_id: data.user?.id,
       expires_at: Math.floor(Date.now() / 1000) + (data.expires_in ?? 3600),
     };
   }
@@ -802,16 +842,6 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  trackRoute("GET", "/api/dashboard/sync");
-  app.get("/api/dashboard/sync", (c) => {
-    const unsynced = usageQueries.getUnsynced(db);
-    return c.json({
-      ...syncState,
-      unsyncedRows: unsynced.length,
-      unsyncedDates: unsynced.map((r) => r.date),
-    });
-  });
-
   trackRoute("GET", "/api/dashboard/routes");
   app.get("/api/dashboard/routes", (c) => {
     return c.json({ routes: registeredRoutes });
@@ -847,85 +877,29 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     app.get("/dashboard", (c) => c.redirect("/dashboard/"));
   }
 
-  // --- Usage Sync Timer (every hour, sync unsynced counters to cloud) ---
+  // --- Quota Cache (refresh every 5 minutes) ---
 
-  const SYNC_INTERVAL = 3_600_000; // 1 hour
-
-  const syncState = {
-    lastRunAt: null as string | null,
-    lastResult: null as "success" | "partial" | "error" | "skipped" | null,
-    lastError: null as string | null,
-    rowsSynced: 0,
-    rowsFailed: 0,
-    nextRunAt: new Date(Date.now() + SYNC_INTERVAL).toISOString(),
-  };
-
-  async function syncUsageToCloud() {
-    syncState.lastRunAt = new Date().toISOString();
-    syncState.rowsSynced = 0;
-    syncState.rowsFailed = 0;
-    syncState.lastError = null;
-
-    const apiKey = readApiKey();
-    if (!apiKey) {
-      syncState.lastResult = "skipped";
-      syncState.nextRunAt = new Date(Date.now() + SYNC_INTERVAL).toISOString();
-      return;
-    }
-
-    const unsynced = usageQueries.getUnsynced(db);
-    if (unsynced.length === 0) {
-      syncState.lastResult = "success";
-      syncState.nextRunAt = new Date(Date.now() + SYNC_INTERVAL).toISOString();
-      return;
-    }
-
-    for (const row of unsynced) {
-      try {
-        const res = await fetch(`${CLOUD_API_URL}/api/usage/sync`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            date: row.date,
-            counters: {
-              contextQueries: row.context_queries,
-              embeddingRequests: row.embedding_requests,
-              embeddingChunks: row.embedding_chunks,
-              purposeRequests: row.purpose_requests,
-              reposIndexed: row.repos_indexed,
-            },
-          }),
-        });
-        if (res.ok) {
-          usageQueries.markSynced(db, row.date);
-          syncState.rowsSynced++;
-        } else {
-          syncState.rowsFailed++;
-          syncState.lastError = `HTTP ${res.status} for ${row.date}`;
-        }
-      } catch (e: any) {
-        syncState.rowsFailed++;
-        syncState.lastError = e?.message ?? "Unknown error";
+  async function refreshQuotaCache() {
+    try {
+      const res = await cloudProxy("GET", "/api/usage/current");
+      if (res.ok) {
+        const data = await res.json() as any;
+        quotaCache = {
+          plan: data.plan ?? "free",
+          usage: data.usage ?? {},
+          quota: data.quota ?? {},
+          fetchedAt: Date.now(),
+        };
       }
-    }
-
-    syncState.lastResult =
-      syncState.rowsFailed === 0
-        ? "success"
-        : syncState.rowsSynced === 0
-          ? "error"
-          : "partial";
-    syncState.nextRunAt = new Date(Date.now() + SYNC_INTERVAL).toISOString();
+    } catch {}
   }
 
-  const syncTimer = setInterval(syncUsageToCloud, SYNC_INTERVAL);
-  syncUsageToCloud().catch(() => {}); // initial sync on startup
-  app.stopSync = () => clearInterval(syncTimer);
+  const quotaTimer = setInterval(refreshQuotaCache, QUOTA_TTL);
+  refreshQuotaCache().catch(() => {});
 
   // --- Telemetry Sync Timer (hourly, sync buffered events to cloud) ---
+
+  const SYNC_INTERVAL = 3_600_000;
 
   async function syncTelemetryToCloud() {
     if (!isTelemetryEnabled()) return;
@@ -934,6 +908,10 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
     const unsynced = telemetryQueries.getUnsynced(db, 500);
     if (unsynced.length === 0) return;
+
+    // Read user_id from auth config if available
+    const auth = readAuthSync();
+    const userId = auth?.user_id ?? null;
 
     const events = unsynced.map((e) => ({
       event_type: e.event_type,
@@ -945,7 +923,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       const res = await fetch(`${CLOUD_API_URL}/api/telemetry`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telemetry_id: tid, events }),
+        body: JSON.stringify({ telemetry_id: tid, user_id: userId, events }),
         signal: AbortSignal.timeout(10000),
       });
       if (res.ok) {
@@ -959,7 +937,10 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   const telemetrySyncTimer = setInterval(syncTelemetryToCloud, SYNC_INTERVAL);
   syncTelemetryToCloud().catch(() => {});
-  app.stopTelemetrySync = () => clearInterval(telemetrySyncTimer);
+  app.stopTelemetrySync = () => {
+    clearInterval(telemetrySyncTimer);
+    clearInterval(quotaTimer);
+  };
 
   return app;
 }

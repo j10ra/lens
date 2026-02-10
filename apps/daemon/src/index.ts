@@ -127,7 +127,7 @@ async function main() {
 
     function shutdown() {
       console.error("[LENS] Shutting down...");
-      app.stopSync?.();
+      app.stopTelemetrySync?.();
       server.close();
       closeDb();
       removePid();

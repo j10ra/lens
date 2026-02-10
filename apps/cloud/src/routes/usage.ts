@@ -2,28 +2,12 @@ import { Hono } from "hono";
 import {
   subscriptionQueries,
   usageQueries,
+  quotaQueries,
   type UsageCounters,
 } from "@lens/cloud-db";
 import type { Env } from "../env";
 import { apiKeyAuth } from "../middleware/auth";
 import { getDb } from "../lib/db";
-
-const QUOTAS: Record<string, Record<string, number>> = {
-  free: {
-    contextQueries: 0,
-    embeddingRequests: 0,
-    embeddingChunks: 0,
-    purposeRequests: 0,
-    reposIndexed: 0,
-  },
-  pro: {
-    contextQueries: 10000,
-    embeddingRequests: 5000,
-    embeddingChunks: 500000,
-    purposeRequests: 2000,
-    reposIndexed: 100,
-  },
-};
 
 const usage = new Hono<{ Bindings: Env }>();
 usage.use("*", apiKeyAuth);
@@ -62,13 +46,19 @@ usage.get("/current", async (c) => {
     sub?.currentPeriodStart?.toISOString().slice(0, 10) ??
     new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
-  const totals = await usageQueries.getCurrentPeriod(
-    db,
-    userId,
-    periodStart,
-  );
+  const [totals, quotaRow] = await Promise.all([
+    usageQueries.getCurrentPeriod(db, userId, periodStart),
+    quotaQueries.getByPlan(db, plan),
+  ]);
 
-  const quota = QUOTAS[plan] ?? QUOTAS.free;
+  const quota = quotaRow ?? {
+    maxRepos: 3,
+    contextQueries: 0,
+    embeddingRequests: 0,
+    embeddingChunks: 0,
+    purposeRequests: 0,
+    reposIndexed: 0,
+  };
 
   return c.json({
     plan,
@@ -79,4 +69,3 @@ usage.get("/current", async (c) => {
 });
 
 export { usage as usageRoutes };
-export { QUOTAS };

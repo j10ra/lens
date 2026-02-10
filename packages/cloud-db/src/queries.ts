@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte, sql, sum, desc } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "./schema";
-import { apiKeys, subscriptions, usageDaily } from "./schema";
+import { apiKeys, subscriptions, usageDaily, planQuotas } from "./schema";
 
 type Db = PostgresJsDatabase<typeof schema>;
 
@@ -219,6 +219,41 @@ export const adminQueries = {
       })
       .from(usageDaily)
       .where(gte(usageDaily.date, periodStart))
+      .then((rows) => rows[0] ?? null);
+  },
+};
+
+export const quotaQueries = {
+  getAll(db: Db) {
+    return db.select().from(planQuotas).orderBy(planQuotas.plan);
+  },
+
+  getByPlan(db: Db, plan: string) {
+    return db
+      .select()
+      .from(planQuotas)
+      .where(eq(planQuotas.plan, plan))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+  },
+
+  update(
+    db: Db,
+    plan: string,
+    values: Partial<{
+      maxRepos: number;
+      contextQueries: number;
+      embeddingRequests: number;
+      embeddingChunks: number;
+      purposeRequests: number;
+      reposIndexed: number;
+    }>,
+  ) {
+    return db
+      .update(planQuotas)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(planQuotas.plan, plan))
+      .returning()
       .then((rows) => rows[0] ?? null);
   },
 };

@@ -1,8 +1,16 @@
 import { createMiddleware } from "hono/factory";
-import { subscriptionQueries, usageQueries } from "@lens/cloud-db";
+import { subscriptionQueries, usageQueries, quotaQueries } from "@lens/cloud-db";
 import type { Env } from "../env";
 import { getDb } from "../lib/db";
-import { QUOTAS } from "../routes/usage";
+
+const ZERO_QUOTA = {
+  maxRepos: 3,
+  contextQueries: 0,
+  embeddingRequests: 0,
+  embeddingChunks: 0,
+  purposeRequests: 0,
+  reposIndexed: 0,
+};
 
 export const quotaCheck = createMiddleware<{ Bindings: Env }>(
   async (c, next) => {
@@ -15,8 +23,12 @@ export const quotaCheck = createMiddleware<{ Bindings: Env }>(
       sub?.currentPeriodStart?.toISOString().slice(0, 10) ??
       new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
-    const totals = await usageQueries.getCurrentPeriod(db, userId, periodStart);
-    const quota = QUOTAS[plan] ?? QUOTAS.free;
+    const [totals, quotaRow] = await Promise.all([
+      usageQueries.getCurrentPeriod(db, userId, periodStart),
+      quotaQueries.getByPlan(db, plan),
+    ]);
+
+    const quota = quotaRow ?? ZERO_QUOTA;
 
     c.set("usageTotals", totals);
     c.set("usageQuota", quota);

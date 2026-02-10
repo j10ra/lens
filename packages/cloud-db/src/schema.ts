@@ -9,6 +9,17 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+export const planQuotas = pgTable("plan_quotas", {
+  plan: text("plan").primaryKey(),
+  maxRepos: integer("max_repos").notNull().default(50),
+  contextQueries: integer("context_queries").notNull().default(0),
+  embeddingRequests: integer("embedding_requests").notNull().default(0),
+  embeddingChunks: integer("embedding_chunks").notNull().default(0),
+  purposeRequests: integer("purpose_requests").notNull().default(0),
+  reposIndexed: integer("repos_indexed").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
 export const apiKeys = pgTable("api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull(),

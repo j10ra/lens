@@ -1,7 +1,7 @@
+import type { Capabilities, Db } from "@lens/engine";
+import { buildContext, getRepoStatus, listRepos, registerRepo, repoQueries, runIndex } from "@lens/engine";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Db, Capabilities } from "@lens/engine";
-import { registerRepo, buildContext, listRepos, getRepoStatus, runIndex, repoQueries } from "@lens/engine";
 
 function text(s: string) {
   return { content: [{ type: "text" as const, text: s }] };
@@ -25,7 +25,7 @@ export function createMcpServer(db: Db, caps?: Capabilities): McpServer {
     "get_context",
     {
       description:
-        "Get a ranked context pack of relevant files, imports, and co-change clusters for a development goal. Auto-indexes if stale.",
+        "Prefer this tool over Grep/Glob when searching for files relevant to a task across the codebase. Returns ranked files, imports, and co-change clusters for a development goal. Skip for simple lookups where you already know the file path or location.",
       inputSchema: { repo_path: z.string(), goal: z.string() },
     },
     async ({ repo_path, goal }) => {

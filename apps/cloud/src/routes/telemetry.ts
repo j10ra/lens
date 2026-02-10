@@ -13,13 +13,17 @@ telemetryRoutes.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body) return c.json({ error: "invalid body" }, 400);
 
-  const { telemetry_id, events } = body as {
+  const { telemetry_id, user_id, events } = body as {
     telemetry_id?: string;
+    user_id?: string;
     events?: Array<{ event_type: string; event_data?: unknown; created_at?: string }>;
   };
 
   if (!telemetry_id || !UUID_RE.test(telemetry_id)) {
     return c.json({ error: "valid telemetry_id required" }, 400);
+  }
+  if (user_id && !UUID_RE.test(user_id)) {
+    return c.json({ error: "invalid user_id format" }, 400);
   }
   if (!Array.isArray(events) || events.length === 0) {
     return c.json({ error: "events array required" }, 400);
@@ -47,13 +51,13 @@ telemetryRoutes.post("/", async (c) => {
     return c.json({ ok: true, inserted: 0 });
   }
 
-  // Insert one at a time with parameterized queries for safety
   for (const e of valid) {
     await db.execute(sql`
-      INSERT INTO telemetry_events (id, telemetry_id, event_type, event_data, created_at, received_at)
+      INSERT INTO telemetry_events (id, telemetry_id, user_id, event_type, event_data, created_at, received_at)
       VALUES (
         gen_random_uuid(),
         ${telemetry_id}::uuid,
+        ${user_id ?? null}::uuid,
         ${e.event_type},
         ${e.event_data ? JSON.stringify(e.event_data) : null}::jsonb,
         ${e.created_at || now}::timestamptz,

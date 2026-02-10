@@ -63,9 +63,10 @@ function DashboardLayout() {
     ? {
         userId: session.user.id,
         email: session.user.email ?? "",
+        accessToken: session.access_token,
         onSignOut: handleSignOut,
       }
-    : { userId: "", email: "", onSignOut: handleSignOut };
+    : { userId: "", email: "", accessToken: "", onSignOut: handleSignOut };
 
   if (loading) {
     return (

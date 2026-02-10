@@ -5,6 +5,7 @@ import {
   CreditCard,
   Users,
   Activity,
+  Settings2,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AppSidebar, NavUser, type NavItem } from "@lens/ui";
@@ -17,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: BarChart3, label: "Usage", href: "/dashboard/usage" },
   { icon: CreditCard, label: "Billing", href: "/dashboard/billing" },
   { icon: Activity, label: "Telemetry", href: "/dashboard/telemetry" },
+  { icon: Settings2, label: "Rates", href: "/dashboard/rates" },
 ];
 
 export function CloudSidebar() {

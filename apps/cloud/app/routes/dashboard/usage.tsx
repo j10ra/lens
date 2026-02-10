@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, PageHeader } from "@lens/ui";
 import { adminGetGlobalUsage } from "@/lib/server-fns";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/dashboard/usage")({
   component: AdminUsagePage,
@@ -35,15 +36,17 @@ type StatCardItem = {
 const ic = "border-border/80 bg-muted/35 text-foreground/80";
 
 function AdminUsagePage() {
+  const { accessToken } = useAuth();
   const [data, setData] = useState<GlobalUsage | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!accessToken) return;
     const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
       .toISOString()
       .slice(0, 10);
 
-    adminGetGlobalUsage({ data: { periodStart } })
+    adminGetGlobalUsage({ data: { accessToken, periodStart } })
       .then((usage) => {
         setData({
           totalUsers: usage?.totalUsers ?? 0,
@@ -56,7 +59,7 @@ function AdminUsagePage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [accessToken]);
 
   if (loading || !data) {
     return (

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@lens/ui";
 import { DataTable } from "@/components/DataTable";
 import { adminGetAllSubscriptions, adminGetUsers } from "@/lib/server-fns";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/dashboard/billing")({
   component: AdminSubscriptionsPage,
@@ -14,14 +15,16 @@ const fmtDate = (d: unknown) =>
   d ? new Date(d as string).toLocaleDateString("en-CA") : "—";
 
 function AdminSubscriptionsPage() {
+  const { accessToken } = useAuth();
   const [subs, setSubs] = useState<SubRow[]>([]);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!accessToken) return;
     Promise.all([
-      adminGetAllSubscriptions().catch(() => []),
-      adminGetUsers().catch(() => ({ users: [] })),
+      adminGetAllSubscriptions({ data: { accessToken } }).catch(() => []),
+      adminGetUsers({ data: { accessToken } }).catch(() => ({ users: [] })),
     ]).then(([allSubs, users]) => {
       setSubs(allSubs as SubRow[]);
       const map: Record<string, string> = {};
@@ -29,7 +32,7 @@ function AdminSubscriptionsPage() {
       setUserMap(map);
       setLoading(false);
     });
-  }, []);
+  }, [accessToken]);
 
   const proCount = subs.filter((s) => s.plan === "pro" && s.status === "active").length;
 

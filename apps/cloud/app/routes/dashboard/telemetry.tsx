@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@lens/ui";
 import { DataTable } from "@/components/DataTable";
 import { adminGetTelemetryStats } from "@/lib/server-fns";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/dashboard/telemetry")({
   component: TelemetryPage,
@@ -17,8 +18,10 @@ interface TelemetryStats {
     telemetry_id: string;
     event_type: string;
     event_data: Record<string, string> | null;
+    user_id: string | null;
     created_at: string;
   }>;
+  perUser: Array<{ user_id: string; event_type: string; count: number }>;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -30,15 +33,17 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 function TelemetryPage() {
+  const { accessToken } = useAuth();
   const [data, setData] = useState<TelemetryStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminGetTelemetryStats()
+    if (!accessToken) return;
+    adminGetTelemetryStats({ data: { accessToken } })
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [accessToken]);
 
   const totalEvents = data?.countsByType.reduce((s, r) => s + r.count, 0) ?? 0;
 
@@ -63,6 +68,18 @@ function TelemetryPage() {
               {row.event_type}
             </span>
           ),
+        },
+        {
+          key: "user_id",
+          label: "User",
+          render: (row: (typeof data.recentEvents)[0]) =>
+            row.user_id ? (
+              <span className="text-muted-foreground" title={row.user_id}>
+                {row.user_id.slice(0, 8)}
+              </span>
+            ) : (
+              <span className="italic text-muted-foreground/40">anon</span>
+            ),
         },
         {
           key: "event_data",

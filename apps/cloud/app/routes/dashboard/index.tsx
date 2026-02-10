@@ -6,6 +6,7 @@ import {
   BarChart3,
   CreditCard,
   Activity,
+  Settings2,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import {
   adminGetGlobalUsage,
   adminGetAllSubscriptions,
 } from "@/lib/server-fns";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/dashboard/")({
   component: AdminOverview,
@@ -26,6 +28,7 @@ const quickLinks = [
   { icon: BarChart3, label: "Usage Analytics", href: "/dashboard/usage" },
   { icon: CreditCard, label: "Subscriptions", href: "/dashboard/billing" },
   { icon: Activity, label: "Telemetry", href: "/dashboard/telemetry" },
+  { icon: Settings2, label: "Rate Limits", href: "/dashboard/rates" },
 ];
 
 type StatCardItem = {
@@ -38,20 +41,22 @@ type StatCardItem = {
 const ic = "border-border/80 bg-muted/35 text-foreground/80";
 
 function AdminOverview() {
+  const { accessToken } = useAuth();
   const [totalUsers, setTotalUsers] = useState(0);
   const [proSubscribers, setProSubscribers] = useState(0);
   const [usage, setUsage] = useState({ contextQueries: 0, embeddingRequests: 0, purposeRequests: 0 });
 
   useEffect(() => {
+    if (!accessToken) return;
     const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
       .toISOString()
       .slice(0, 10);
 
-    adminGetUsers()
+    adminGetUsers({ data: { accessToken } })
       .then((r) => setTotalUsers(r?.users?.length ?? 0))
       .catch(() => {});
 
-    adminGetGlobalUsage({ data: { periodStart } })
+    adminGetGlobalUsage({ data: { accessToken, periodStart } })
       .then((r) => {
         if (r) setUsage({
           contextQueries: r.contextQueries ?? 0,
@@ -61,12 +66,12 @@ function AdminOverview() {
       })
       .catch(() => {});
 
-    adminGetAllSubscriptions()
+    adminGetAllSubscriptions({ data: { accessToken } })
       .then((r) => {
         if (Array.isArray(r)) setProSubscribers(r.filter((s) => s.plan === "pro" && s.status === "active").length);
       })
       .catch(() => {});
-  }, []);
+  }, [accessToken]);
 
   const stats: StatCardItem[] = [
     { label: "Users", value: totalUsers.toLocaleString(), description: "Registered accounts", icon: Users },
