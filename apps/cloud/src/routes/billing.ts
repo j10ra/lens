@@ -27,7 +27,7 @@ authed.post("/checkout", async (c) => {
   const interval = body.interval === "yearly" ? "yearly" : "monthly";
   const priceId =
     interval === "yearly" ? c.env.STRIPE_PRICE_YEARLY : c.env.STRIPE_PRICE_MONTHLY;
-  const returnUrl = body.return_url || "https://lens.dev/billing";
+  const returnUrl = body.return_url || `${c.env.APP_URL}/dashboard/billing`;
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -64,7 +64,7 @@ authed.get("/portal", async (c) => {
     return c.json({ error: "No billing account found" }, 404);
   }
 
-  const returnUrl = c.req.query("return_url") || "https://lens.dev/billing";
+  const returnUrl = c.req.query("return_url") || `${c.env.APP_URL}/dashboard/billing`;
   const session = await stripe.billingPortal.sessions.create({
     customer: sub.stripeCustomerId,
     return_url: returnUrl,
