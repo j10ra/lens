@@ -39,7 +39,7 @@ function UsersPage() {
     if (!accessToken) return;
     adminGetUsers({ data: { accessToken } })
       .then((data) => setUsers(data.users))
-      .catch(() => {})
+      .catch((err) => console.error("[UsersPage] fetch error:", err))
       .finally(() => setLoading(false));
   }, [accessToken]);
 

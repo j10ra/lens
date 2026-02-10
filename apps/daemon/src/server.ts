@@ -836,6 +836,9 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
             }
           : { context_queries: 0, embedding_requests: 0, embedding_chunks: 0, purpose_requests: 0, repos_indexed: 0 },
         synced_at: today?.synced_at ?? null,
+        plan: quotaCache?.plan ?? null,
+        quota: quotaCache?.quota ?? null,
+        has_capabilities: !!caps,
       });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);

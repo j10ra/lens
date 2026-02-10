@@ -43,7 +43,7 @@ async function ensureApiKey(data: Record<string, unknown>): Promise<string | und
   }
 }
 
-async function loadCapabilities(): Promise<Capabilities | undefined> {
+async function loadCapabilities(db: ReturnType<typeof openDb>): Promise<Capabilities | undefined> {
   try {
     const authPath = join(homedir(), ".lens", "auth.json");
     const data = JSON.parse(readFileSync(authPath, "utf-8"));
@@ -66,7 +66,10 @@ async function loadCapabilities(): Promise<Capabilities | undefined> {
     }
 
     const { createCloudCapabilities } = await import("./cloud-capabilities");
-    const caps = createCloudCapabilities(apiKey);
+    const { usageQueries } = await import("@lens/engine");
+    const caps = createCloudCapabilities(apiKey, (counter, amount) => {
+      try { usageQueries.increment(db, counter as any, amount); } catch {}
+    });
     console.error("[LENS] Cloud capabilities enabled (Pro plan)");
     return caps;
   } catch {
@@ -76,7 +79,7 @@ async function loadCapabilities(): Promise<Capabilities | undefined> {
 
 async function main() {
   const db = openDb();
-  const caps = await loadCapabilities();
+  const caps = await loadCapabilities(db);
 
   if (process.argv.includes("--stdio")) {
     // MCP stdio mode — stdout reserved for JSON-RPC

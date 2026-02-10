@@ -1,7 +1,9 @@
 import type { Capabilities } from "@lens/engine";
 import { getCloudUrl } from "./config";
 
-export function createCloudCapabilities(apiKey: string): Capabilities {
+export type UsageTracker = (counter: string, amount?: number) => void;
+
+export function createCloudCapabilities(apiKey: string, trackUsage?: UsageTracker): Capabilities {
   const CLOUD_API_URL = getCloudUrl();
   const headers = {
     Authorization: `Bearer ${apiKey}`,
@@ -26,6 +28,8 @@ export function createCloudCapabilities(apiKey: string): Capabilities {
       }
 
       const data = await res.json() as { data?: Array<{ embedding: number[] }> };
+      trackUsage?.("embedding_requests");
+      trackUsage?.("embedding_chunks", texts.length);
       return (data.data ?? []).map((d) => d.embedding);
     },
 
@@ -58,6 +62,7 @@ export function createCloudCapabilities(apiKey: string): Capabilities {
       }
 
       const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+      trackUsage?.("purpose_requests");
       return data.choices?.[0]?.message?.content?.trim() ?? "";
     },
   };

@@ -157,19 +157,10 @@ export const api = {
         repos_indexed: number;
       };
       synced_at: string | null;
+      plan: string | null;
+      quota: Record<string, number> | null;
+      has_capabilities: boolean;
     }>("/api/dashboard/usage"),
-
-  syncStatus: () =>
-    request<{
-      lastRunAt: string | null;
-      lastResult: "success" | "partial" | "error" | "skipped" | null;
-      lastError: string | null;
-      rowsSynced: number;
-      rowsFailed: number;
-      nextRunAt: string;
-      unsyncedRows: number;
-      unsyncedDates: string[];
-    }>("/api/dashboard/sync"),
 
   authStatus: () =>
     request<{
@@ -178,15 +169,6 @@ export const api = {
       expires_at?: number;
       expired?: boolean;
     }>("/api/auth/status"),
-
-  // Cloud proxy methods
-  cloudUsageCurrent: () =>
-    request<{
-      plan: string;
-      periodStart: string;
-      usage: Record<string, number> | null;
-      quota: Record<string, number>;
-    }>("/api/cloud/usage/current"),
 
   cloudUsageRange: (start: string, end: string) =>
     request<{
