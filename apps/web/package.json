@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3000",
-    "build": "vite build && cp -r .client-assets dist/assets && rm -rf .client-assets",
+    "build": "vite build && node restore-assets.mjs",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit"
   },
