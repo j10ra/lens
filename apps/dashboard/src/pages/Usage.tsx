@@ -154,7 +154,7 @@ export function Usage() {
           </div>
         ) : (
           <>
-            <section className={`grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 ${isPro ? "@5xl/main:grid-cols-5" : ""}`}>
+            <section className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @3xl/main:grid-cols-3">
               <UsageBar label="Context Queries" used={today.context_queries} />
               <UsageBar label="Repos Indexed" used={today.repos_indexed} />
               {isPro && (
