@@ -156,6 +156,28 @@ billing.post("/webhooks/stripe", async (c) => {
       break;
     }
 
+    case "invoice.paid": {
+      const invoice = event.data.object;
+      const subId = invoice.subscription as string;
+      if (!subId || invoice.billing_reason !== "subscription_create") break;
+
+      const sub = await stripe.subscriptions.retrieve(subId);
+      const userId = sub.metadata?.userId;
+      if (!userId) break;
+
+      await subscriptionQueries.upsert(db, {
+        userId,
+        stripeCustomerId: sub.customer as string,
+        stripeSubscriptionId: sub.id,
+        plan: "pro",
+        status: sub.status === "active" ? "active" : sub.status,
+        periodStart: new Date(sub.current_period_start * 1000),
+        periodEnd: new Date(sub.current_period_end * 1000),
+        cancelAtPeriodEnd: sub.cancel_at_period_end,
+      });
+      break;
+    }
+
     case "invoice.payment_failed": {
       const invoice = event.data.object;
       const subId = invoice.subscription as string;
