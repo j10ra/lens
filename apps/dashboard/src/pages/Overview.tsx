@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Activity, BookText, Cpu, Database, FolderGit2, type LucideIcon, Network, Shapes } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import { PageHeader } from "@lens/ui";
+import { PageHeader, Badge } from "@lens/ui";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@lens/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@lens/ui";
@@ -32,6 +32,14 @@ export function Overview() {
     placeholderData: keepPreviousData,
   });
 
+  const auth = useQuery({ queryKey: ["auth-status"], queryFn: api.authStatus });
+  const { data: cloud } = useQuery({
+    queryKey: ["cloud-usage-current"],
+    queryFn: api.cloudUsageCurrent,
+    enabled: !!auth.data?.authenticated,
+  });
+  const isPro = (cloud?.plan ?? "free") === "pro";
+
   if (!stats && isLoading) return <Loading />;
 
   const uptime = stats?.uptime_seconds ?? 0;
@@ -58,27 +66,6 @@ export function Overview() {
       iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
     },
     {
-      label: "Embeddings",
-      value: (stats?.total_embeddings ?? 0).toLocaleString(),
-      description: "Vector embeddings",
-      icon: Cpu,
-      iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-    },
-    {
-      label: "Summaries",
-      value: (stats?.total_summaries ?? 0).toLocaleString(),
-      description: "File purpose summaries",
-      icon: BookText,
-      iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-    },
-    {
-      label: "Vocab",
-      value: (stats?.total_vocab_clusters ?? 0).toLocaleString(),
-      description: "Vocabulary clusters",
-      icon: Network,
-      iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-    },
-    {
       label: "DB Size",
       value: `${stats?.db_size_mb ?? 0} MB`,
       description: "SQLite database",
@@ -94,6 +81,32 @@ export function Overview() {
     },
   ];
 
+  if (isPro) {
+    statCards.splice(2, 0,
+      {
+        label: "Embeddings",
+        value: (stats?.total_embeddings ?? 0).toLocaleString(),
+        description: "Vector embeddings",
+        icon: Cpu,
+        iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
+      },
+      {
+        label: "Summaries",
+        value: (stats?.total_summaries ?? 0).toLocaleString(),
+        description: "File purpose summaries",
+        icon: BookText,
+        iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
+      },
+      {
+        label: "Vocab",
+        value: (stats?.total_vocab_clusters ?? 0).toLocaleString(),
+        description: "Vocabulary clusters",
+        icon: Network,
+        iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
+      },
+    );
+  }
+
   return (
     <>
       <PageHeader>
@@ -107,7 +120,7 @@ export function Overview() {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-7">
+        <section className={isPro ? "grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @3xl/main:grid-cols-4" : "grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @3xl/main:grid-cols-3"}>
           {statCards.map((card) => {
             const Icon = card.icon;
             return (
@@ -155,7 +168,7 @@ export function Overview() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <div className="grid grid-cols-5 gap-2 text-xs">
+                    <div className={isPro ? "grid grid-cols-5 gap-2 text-xs" : "grid grid-cols-2 gap-2 text-xs"}>
                       <div className="rounded-md border border-border bg-background px-2 py-1.5">
                         <p className="text-muted-foreground">Files</p>
                         <p className="font-mono font-medium tabular-nums">{repo.files_indexed}</p>
@@ -164,23 +177,38 @@ export function Overview() {
                         <p className="text-muted-foreground">Chunks</p>
                         <p className="font-mono font-medium tabular-nums">{repo.chunk_count}</p>
                       </div>
-                      <div className="rounded-md border border-border bg-background px-2 py-1.5">
-                        <p className="text-muted-foreground">Embed</p>
-                        <p className="font-mono font-medium tabular-nums">{repo.embedded_pct}%</p>
-                      </div>
-                      <div className="rounded-md border border-border bg-background px-2 py-1.5">
-                        <p className="text-muted-foreground">Summaries</p>
-                        <p className="font-mono font-medium tabular-nums">{repo.purpose_count}/{repo.purpose_total}</p>
-                      </div>
-                      <div className="rounded-md border border-border bg-background px-2 py-1.5">
-                        <p className="text-muted-foreground">Vocab</p>
-                        <p className="font-mono font-medium tabular-nums">{repo.vocab_cluster_count}</p>
-                      </div>
+                      {isPro && (
+                        <>
+                          <div className="rounded-md border border-border bg-background px-2 py-1.5">
+                            <p className="text-muted-foreground">Embed</p>
+                            <p className="font-mono font-medium tabular-nums">{repo.embedded_pct}%</p>
+                          </div>
+                          <div className="rounded-md border border-border bg-background px-2 py-1.5">
+                            <p className="text-muted-foreground">Summaries</p>
+                            <p className="font-mono font-medium tabular-nums">{repo.purpose_count}/{repo.purpose_total}</p>
+                          </div>
+                          <div className="rounded-md border border-border bg-background px-2 py-1.5">
+                            <p className="text-muted-foreground">Vocab</p>
+                            <p className="font-mono font-medium tabular-nums">{repo.vocab_cluster_count}</p>
+                          </div>
+                        </>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">Indexed {timeAgo(repo.last_indexed_at)}</p>
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </section>
+        )}
+
+        {!isPro && (
+          <section className="px-4 lg:px-6">
+            <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 p-4">
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Upgrade to Pro</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Semantic search, vocab clusters, and purpose summaries — powered by Voyage + OpenRouter.
+              </p>
             </div>
           </section>
         )}
