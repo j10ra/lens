@@ -35,6 +35,13 @@ packages/
 - `pnpm -w build:publish` — bundle for global install
 - `pnpm -w deploy:local` — build + install globally + restart daemon
 
+### Type Checking
+
+Always run `tsc --noEmit` after code changes. Biome only catches lint/format issues, not type errors.
+
+- `pnpm --filter @lens/cloud typecheck` — cloud app
+- `pnpm --filter @lens/engine typecheck` — engine
+
 ### Key Architecture
 
 - **Engine** (`packages/engine`): SQLite via better-sqlite3 + Drizzle ORM. Tables: repos, chunks, file_metadata, file_imports, file_stats, file_cochanges, usage_counters, request_logs

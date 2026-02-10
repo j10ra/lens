@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, cn } from "@lens/ui";
 
-interface Column<T> {
+export interface Column<T = Record<string, unknown>> {
   key: string;
   label: React.ReactNode;
   className?: string;
@@ -9,7 +9,8 @@ interface Column<T> {
   render?: (row: T) => React.ReactNode;
 }
 
-interface DataTableProps<T extends Record<string, unknown>> {
+// biome-ignore lint: generic constraint relaxed for typed row arrays
+interface DataTableProps<T = Record<string, unknown>> {
   columns: Column<T>[];
   rows: T[];
   total?: number;
@@ -21,7 +22,7 @@ interface DataTableProps<T extends Record<string, unknown>> {
   showRowNumbers?: boolean;
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export function DataTable<T>({
   columns,
   rows,
   total = rows.length,
@@ -94,7 +95,7 @@ export function DataTable<T extends Record<string, unknown>>({
                         col.className,
                       )}
                     >
-                      {col.render ? col.render(row) : <CellValue value={row[col.key]} />}
+                      {col.render ? col.render(row) : <CellValue value={(row as Record<string, unknown>)[col.key]} />}
                     </td>
                   ))}
                 </tr>

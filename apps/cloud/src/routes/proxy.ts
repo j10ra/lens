@@ -1,9 +1,9 @@
-import { Hono } from "hono";
 import { subscriptionQueries, usageQueries } from "@lens/cloud-db";
+import { Hono } from "hono";
 import type { Env } from "../env";
-import { apiKeyAuth } from "../middleware/auth";
 import { getDb } from "../lib/db";
 import { proxyOpenRouter, proxyVoyage } from "../lib/proxy";
+import { apiKeyAuth } from "../middleware/auth";
 import { quotaCheck } from "../middleware/quota";
 import { rateLimit } from "../middleware/rate-limit";
 
@@ -15,10 +15,7 @@ proxy.use("*", apiKeyAuth);
 proxy.use("*", rateLimit);
 proxy.use("*", quotaCheck);
 
-async function requirePro(
-  db: ReturnType<typeof getDb>,
-  userId: string,
-): Promise<string | null> {
+async function requirePro(db: ReturnType<typeof getDb>, userId: string): Promise<string | null> {
   const sub = await subscriptionQueries.getByUserId(db, userId);
   if (!sub || sub.plan !== "pro" || sub.status !== "active") {
     return "Pro plan required";
@@ -46,8 +43,8 @@ proxy.post("/embed", async (c) => {
   }
 
   // Quota check
-  const usage = c.get("usageTotals") as Record<string, number> | null;
-  const quota = c.get("usageQuota") as Record<string, number>;
+  const usage = c.get("usageTotals");
+  const quota = c.get("usageQuota");
   if ((usage?.embeddingRequests ?? 0) >= quota.embeddingRequests) {
     return c.json({ error: "Quota exceeded: embedding requests", limit: quota.embeddingRequests }, 429);
   }
@@ -98,8 +95,8 @@ proxy.post("/chat", async (c) => {
   }
 
   // Quota check
-  const usage = c.get("usageTotals") as Record<string, number> | null;
-  const quota = c.get("usageQuota") as Record<string, number>;
+  const usage = c.get("usageTotals");
+  const quota = c.get("usageQuota");
   if ((usage?.purposeRequests ?? 0) >= quota.purposeRequests) {
     return c.json({ error: "Quota exceeded: purpose requests", limit: quota.purposeRequests }, 429);
   }
@@ -111,9 +108,7 @@ proxy.post("/chat", async (c) => {
   });
 
   const today = new Date().toISOString().slice(0, 10);
-  c.executionCtx.waitUntil(
-    usageQueries.sync(db, userId, today, { purposeRequests: 1 }),
-  );
+  c.executionCtx.waitUntil(usageQueries.sync(db, userId, today, { purposeRequests: 1 }));
 
   return new Response(upstream.body, {
     status: upstream.status,

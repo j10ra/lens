@@ -3,6 +3,22 @@ import { subscriptionQueries, usageQueries, quotaQueries } from "@lens/cloud-db"
 import type { Env } from "../env";
 import { getDb } from "../lib/db";
 
+interface QuotaLimits {
+  maxRepos: number;
+  contextQueries: number;
+  embeddingRequests: number;
+  embeddingChunks: number;
+  purposeRequests: number;
+  reposIndexed: number;
+}
+
+declare module "hono" {
+  interface ContextVariableMap {
+    usageTotals: Record<string, number> | null;
+    usageQuota: QuotaLimits;
+  }
+}
+
 const ZERO_QUOTA = {
   maxRepos: 3,
   contextQueries: 0,
@@ -28,10 +44,10 @@ export const quotaCheck = createMiddleware<{ Bindings: Env }>(
       quotaQueries.getByPlan(db, plan),
     ]);
 
-    const quota = quotaRow ?? ZERO_QUOTA;
+    const { plan: _p, updatedAt: _u, ...limits } = quotaRow ?? { ...ZERO_QUOTA, plan: "free", updatedAt: null };
 
     c.set("usageTotals", totals);
-    c.set("usageQuota", quota);
+    c.set("usageQuota", limits);
     await next();
   },
 );

@@ -130,7 +130,7 @@ function TelemetryPage() {
         ) : (
           <DataTable
             columns={columns}
-            rows={(data?.recentEvents ?? []) as Array<Record<string, unknown>>}
+            rows={data?.recentEvents ?? []}
             emptyMessage="No telemetry events yet"
           />
         )}

@@ -57,7 +57,7 @@ function UsersPage() {
         ) : (
           <DataTable
             columns={columns}
-            rows={users as Array<Record<string, unknown>>}
+            rows={users}
             emptyMessage="No users found"
           />
         )}
