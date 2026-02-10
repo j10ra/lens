@@ -2,17 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { sql } from "drizzle-orm";
 import { getServerDb } from "./db.server";
 import { adminQueries, quotaQueries } from "@lens/cloud-db";
-import { requireAdmin } from "./admin-guard";
-
-// --- Supabase admin client (for auth API calls) ---
-
-function getAdminClient() {
-  const { createClient } = require("@supabase/supabase-js");
-  const url = process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
-  if (!url || !key) throw new Error("Missing SUPABASE_SERVICE_KEY or VITE_SUPABASE_URL");
-  return createClient(url, key);
-}
+import { requireAdmin, getAdminClient } from "./admin-guard";
 
 // --- Admin: Users ---
 
@@ -23,7 +13,11 @@ export const adminGetUsers = createServerFn({ method: "GET" })
     try {
       const supabase = getAdminClient();
       const { data: result, error } = await supabase.auth.admin.listUsers();
-      if (error) return { users: [] };
+      if (error) {
+        console.error("[adminGetUsers] listUsers error:", error);
+        return { users: [] };
+      }
+      console.log("[adminGetUsers] found", result.users.length, "users");
       return {
         users: result.users.map((u: any) => ({
           id: u.id,
@@ -32,7 +26,8 @@ export const adminGetUsers = createServerFn({ method: "GET" })
           last_sign_in_at: u.last_sign_in_at,
         })),
       };
-    } catch {
+    } catch (err) {
+      console.error("[adminGetUsers] caught:", err);
       return { users: [] };
     }
   });

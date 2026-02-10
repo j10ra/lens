@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader } from "@lens/ui";
+import { Save } from "lucide-react";
+import { Button, PageHeader } from "@lens/ui";
 import { adminGetQuotas, adminUpdateQuota } from "@/lib/server-fns";
 import { useAuth } from "@/lib/auth-context";
 
@@ -56,52 +57,64 @@ function RatesPage() {
       <PageHeader>
         <span className="text-sm font-medium">Rate Limits</span>
         <span className="text-xs text-muted-foreground">Configure plan quotas</span>
+        <div className="ml-auto">
+          <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" disabled={!!saving}>
+            {saving ? (
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            {saving ? "Saving..." : "Saved"}
+          </Button>
+        </div>
       </PageHeader>
-      <div className="flex flex-col flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto">
         {loading ? (
           <div className="flex flex-1 items-center justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
-        ) : (
-          <div className="px-4 py-4 lg:px-6">
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Plan</th>
-                    {FIELDS.map((f) => (
-                      <th key={f.key} className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                        {f.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.plan} className="border-b last:border-0">
-                      <td className="px-4 py-2 font-medium capitalize">{row.plan}</td>
-                      {FIELDS.map((f) => (
-                        <td key={f.key} className="px-4 py-1">
-                          <EditableCell
-                            value={row[f.key]}
-                            saving={saving === `${row.plan}.${f.key}`}
-                            onSave={(v) => {
-                              setRows((prev) =>
-                                prev.map((r) =>
-                                  r.plan === row.plan ? { ...r, [f.key]: v } : r,
-                                ),
-                              );
-                              handleSave(row.plan, f.key, v);
-                            }}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        ) : rows.length === 0 ? (
+          <div className="py-12 text-center text-xs text-muted-foreground">
+            No quota rows found
           </div>
+        ) : (
+          <table className="w-full border-collapse text-xs">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-muted/60 text-left">
+                <th className="w-12 border-b border-r border-border bg-muted/60 px-2 py-2 text-center font-medium text-muted-foreground">#</th>
+                <th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Plan</th>
+                {FIELDS.map((f) => (
+                  <th key={f.key} className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground last:border-r-0">
+                    {f.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={row.plan} className="group hover:bg-accent/30">
+                  <td className="border-b border-r border-border bg-muted/20 px-2 py-1.5 text-center font-mono text-[10px] text-muted-foreground tabular-nums">{i + 1}</td>
+                  <td className="border-b border-r border-border px-3 py-1.5 font-medium capitalize">{row.plan}</td>
+                  {FIELDS.map((f) => (
+                    <td key={f.key} className="border-b border-r border-border px-3 py-0.5 last:border-r-0">
+                      <EditableCell
+                        value={row[f.key]}
+                        saving={saving === `${row.plan}.${f.key}`}
+                        onSave={(v) => {
+                          setRows((prev) =>
+                            prev.map((r) =>
+                              r.plan === row.plan ? { ...r, [f.key]: v } : r,
+                            ),
+                          );
+                          handleSave(row.plan, f.key, v);
+                        }}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </>
@@ -144,7 +157,7 @@ function EditableCell({
       onKeyDown={(e) => {
         if (e.key === "Enter") ref.current?.blur();
       }}
-      className={`w-28 rounded border bg-transparent px-2 py-1 text-sm tabular-nums outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 ${saving ? "opacity-50" : ""}`}
+      className={`w-24 rounded border border-transparent bg-transparent px-2 py-1 font-mono text-xs tabular-nums outline-none focus:border-primary focus:bg-background focus:ring-1 focus:ring-primary/30 ${saving ? "opacity-50" : ""}`}
     />
   );
 }

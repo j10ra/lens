@@ -12,10 +12,13 @@ function getAdminClient() {
   return createClient(url, key);
 }
 
+export { getAdminClient };
+
 export async function requireAdmin(accessToken: string) {
   if (!accessToken) throw new Error("Unauthorized");
   const supabase = getAdminClient();
   const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+  console.log("[requireAdmin] user:", user?.email, "error:", error?.message, "adminList:", ADMIN_EMAILS);
   if (error || !user?.email) throw new Error("Unauthorized");
   if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) throw new Error("Forbidden");
   return { userId: user.id, email: user.email };
