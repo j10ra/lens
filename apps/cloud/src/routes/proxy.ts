@@ -2,10 +2,13 @@ import { Hono } from "hono";
 import { subscriptionQueries, usageQueries } from "@lens/cloud-db";
 import type { Env } from "../env";
 import { apiKeyAuth } from "../middleware/auth";
-import { rateLimit } from "../middleware/rate-limit";
-import { quotaCheck } from "../middleware/quota";
 import { getDb } from "../lib/db";
-import { proxyVoyage, proxyOpenRouter } from "../lib/proxy";
+import { proxyOpenRouter, proxyVoyage } from "../lib/proxy";
+import { quotaCheck } from "../middleware/quota";
+import { rateLimit } from "../middleware/rate-limit";
+
+const EMBED_MODELS = new Set(["voyage-code-3"]);
+const CHAT_MODELS = new Set(["qwen/qwen3-coder-next"]);
 
 const proxy = new Hono<{ Bindings: Env }>();
 proxy.use("*", apiKeyAuth);
@@ -23,8 +26,8 @@ async function requirePro(
   return null;
 }
 
-// POST /api/proxy/voyage/embed
-proxy.post("/voyage/embed", async (c) => {
+// POST /api/proxy/embed
+proxy.post("/embed", async (c) => {
   const userId = c.get("userId");
   const db = getDb(c.env.DATABASE_URL);
 
@@ -32,6 +35,11 @@ proxy.post("/voyage/embed", async (c) => {
   if (planErr) return c.json({ error: planErr }, 403);
 
   const body = await c.req.json<{ input: string[]; model?: string }>();
+  const model = body.model ?? "voyage-code-3";
+
+  if (!EMBED_MODELS.has(model)) {
+    return c.json({ error: `Model not allowed: ${model}`, allowed: [...EMBED_MODELS] }, 400);
+  }
 
   if (!body.input || body.input.length > 32) {
     return c.json({ error: "Max 32 chunks per request" }, 400);
@@ -48,7 +56,7 @@ proxy.post("/voyage/embed", async (c) => {
   }
 
   const upstream = await proxyVoyage(c.env.VOYAGE_API_KEY, {
-    model: body.model ?? "voyage-code-3",
+    model,
     input: body.input,
   });
 
@@ -66,8 +74,8 @@ proxy.post("/voyage/embed", async (c) => {
   });
 });
 
-// POST /api/proxy/openrouter/chat
-proxy.post("/openrouter/chat", async (c) => {
+// POST /api/proxy/chat
+proxy.post("/chat", async (c) => {
   const userId = c.get("userId");
   const db = getDb(c.env.DATABASE_URL);
 
@@ -79,6 +87,11 @@ proxy.post("/openrouter/chat", async (c) => {
     messages: unknown[];
     max_tokens?: number;
   }>();
+  const model = body.model ?? "qwen/qwen3-coder-next";
+
+  if (!CHAT_MODELS.has(model)) {
+    return c.json({ error: `Model not allowed: ${model}`, allowed: [...CHAT_MODELS] }, 400);
+  }
 
   if (body.max_tokens && body.max_tokens > 4096) {
     return c.json({ error: "Max 4096 tokens per request" }, 400);
@@ -92,7 +105,7 @@ proxy.post("/openrouter/chat", async (c) => {
   }
 
   const upstream = await proxyOpenRouter(c.env.OPENROUTER_API_KEY, {
-    model: body.model ?? "qwen/qwen3-coder-next",
+    model,
     messages: body.messages,
     max_tokens: Math.min(body.max_tokens ?? 2048, 4096),
   });

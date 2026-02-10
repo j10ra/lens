@@ -10,7 +10,7 @@ export function createCloudCapabilities(apiKey: string): Capabilities {
 
   return {
     async embedTexts(texts: string[], isQuery?: boolean): Promise<number[][]> {
-      const res = await fetch(`${CLOUD_API_URL}/api/proxy/voyage/embed`, {
+      const res = await fetch(`${CLOUD_API_URL}/api/proxy/embed`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -40,7 +40,7 @@ export function createCloudCapabilities(apiKey: string): Capabilities {
         .filter(Boolean)
         .join("\n");
 
-      const res = await fetch(`${CLOUD_API_URL}/api/proxy/openrouter/chat`, {
+      const res = await fetch(`${CLOUD_API_URL}/api/proxy/chat`, {
         method: "POST",
         headers,
         body: JSON.stringify({
