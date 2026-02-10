@@ -3,7 +3,24 @@ import { api } from "@/lib/api";
 import { PageHeader } from "@lens/ui";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@lens/ui";
 
-function UsageBar({ label, used, limit }: { label: string; used: number; limit?: number }) {
+function UsageBar({ label, used, limit, locked }: { label: string; used: number; limit?: number; locked?: boolean }) {
+  if (locked) {
+    return (
+      <Card className="border-border bg-background py-4 shadow-none opacity-60">
+        <CardHeader className="pb-1">
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">Pro</span>
+          </div>
+          <CardTitle className="mt-1 text-2xl font-semibold tabular-nums">—</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <p className="text-xs text-muted-foreground">Upgrade to Pro</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!limit || limit <= 0) {
     return (
       <Card className="border-border bg-background py-4 shadow-none">
@@ -78,33 +95,31 @@ function SyncStatusCard() {
   const result = sync.lastResult ? RESULT_STYLES[sync.lastResult] : null;
 
   return (
-    <section className="px-4 lg:px-6">
-      <Card className="border-border bg-background shadow-none">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-sm font-medium">Cloud Sync</CardTitle>
-            {result && <Badge variant={result.variant}>{result.label}</Badge>}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-1.5 text-xs text-muted-foreground">
-          <div className="flex gap-6">
-            <span>Last run: {sync.lastRunAt ? timeAgo(sync.lastRunAt) : "never"}</span>
-            <span>Next: {timeUntil(sync.nextRunAt)}</span>
-          </div>
-          {sync.lastResult === "success" && sync.rowsSynced > 0 && (
-            <p>{sync.rowsSynced} row{sync.rowsSynced > 1 ? "s" : ""} synced</p>
-          )}
-          {sync.unsyncedRows > 0 && (
-            <p className="text-yellow-600 dark:text-yellow-400">
-              {sync.unsyncedRows} unsynced: {sync.unsyncedDates.join(", ")}
-            </p>
-          )}
-          {sync.lastError && (
-            <p className="text-destructive">{sync.lastError}</p>
-          )}
-        </CardContent>
-      </Card>
-    </section>
+    <Card className="border-border bg-background py-4 shadow-none">
+      <CardHeader className="pb-1">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cloud Sync</p>
+          {result && <Badge variant={result.variant}>{result.label}</Badge>}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-1.5 pt-0 text-xs text-muted-foreground">
+        <div className="flex gap-6">
+          <span>Last: {sync.lastRunAt ? timeAgo(sync.lastRunAt) : "never"}</span>
+          <span>Next: {timeUntil(sync.nextRunAt)}</span>
+        </div>
+        {sync.lastResult === "success" && sync.rowsSynced > 0 && (
+          <p>{sync.rowsSynced} row{sync.rowsSynced > 1 ? "s" : ""} synced</p>
+        )}
+        {sync.unsyncedRows > 0 && (
+          <p className="text-yellow-600 dark:text-yellow-400">
+            {sync.unsyncedRows} unsynced: {sync.unsyncedDates.join(", ")}
+          </p>
+        )}
+        {sync.lastError && (
+          <p className="text-destructive">{sync.lastError}</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -157,29 +172,13 @@ export function Usage() {
             <section className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @3xl/main:grid-cols-3">
               <UsageBar label="Context Queries" used={today.context_queries} />
               <UsageBar label="Repos Indexed" used={today.repos_indexed} />
-              {isPro && (
-                <>
-                  <UsageBar label="Embedding Requests" used={today.embedding_requests} limit={quota?.embeddingRequests} />
-                  <UsageBar label="Embedding Chunks" used={today.embedding_chunks} limit={quota?.embeddingChunks} />
-                  <UsageBar label="Purpose Summaries" used={today.purpose_requests} limit={quota?.purposeRequests} />
-                </>
-              )}
+              <UsageBar label="Embedding Requests" used={today.embedding_requests} limit={quota?.embeddingRequests} locked={!isPro} />
+              <UsageBar label="Embedding Chunks" used={today.embedding_chunks} limit={quota?.embeddingChunks} locked={!isPro} />
+              <UsageBar label="Purpose Summaries" used={today.purpose_requests} limit={quota?.purposeRequests} locked={!isPro} />
+              <SyncStatusCard />
             </section>
-
-            {!isPro && (
-              <section className="px-4 lg:px-6">
-                <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 p-4">
-                  <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Upgrade to Pro</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Semantic search, vocab clusters, and purpose summaries — powered by Voyage + OpenRouter.
-                  </p>
-                </div>
-              </section>
-            )}
           </>
         )}
-
-        <SyncStatusCard />
 
         {!isAuthed && (
           <section className="px-4 lg:px-6">

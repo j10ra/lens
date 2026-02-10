@@ -14,6 +14,14 @@ export function Repos() {
 	const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 	const queryClient = useQueryClient();
 
+	const auth = useQuery({ queryKey: ["auth-status"], queryFn: api.authStatus });
+	const { data: cloud } = useQuery({
+		queryKey: ["cloud-usage-current"],
+		queryFn: api.cloudUsageCurrent,
+		enabled: !!auth.data?.authenticated,
+	});
+	const isPro = (cloud?.plan ?? "free") === "pro";
+
 	const { data, isLoading } = useQuery({
 		queryKey: ["dashboard-repos"],
 		queryFn: api.repos,
@@ -312,7 +320,7 @@ export function Repos() {
 									</td>
 									<td className="border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums">{r.files_indexed}</td>
 									<td className="border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums">{r.chunk_count}</td>
-									<td className="border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums">{r.embedded_pct}%</td>
+									<td className={`border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums ${isPro ? "" : "opacity-40"}`}>{isPro ? `${r.embedded_pct}%` : "—"}</td>
 									<td className="border-b border-border px-3 py-1.5 text-muted-foreground">{timeAgo(r.last_indexed_at)}</td>
 								</tr>
 							))

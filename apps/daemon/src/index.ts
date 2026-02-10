@@ -22,9 +22,24 @@ async function loadCapabilities(): Promise<Capabilities | undefined> {
     const data = JSON.parse(readFileSync(authPath, "utf-8"));
     if (!data.api_key) return undefined;
 
+    // Check plan — only Pro users get cloud capabilities
+    const cloudUrl = process.env.LENS_CLOUD_URL ?? "https://lens.dev";
+    const res = await fetch(`${cloudUrl}/api/usage/current`, {
+      headers: { Authorization: `Bearer ${data.api_key}` },
+    });
+    if (!res.ok) {
+      console.error(`[LENS] Plan check failed (${res.status}), capabilities disabled`);
+      return undefined;
+    }
+    const usage = await res.json() as { plan?: string };
+    if (usage.plan !== "pro") {
+      console.error(`[LENS] Plan: ${usage.plan ?? "free"} — Pro features disabled`);
+      return undefined;
+    }
+
     const { createCloudCapabilities } = await import("./cloud-capabilities");
     const caps = createCloudCapabilities(data.api_key);
-    console.error("[LENS] Cloud capabilities enabled");
+    console.error("[LENS] Cloud capabilities enabled (Pro plan)");
     return caps;
   } catch {
     return undefined;

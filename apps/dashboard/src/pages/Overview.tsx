@@ -1,10 +1,9 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Activity, BookText, Cpu, Database, FolderGit2, type LucideIcon, Network, Shapes } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import { PageHeader, Badge } from "@lens/ui";
+import { PageHeader } from "@lens/ui";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Button } from "@lens/ui";
-import { Card, CardContent, CardHeader, CardTitle } from "@lens/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle } from "@lens/ui";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
 
@@ -14,6 +13,7 @@ type StatCardItem = {
   description: string;
   icon: LucideIcon;
   iconClassName: string;
+  pro?: boolean;
 };
 
 export function Overview() {
@@ -50,62 +50,17 @@ export function Overview() {
         ? `${Math.floor(uptime / 60)}m`
         : `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`;
 
-  const statCards: StatCardItem[] = [
-    {
-      label: "Repos",
-      value: stats?.repos_count ?? 0,
-      description: "Registered repositories",
-      icon: FolderGit2,
-      iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-    },
-    {
-      label: "Chunks",
-      value: (stats?.total_chunks ?? 0).toLocaleString(),
-      description: "Indexed code segments",
-      icon: Shapes,
-      iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-    },
-    {
-      label: "DB Size",
-      value: `${stats?.db_size_mb ?? 0} MB`,
-      description: "SQLite database",
-      icon: Database,
-      iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-    },
-    {
-      label: "Uptime",
-      value: uptimeStr,
-      description: "Daemon process",
-      icon: Activity,
-      iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-    },
-  ];
+  const ic = "border-border/80 bg-muted/35 text-foreground/80";
 
-  if (isPro) {
-    statCards.splice(2, 0,
-      {
-        label: "Embeddings",
-        value: (stats?.total_embeddings ?? 0).toLocaleString(),
-        description: "Vector embeddings",
-        icon: Cpu,
-        iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-      },
-      {
-        label: "Summaries",
-        value: (stats?.total_summaries ?? 0).toLocaleString(),
-        description: "File purpose summaries",
-        icon: BookText,
-        iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-      },
-      {
-        label: "Vocab",
-        value: (stats?.total_vocab_clusters ?? 0).toLocaleString(),
-        description: "Vocabulary clusters",
-        icon: Network,
-        iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
-      },
-    );
-  }
+  const statCards: StatCardItem[] = [
+    { label: "Repos", value: stats?.repos_count ?? 0, description: "Registered repositories", icon: FolderGit2, iconClassName: ic },
+    { label: "Chunks", value: (stats?.total_chunks ?? 0).toLocaleString(), description: "Indexed code segments", icon: Shapes, iconClassName: ic },
+    { label: "Embeddings", value: (stats?.total_embeddings ?? 0).toLocaleString(), description: "Vector embeddings", icon: Cpu, iconClassName: ic, pro: true },
+    { label: "Summaries", value: (stats?.total_summaries ?? 0).toLocaleString(), description: "File purpose summaries", icon: BookText, iconClassName: ic, pro: true },
+    { label: "Vocab", value: (stats?.total_vocab_clusters ?? 0).toLocaleString(), description: "Vocabulary clusters", icon: Network, iconClassName: ic, pro: true },
+    { label: "DB Size", value: `${stats?.db_size_mb ?? 0} MB`, description: "SQLite database", icon: Database, iconClassName: ic },
+    { label: "Uptime", value: uptimeStr, description: "Daemon process", icon: Activity, iconClassName: ic },
+  ];
 
   return (
     <>
@@ -120,16 +75,22 @@ export function Overview() {
           </div>
         </section>
 
-        <section className={isPro ? "grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @3xl/main:grid-cols-4" : "grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @3xl/main:grid-cols-3"}>
+        <section className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @3xl/main:grid-cols-4">
           {statCards.map((card) => {
             const Icon = card.icon;
+            const locked = card.pro && !isPro;
             return (
-              <Card key={card.label} className="border-border bg-background py-4 shadow-none">
+              <Card key={card.label} className={`border-border bg-background py-4 shadow-none ${locked ? "opacity-60" : ""}`}>
                 <CardHeader className="pb-1">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.label}</p>
-                      <CardTitle className="mt-1 text-2xl font-semibold tabular-nums">{card.value}</CardTitle>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.label}</p>
+                        {locked && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">Pro</span>}
+                      </div>
+                      <CardTitle className="mt-1 text-2xl font-semibold tabular-nums">
+                        {locked ? "—" : card.value}
+                      </CardTitle>
                     </div>
                     <span className={`rounded-md border p-1.5 ${card.iconClassName}`}>
                       <Icon className="h-4 w-4" />
@@ -168,7 +129,7 @@ export function Overview() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <div className={isPro ? "grid grid-cols-5 gap-2 text-xs" : "grid grid-cols-2 gap-2 text-xs"}>
+                    <div className="grid grid-cols-5 gap-2 text-xs">
                       <div className="rounded-md border border-border bg-background px-2 py-1.5">
                         <p className="text-muted-foreground">Files</p>
                         <p className="font-mono font-medium tabular-nums">{repo.files_indexed}</p>
@@ -177,38 +138,23 @@ export function Overview() {
                         <p className="text-muted-foreground">Chunks</p>
                         <p className="font-mono font-medium tabular-nums">{repo.chunk_count}</p>
                       </div>
-                      {isPro && (
-                        <>
-                          <div className="rounded-md border border-border bg-background px-2 py-1.5">
-                            <p className="text-muted-foreground">Embed</p>
-                            <p className="font-mono font-medium tabular-nums">{repo.embedded_pct}%</p>
-                          </div>
-                          <div className="rounded-md border border-border bg-background px-2 py-1.5">
-                            <p className="text-muted-foreground">Summaries</p>
-                            <p className="font-mono font-medium tabular-nums">{repo.purpose_count}/{repo.purpose_total}</p>
-                          </div>
-                          <div className="rounded-md border border-border bg-background px-2 py-1.5">
-                            <p className="text-muted-foreground">Vocab</p>
-                            <p className="font-mono font-medium tabular-nums">{repo.vocab_cluster_count}</p>
-                          </div>
-                        </>
-                      )}
+                      <div className={`rounded-md border border-border bg-background px-2 py-1.5 ${isPro ? "" : "opacity-40"}`}>
+                        <p className="text-muted-foreground">Embed</p>
+                        <p className="font-mono font-medium tabular-nums">{isPro ? `${repo.embedded_pct}%` : "—"}</p>
+                      </div>
+                      <div className={`rounded-md border border-border bg-background px-2 py-1.5 ${isPro ? "" : "opacity-40"}`}>
+                        <p className="text-muted-foreground">Summaries</p>
+                        <p className="font-mono font-medium tabular-nums">{isPro ? `${repo.purpose_count}/${repo.purpose_total}` : "—"}</p>
+                      </div>
+                      <div className={`rounded-md border border-border bg-background px-2 py-1.5 ${isPro ? "" : "opacity-40"}`}>
+                        <p className="text-muted-foreground">Vocab</p>
+                        <p className="font-mono font-medium tabular-nums">{isPro ? repo.vocab_cluster_count : "—"}</p>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">Indexed {timeAgo(repo.last_indexed_at)}</p>
                   </CardContent>
                 </Card>
               ))}
-            </div>
-          </section>
-        )}
-
-        {!isPro && (
-          <section className="px-4 lg:px-6">
-            <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 p-4">
-              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Upgrade to Pro</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Semantic search, vocab clusters, and purpose summaries — powered by Voyage + OpenRouter.
-              </p>
             </div>
           </section>
         )}
