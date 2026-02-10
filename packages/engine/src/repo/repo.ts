@@ -2,6 +2,7 @@ import type { Db } from "../db/connection";
 import type { Capabilities } from "../capabilities";
 import type { RegisterResponse, StatusResponse } from "../types";
 import { repoQueries, chunkQueries, metadataQueries } from "../db/queries";
+import type { VocabCluster } from "../types";
 import { deriveIdentityKey } from "./identity";
 import { getHeadCommit } from "../index/discovery";
 import { runIndex } from "../index/engine";
@@ -63,6 +64,8 @@ export async function getRepoStatus(db: Db, id: string): Promise<StatusResponse>
   const isStale = !!(currentHead && repo.last_indexed_commit !== currentHead);
   const stats = chunkQueries.getStats(db, id);
   const structural = metadataQueries.getStructuralStats(db, id);
+  const vocabRaw = repo.vocab_clusters;
+  const vocabClusters: VocabCluster[] = vocabRaw ? JSON.parse(vocabRaw) : [];
 
   return {
     index_status: repo.index_status,
@@ -80,5 +83,6 @@ export async function getRepoStatus(db: Db, id: string): Promise<StatusResponse>
     cochange_pairs: structural.cochange_pairs,
     purpose_count: structural.purpose_count,
     purpose_total: structural.purpose_total,
+    vocab_cluster_count: Array.isArray(vocabClusters) ? vocabClusters.length : 0,
   };
 }

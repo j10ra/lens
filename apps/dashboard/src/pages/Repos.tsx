@@ -157,16 +157,34 @@ export function Repos() {
 							</CardTitle>
 						</CardHeader>
 						<CardContent className="space-y-3">
-							<ProgressBar
-								label="Embeddings"
-								value={selected.embedded_count}
-								max={selected.embeddable_count}
-							/>
-							<ProgressBar
-								label="Purpose"
-								value={selected.purpose_count}
-								max={selected.purpose_total}
-							/>
+							{selected.has_capabilities ? (
+								<>
+									<ProgressBar
+										label="Embeddings"
+										value={selected.embedded_count}
+										max={selected.embeddable_count}
+									/>
+									<ProgressBar
+										label="Vocab clusters"
+										value={selected.vocab_cluster_count}
+										max={selected.vocab_cluster_count || 1}
+									/>
+									<ProgressBar
+										label="Purpose"
+										value={selected.purpose_count}
+										max={selected.purpose_total}
+									/>
+								</>
+							) : (
+								<div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+									<p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+										⚡ Pro — Embeddings · Vocab clusters · Summaries
+									</p>
+									<p className="text-xs text-muted-foreground mt-0.5">
+										<code className="text-[10px]">lens login</code> → upgrade to enable
+									</p>
+								</div>
+							)}
 							<div className="pt-1">
 								<Stat
 									label="Watcher"

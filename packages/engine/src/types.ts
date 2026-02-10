@@ -172,4 +172,5 @@ export interface StatusResponse {
   cochange_pairs: number;
   purpose_count: number;
   purpose_total: number;
+  vocab_cluster_count: number;
 }
