@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Activity, Cpu, Database, FolderGit2, type LucideIcon, Shapes } from "lucide-react";
+import { Activity, BookText, Cpu, Database, FolderGit2, type LucideIcon, Network, Shapes } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { PageHeader } from "@lens/ui";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -65,6 +65,20 @@ export function Overview() {
       iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
     },
     {
+      label: "Summaries",
+      value: (stats?.total_summaries ?? 0).toLocaleString(),
+      description: "File purpose summaries",
+      icon: BookText,
+      iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
+    },
+    {
+      label: "Vocab",
+      value: (stats?.total_vocab_clusters ?? 0).toLocaleString(),
+      description: "Vocabulary clusters",
+      icon: Network,
+      iconClassName: "border-border/80 bg-muted/35 text-foreground/80",
+    },
+    {
       label: "DB Size",
       value: `${stats?.db_size_mb ?? 0} MB`,
       description: "SQLite database",
@@ -93,7 +107,7 @@ export function Overview() {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-5">
+        <section className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-7">
           {statCards.map((card) => {
             const Icon = card.icon;
             return (
@@ -141,7 +155,7 @@ export function Overview() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="grid grid-cols-5 gap-2 text-xs">
                       <div className="rounded-md border border-border bg-background px-2 py-1.5">
                         <p className="text-muted-foreground">Files</p>
                         <p className="font-mono font-medium tabular-nums">{repo.files_indexed}</p>
@@ -153,6 +167,14 @@ export function Overview() {
                       <div className="rounded-md border border-border bg-background px-2 py-1.5">
                         <p className="text-muted-foreground">Embed</p>
                         <p className="font-mono font-medium tabular-nums">{repo.embedded_pct}%</p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background px-2 py-1.5">
+                        <p className="text-muted-foreground">Summaries</p>
+                        <p className="font-mono font-medium tabular-nums">{repo.purpose_count}/{repo.purpose_total}</p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background px-2 py-1.5">
+                        <p className="text-muted-foreground">Vocab</p>
+                        <p className="font-mono font-medium tabular-nums">{repo.vocab_cluster_count}</p>
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground">Indexed {timeAgo(repo.last_indexed_at)}</p>

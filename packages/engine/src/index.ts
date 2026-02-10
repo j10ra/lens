@@ -70,4 +70,6 @@ export {
   statsQueries,
   cochangeQueries,
   logQueries,
+  usageQueries,
+  type UsageCounter,
 } from "./db/queries";

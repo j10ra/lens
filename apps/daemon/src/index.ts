@@ -84,6 +84,7 @@ async function main() {
 
     function shutdown() {
       console.error("[LENS] Shutting down...");
+      app.stopSync?.();
       server.close();
       closeDb();
       removePid();

@@ -69,6 +69,20 @@ export function RootLayout() {
     return () => es.close();
   }, [qc]);
 
+  useEffect(() => {
+    const es = new EventSource("/api/repo/events");
+    let timer: ReturnType<typeof setTimeout>;
+    es.onmessage = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["dashboard-repos"] });
+        qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        qc.invalidateQueries({ queryKey: ["dashboard-jobs"] });
+      }, 300);
+    };
+    return () => { clearTimeout(timer); es.close(); };
+  }, [qc]);
+
   const user = auth.data?.authenticated
     ? { name: auth.data.email ?? "User", email: auth.data.email ?? "" }
     : { name: "Guest", email: "Run: lens login" };

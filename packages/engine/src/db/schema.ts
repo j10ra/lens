@@ -122,6 +122,23 @@ export const fileCochanges = sqliteTable(
   ],
 );
 
+export const usageCounters = sqliteTable(
+  "usage_counters",
+  {
+    id: uuid(),
+    date: text("date").notNull().unique(),
+    context_queries: integer("context_queries").notNull().default(0),
+    embedding_requests: integer("embedding_requests").notNull().default(0),
+    embedding_chunks: integer("embedding_chunks").notNull().default(0),
+    purpose_requests: integer("purpose_requests").notNull().default(0),
+    repos_indexed: integer("repos_indexed").notNull().default(0),
+    synced_at: text("synced_at"),
+    created_at: now(),
+    updated_at: updatedAt(),
+  },
+  (t) => [index("idx_usage_counters_date").on(t.date)],
+);
+
 export const requestLogs = sqliteTable(
   "request_logs",
   {

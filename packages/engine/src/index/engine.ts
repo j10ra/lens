@@ -32,7 +32,7 @@ async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function runIndex(db: Db, repoId: string, caps?: Capabilities, force = false): Promise<IndexResult> {
+export async function runIndex(db: Db, repoId: string, caps?: Capabilities, force = false, onProgress?: () => void): Promise<IndexResult> {
   return withLock(repoId, async () => {
     const start = Date.now();
 
@@ -121,14 +121,20 @@ export async function runIndex(db: Db, repoId: string, caps?: Capabilities, forc
       }
     }
 
+    onProgress?.();
+
     // Structural analysis
     extractAndPersistMetadata(db, repoId);
+    onProgress?.();
     await buildVocabClusters(db, repoId, caps);
     buildAndPersistImportGraph(db, repoId);
     computeMaxImportDepth(db, repoId);
+    onProgress?.();
     await analyzeGitHistory(db, repoId, repo.root_path, repo.last_git_analysis_commit);
+    onProgress?.();
 
     repoQueries.updateIndexState(db, repoId, headCommit, "ready");
+    onProgress?.();
 
     return {
       files_scanned: files.length,

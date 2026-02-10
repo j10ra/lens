@@ -136,6 +136,20 @@ function createTablesSql(): string {
     );
     CREATE INDEX IF NOT EXISTS idx_cochanges_lookup ON file_cochanges(repo_id, path_a);
 
+    CREATE TABLE IF NOT EXISTS usage_counters (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL UNIQUE,
+      context_queries INTEGER NOT NULL DEFAULT 0,
+      embedding_requests INTEGER NOT NULL DEFAULT 0,
+      embedding_chunks INTEGER NOT NULL DEFAULT 0,
+      purpose_requests INTEGER NOT NULL DEFAULT 0,
+      repos_indexed INTEGER NOT NULL DEFAULT 0,
+      synced_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_usage_counters_date ON usage_counters(date);
+
     CREATE TABLE IF NOT EXISTS request_logs (
       id TEXT PRIMARY KEY,
       method TEXT NOT NULL,

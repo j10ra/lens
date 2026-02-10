@@ -13,6 +13,8 @@ interface StatusResponse {
   cochange_pairs: number;
   purpose_count: number;
   purpose_total: number;
+  vocab_cluster_count: number;
+  has_capabilities?: boolean;
 }
 
 // ANSI
@@ -20,10 +22,11 @@ const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
 const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
+const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 
 const MAX_CONN_FAILURES = 5;
-const TOTAL_LINES = 16;
+const TOTAL_LINES = 18;
 const POLL_INTERVAL = 5000;
 const RENDER_INTERVAL = 33; // ~30fps
 
@@ -70,6 +73,7 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
     const s = data!;
     const f = frames[frame % frames.length];
     const indexing = s.index_status === "indexing";
+    const hasCaps = s.has_capabilities !== false;
     const lines: string[] = [];
 
     // Header
@@ -89,8 +93,18 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
       lines.push(`  ${dim("○")} Git history     ${dim("...")}`);
       lines.push(`  ${dim("○")} Import graph    ${dim("...")}`);
       lines.push(`  ${dim("○")} Co-changes      ${dim("...")}`);
-      lines.push(`  ${dim("○")} Embeddings      ${dim("...")}`);
-      lines.push(`  ${dim("○")} Summaries       ${dim("...")}`);
+      if (hasCaps) {
+        lines.push(`  ${dim("○")} Embeddings      ${dim("...")}`);
+        lines.push(`  ${dim("○")} Vocab clusters  ${dim("...")}`);
+        lines.push(`  ${dim("○")} Summaries       ${dim("...")}`);
+      } else {
+        lines.push(``);
+        lines.push(`  ${yellow("⚡")} ${bold("Pro")}`);
+        lines.push(`    ${dim("· Vocab clusters")}`);
+        lines.push(`    ${dim("· Embeddings")}`);
+        lines.push(`    ${dim("· Summaries")}`);
+        lines.push(`    ${dim("lens login → upgrade to enable")}`);
+      }
     } else {
       lines.push(
         `  ${s.chunk_count > 0 ? green("✓") : cyan(f)} Chunks          ${dim(s.chunk_count > 0 ? s.chunk_count.toLocaleString() : "scanning...")}`,
@@ -107,36 +121,60 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
       lines.push(
         `  ${s.cochange_pairs > 0 ? green("✓") : dim("○")} Co-changes      ${dim(s.cochange_pairs > 0 ? `${s.cochange_pairs.toLocaleString()} pairs` : "...")}`,
       );
-      // Embeddings
-      const embDone = s.embedded_count >= s.embeddable_count && s.embeddable_count > 0;
-      if (embDone) {
-        lines.push(`  ${green("✓")} Embeddings      ${dim(`${s.embedded_count}/${s.embeddable_count} code chunks`)}`);
-      } else if (s.embeddable_count === 0) {
-        lines.push(`  ${dim("○")} Embeddings      ${dim("no code chunks")}`);
+
+      if (hasCaps) {
+        // Embeddings
+        const embDone = s.embedded_count >= s.embeddable_count && s.embeddable_count > 0;
+        if (embDone) {
+          lines.push(`  ${green("✓")} Embeddings      ${dim(`${s.embedded_count}/${s.embeddable_count} code chunks`)}`);
+        } else if (s.embeddable_count === 0) {
+          lines.push(`  ${dim("○")} Embeddings      ${dim("no code chunks")}`);
+        } else {
+          lines.push(
+            `  ${cyan(f)} Embeddings      ${createBar(s.embedded_pct, 20)} ${dim(`${s.embedded_count}/${s.embeddable_count}`)}`,
+          );
+        }
+        // Vocab clusters
+        if (s.vocab_cluster_count > 0) {
+          lines.push(`  ${green("✓")} Vocab clusters  ${dim(`${s.vocab_cluster_count} clusters`)}`);
+        } else {
+          lines.push(`  ${cyan(f)} Vocab clusters  ${dim("building...")}`);
+        }
+        // Summaries
+        const sumDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;
+        if (sumDone) {
+          lines.push(`  ${green("✓")} Summaries       ${dim(`${s.purpose_count}/${s.purpose_total} files`)}`);
+        } else if (s.purpose_total > 0) {
+          lines.push(
+            `  ${cyan(f)} Summaries       ${createBar(Math.round((s.purpose_count / s.purpose_total) * 100), 20)} ${dim(`${s.purpose_count}/${s.purpose_total}`)}`,
+          );
+        } else {
+          lines.push(`  ${dim("○")} Summaries       ${dim("...")}`);
+        }
       } else {
-        lines.push(
-          `  ${cyan(f)} Embeddings      ${createBar(s.embedded_pct, 20)} ${dim(`${s.embedded_count}/${s.embeddable_count}`)}`,
-        );
-      }
-      // Summaries
-      const sumDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;
-      if (sumDone) {
-        lines.push(`  ${green("✓")} Summaries       ${dim(`${s.purpose_count}/${s.purpose_total} files`)}`);
-      } else if (s.purpose_total > 0) {
-        lines.push(
-          `  ${cyan(f)} Summaries       ${createBar(Math.round((s.purpose_count / s.purpose_total) * 100), 20)} ${dim(`${s.purpose_count}/${s.purpose_total}`)}`,
-        );
-      } else {
-        lines.push(`  ${dim("○")} Summaries       ${dim("...")}`);
+        // Pro upsell — no capabilities
+        lines.push(``);
+        lines.push(`  ${yellow("⚡")} ${bold("Pro")}`);
+        lines.push(`    ${dim("· Vocab clusters")}`);
+        lines.push(`    ${dim("· Embeddings")}`);
+        lines.push(`    ${dim("· Summaries")}`);
+        lines.push(`    ${dim("lens login → upgrade to enable")}`);
       }
     }
 
     // Completion checks
     const structuralDone =
       !indexing && s.metadata_count > 0 && s.chunk_count > 0 && s.git_commits_analyzed > 0 && s.import_edge_count > 0;
-    const embDone = (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) || s.embeddable_count === 0;
-    const sumDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;
-    const allDone = structuralDone && embDone && sumDone;
+
+    let allDone: boolean;
+    if (hasCaps) {
+      const embDone = (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) || s.embeddable_count === 0;
+      const sumDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;
+      allDone = structuralDone && embDone && sumDone;
+    } else {
+      // Without caps, structural completion = done
+      allDone = structuralDone;
+    }
 
     // Footer
     lines.push(``);
@@ -148,7 +186,11 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
       lines.push(``);
     } else if (structuralDone) {
       lines.push(`  ${green("✓")} ${bold("Ready")} — ${cyan('lens context "<goal>"')}`);
-      lines.push(`  ${dim("Background tasks continue — Ctrl+C to exit, check:")} ${cyan("lens status")}`);
+      if (hasCaps) {
+        lines.push(`  ${dim("Background tasks continue — Ctrl+C to exit, check:")} ${cyan("lens status")}`);
+      } else {
+        lines.push(``);
+      }
     } else {
       lines.push(`  ${dim("Runs in background — Ctrl+C to exit")}`);
       lines.push(`  ${dim("Check progress:")} ${cyan("lens status")}`);

@@ -22,6 +22,7 @@ import {
   ensureEmbedded,
   enrichPurpose,
   getRawDb,
+  usageQueries,
 } from "@lens/engine";
 
 const TEMPLATE = `<!-- LENS — Repo Context Daemon -->
@@ -64,8 +65,8 @@ const MIME_TYPES: Record<string, string> = {
   ".ttf": "font/ttf",
 };
 
-export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): Hono {
-  const app = new Hono();
+export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): Hono & { stopSync?: () => void } {
+  const app = new Hono() as Hono & { stopSync?: () => void };
 
   // Collect registered route paths for /api/dashboard/routes
   const registeredRoutes: Array<{ method: string; path: string }> = [];
@@ -113,12 +114,23 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       const result = registerRepo(db, root_path, name, remote_url);
 
       if (result.created) {
-        runIndex(db, result.repo_id, caps)
-          .then(() => Promise.all([ensureEmbedded(db, result.repo_id, caps), enrichPurpose(db, result.repo_id, caps)]))
+        runIndex(db, result.repo_id, caps, false, emitRepoEvent)
+          .then((r) => {
+            if (r.files_scanned > 0) usageQueries.increment(db, "repos_indexed");
+            return Promise.all([ensureEmbedded(db, result.repo_id, caps), enrichPurpose(db, result.repo_id, caps)]);
+          })
+          .then(([embedRes, purposeRes]) => {
+            if (embedRes.embedded_count > 0) {
+              usageQueries.increment(db, "embedding_requests");
+              usageQueries.increment(db, "embedding_chunks", embedRes.embedded_count);
+            }
+            if (purposeRes.enriched > 0) usageQueries.increment(db, "purpose_requests");
+          })
           .catch((e) => console.error("[LENS] post-register index failed:", e));
       }
 
       startWatcher(db, result.repo_id, root_path);
+      emitRepoEvent();
       return c.json(result);
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -178,6 +190,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       const id = c.req.param("id");
       await stopWatcher(id).catch(() => {});
       const result = removeRepo(db, id);
+      emitRepoEvent();
       return c.json(result);
     } catch (e: any) {
       if (e.message === "repo not found") return c.json({ error: "repo not found" }, 404);
@@ -189,7 +202,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
   app.get("/repo/:id/status", async (c) => {
     try {
       const status = await getRepoStatus(db, c.req.param("id"));
-      return c.json(status);
+      return c.json({ ...status, has_capabilities: !!caps });
     } catch (e: any) {
       if (e.message === "repo not found") return c.json({ error: "repo not found" }, 404);
       return c.json({ error: e.message }, 500);
@@ -204,6 +217,10 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       const { repo_id, goal } = await c.req.json();
       if (!repo_id || !goal) return c.json({ error: "repo_id and goal required" }, 400);
       const result = await buildContext(db, repo_id, goal, caps);
+      usageQueries.increment(db, "context_queries");
+      if (chunkQueries.hasEmbeddings(db, repo_id)) {
+        usageQueries.increment(db, "embedding_requests");
+      }
       return c.json(result);
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -217,10 +234,17 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     try {
       const { repo_id, force } = await c.req.json();
       if (!repo_id) return c.json({ error: "repo_id required" }, 400);
-      const result = await runIndex(db, repo_id, caps, force ?? false);
-      Promise.all([ensureEmbedded(db, repo_id, caps), enrichPurpose(db, repo_id, caps)]).catch((e) =>
-        console.error("[LENS] post-index embed/enrich failed:", e),
-      );
+      const result = await runIndex(db, repo_id, caps, force ?? false, emitRepoEvent);
+      if (result.files_scanned > 0) usageQueries.increment(db, "repos_indexed");
+      Promise.all([ensureEmbedded(db, repo_id, caps), enrichPurpose(db, repo_id, caps)])
+        .then(([embedRes, purposeRes]) => {
+          if (embedRes.embedded_count > 0) {
+            usageQueries.increment(db, "embedding_requests");
+            usageQueries.increment(db, "embedding_chunks", embedRes.embedded_count);
+          }
+          if (purposeRes.enriched > 0) usageQueries.increment(db, "purpose_requests");
+        })
+        .catch((e) => console.error("[LENS] post-index embed/enrich failed:", e));
       return c.json(result);
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -251,6 +275,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
         chunk_count: stats.chunk_count,
         files_indexed: stats.files_indexed,
         chunks_with_embeddings: stats.embedded_count,
+        has_capabilities: !!caps,
       });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -264,6 +289,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       if (!repo_id) return c.json({ error: "repo_id required" }, 400);
       const repo = getRepo(db, repo_id);
       const result = startWatcher(db, repo_id, repo.root_path);
+      emitRepoEvent();
       return c.json(result);
     } catch (e: any) {
       if (e.message === "repo not found") return c.json({ error: "repo not found" }, 404);
@@ -277,6 +303,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       const { repo_id } = await c.req.json();
       if (!repo_id) return c.json({ error: "repo_id required" }, 400);
       const result = await stopWatcher(repo_id);
+      emitRepoEvent();
       return c.json(result);
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -358,6 +385,32 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       expires_at: Math.floor(Date.now() / 1000) + (data.expires_in ?? 3600),
     };
   }
+
+  // SSE: repo mutation bus — notify dashboard on register/remove/index/watch changes
+  const repoClients = new Set<ReadableStreamDefaultController>();
+  const encoder = new TextEncoder();
+
+  function emitRepoEvent() {
+    for (const ctrl of repoClients) {
+      try { ctrl.enqueue(encoder.encode("data: repo-changed\n\n")); }
+      catch { repoClients.delete(ctrl); }
+    }
+  }
+
+  track("GET", "/api/repo/events");
+  app.get("/api/repo/events", (c) => {
+    const stream = new ReadableStream({
+      start(ctrl) { repoClients.add(ctrl); },
+      cancel(ctrl) { repoClients.delete(ctrl as ReadableStreamDefaultController); },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  });
 
   // SSE: watch ~/.lens/auth.json and push changes to connected clients
   const authClients = new Set<ReadableStreamDefaultController>();
@@ -502,15 +555,22 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       const repos = listRepos(db);
       let totalChunks = 0;
       let totalEmbeddings = 0;
+      let totalSummaries = 0;
+      let totalVocabClusters = 0;
       for (const r of repos) {
         const s = chunkQueries.getStats(db, r.id);
+        const structural = metadataQueries.getStructuralStats(db, r.id);
         totalChunks += s.chunk_count;
         totalEmbeddings += s.embedded_count;
+        totalSummaries += structural.purpose_count;
+        totalVocabClusters += r.vocab_clusters ? (JSON.parse(r.vocab_clusters) as unknown[]).length : 0;
       }
       return c.json({
         repos_count: repos.length,
         total_chunks: totalChunks,
         total_embeddings: totalEmbeddings,
+        total_summaries: totalSummaries,
+        total_vocab_clusters: totalVocabClusters,
         db_size_mb: getDbSizeMb(),
         uptime_seconds: Math.floor((Date.now() - startedAt) / 1000),
       });
@@ -540,9 +600,11 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
             stats.embeddable_count > 0 ? Math.round((stats.embedded_count / stats.embeddable_count) * 100) : 0,
           purpose_count: structural.purpose_count,
           purpose_total: structural.purpose_total,
+          vocab_cluster_count: r.vocab_clusters ? (JSON.parse(r.vocab_clusters) as unknown[]).length : 0,
           last_indexed_at: r.last_indexed_at,
           last_indexed_commit: r.last_indexed_commit,
           max_import_depth: r.max_import_depth,
+          has_capabilities: !!caps,
           watcher: {
             active: watcher.watching,
             changed_files: watcher.changed_files ?? 0,
@@ -567,12 +629,15 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
       const watcher = getWatcherStatus(id);
       let currentHead: string | null = null;
       try { currentHead = await getHeadCommit(repo.root_path); } catch {}
+      const vocabClusters: unknown[] = repo.vocab_clusters ? JSON.parse(repo.vocab_clusters) : [];
       return c.json({
         ...repo,
         ...stats,
         ...structural,
+        vocab_cluster_count: Array.isArray(vocabClusters) ? vocabClusters.length : 0,
         current_head: currentHead,
         is_stale: !!(currentHead && repo.last_indexed_commit !== currentHead),
+        has_capabilities: !!caps,
         watcher: {
           active: watcher.watching,
           changed_files: watcher.changed_files ?? 0,
@@ -693,6 +758,27 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
+  track("GET", "/api/dashboard/usage");
+  app.get("/api/dashboard/usage", (c) => {
+    try {
+      const today = usageQueries.getToday(db);
+      return c.json({
+        today: today
+          ? {
+              context_queries: today.context_queries,
+              embedding_requests: today.embedding_requests,
+              embedding_chunks: today.embedding_chunks,
+              purpose_requests: today.purpose_requests,
+              repos_indexed: today.repos_indexed,
+            }
+          : { context_queries: 0, embedding_requests: 0, embedding_chunks: 0, purpose_requests: 0, repos_indexed: 0 },
+        synced_at: today?.synced_at ?? null,
+      });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
   track("GET", "/api/dashboard/routes");
   app.get("/api/dashboard/routes", (c) => {
     return c.json({ routes: registeredRoutes });
@@ -727,6 +813,43 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     // Redirect /dashboard to /dashboard/
     app.get("/dashboard", (c) => c.redirect("/dashboard/"));
   }
+
+  // --- Usage Sync Timer (every hour, sync unsynced counters to cloud) ---
+
+  const SYNC_INTERVAL = 3_600_000; // 1 hour
+
+  async function syncUsageToCloud() {
+    const apiKey = readApiKey();
+    if (!apiKey) return;
+
+    const unsynced = usageQueries.getUnsynced(db);
+    for (const row of unsynced) {
+      try {
+        const res = await fetch(`${CLOUD_API_URL}/api/usage/sync`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            date: row.date,
+            counters: {
+              contextQueries: row.context_queries,
+              embeddingRequests: row.embedding_requests,
+              embeddingChunks: row.embedding_chunks,
+              purposeRequests: row.purpose_requests,
+              reposIndexed: row.repos_indexed,
+            },
+          }),
+        });
+        if (res.ok) usageQueries.markSynced(db, row.date);
+      } catch {}
+    }
+  }
+
+  const syncTimer = setInterval(syncUsageToCloud, SYNC_INTERVAL);
+  syncUsageToCloud().catch(() => {}); // initial sync on startup
+  app.stopSync = () => clearInterval(syncTimer);
 
   return app;
 }

@@ -14,6 +14,8 @@ export const api = {
       repos_count: number;
       total_chunks: number;
       total_embeddings: number;
+      total_summaries: number;
+      total_vocab_clusters: number;
       db_size_mb: number;
       uptime_seconds: number;
     }>("/api/dashboard/stats"),
@@ -32,9 +34,11 @@ export const api = {
         embedded_pct: number;
         purpose_count: number;
         purpose_total: number;
+        vocab_cluster_count: number;
         last_indexed_at: string | null;
         last_indexed_commit: string | null;
         max_import_depth: number;
+        has_capabilities: boolean;
         watcher: { active: boolean; changed_files: number; started_at: string | null };
       }>;
     }>("/api/dashboard/repos"),
@@ -142,6 +146,18 @@ export const api = {
 
   removeRepo: (id: string) =>
     request<{ removed: boolean }>(`/repo/${id}`, { method: "DELETE" }),
+
+  localUsage: () =>
+    request<{
+      today: {
+        context_queries: number;
+        embedding_requests: number;
+        embedding_chunks: number;
+        purpose_requests: number;
+        repos_indexed: number;
+      };
+      synced_at: string | null;
+    }>("/api/dashboard/usage"),
 
   authStatus: () =>
     request<{

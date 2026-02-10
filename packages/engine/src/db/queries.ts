@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, inArray, or, sql } from "drizzle-orm";
 import type { Db } from "./connection";
-import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos, requestLogs } from "./schema";
+import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos, requestLogs, usageCounters } from "./schema";
 
 // --- Helpers ---
 
@@ -735,6 +735,54 @@ export const logQueries = {
       .all();
 
     return { total_today: totalToday, by_source: bySource, by_endpoint: byEndpoint };
+  },
+};
+
+// --- Usage Counter Queries ---
+
+export type UsageCounter = "context_queries" | "embedding_requests" | "embedding_chunks" | "purpose_requests" | "repos_indexed";
+
+export const usageQueries = {
+  increment(db: Db, counter: UsageCounter, amount = 1): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const existing = db.select({ id: usageCounters.id }).from(usageCounters).where(eq(usageCounters.date, today)).get();
+    if (existing) {
+      db.update(usageCounters)
+        .set({
+          [counter]: sql`${usageCounters[counter]} + ${amount}`,
+          updated_at: sql`datetime('now')`,
+        })
+        .where(eq(usageCounters.id, existing.id))
+        .run();
+    } else {
+      db.insert(usageCounters)
+        .values({ id: randomUUID(), date: today, [counter]: amount })
+        .run();
+    }
+  },
+
+  getByDate(db: Db, date: string) {
+    return db.select().from(usageCounters).where(eq(usageCounters.date, date)).get() ?? null;
+  },
+
+  getUnsynced(db: Db) {
+    return db
+      .select()
+      .from(usageCounters)
+      .where(sql`synced_at IS NULL AND (context_queries > 0 OR embedding_requests > 0 OR purpose_requests > 0 OR repos_indexed > 0)`)
+      .all();
+  },
+
+  markSynced(db: Db, date: string): void {
+    db.update(usageCounters)
+      .set({ synced_at: sql`datetime('now')` })
+      .where(eq(usageCounters.date, date))
+      .run();
+  },
+
+  getToday(db: Db) {
+    const today = new Date().toISOString().slice(0, 10);
+    return this.getByDate(db, today);
   },
 };
 

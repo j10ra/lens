@@ -3,7 +3,7 @@ import path from "node:path";
 import { get } from "./client.js";
 import { readConfig } from "./config.js";
 
-const RLM_MARKER = "LENS — Repo Context Engine";
+const RLM_MARKER = "lens context";
 
 // Search order: root files first (more likely to be user's main file), then .claude/
 const CANDIDATE_PATHS = ["CLAUDE.md", "agents.md", "AGENTS.md", ".CLAUDE.md", ".agents.md", ".AGENTS.md"];
@@ -30,7 +30,7 @@ export async function injectClaudeMd(repoRoot: string): Promise<void> {
   let existingContent = "";
   try {
     existingContent = await fs.readFile(targetFile, "utf-8");
-    if (existingContent.includes(RLM_MARKER)) {
+    if (existingContent.toLowerCase().includes(RLM_MARKER)) {
       return; // Already has LENS content
     }
   } catch {
