@@ -14,10 +14,8 @@ function preserveClientAssets(): Plugin {
   return {
     name: "preserve-client-assets",
     writeBundle(options) {
-      console.log(`[preserve-assets] writeBundle dir=${options.dir}`);
       const assetsDir = join(options.dir!, "assets");
       if (existsSync(assetsDir)) {
-        console.log(`[preserve-assets] Found assets, copying to ${backupDir}`);
         cpSync(assetsDir, backupDir, { recursive: true });
       }
     },
