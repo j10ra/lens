@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
@@ -8,6 +9,7 @@ const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 export interface Config {
   inject_behavior: "always" | "skip" | "once";
   show_progress: boolean;
+  cloud_url?: string;
 }
 
 const DEFAULTS: Config = {
@@ -44,9 +46,20 @@ export async function configSet(key: string, value: string): Promise<void> {
     config.inject_behavior = value as Config["inject_behavior"];
   } else if (key === "show_progress") {
     config.show_progress = value === "true";
+  } else if (key === "cloud_url") {
+    config.cloud_url = value;
   } else {
     throw new Error(`Invalid config: ${key}=${value}`);
   }
 
   await writeConfig(config);
+}
+
+export function getCloudUrl(): string {
+  if (process.env.LENS_CLOUD_URL) return process.env.LENS_CLOUD_URL;
+  try {
+    const cfg = JSON.parse(fsSync.readFileSync(CONFIG_FILE, "utf-8"));
+    if (cfg.cloud_url) return cfg.cloud_url;
+  } catch {}
+  return "https://lens.dev";
 }

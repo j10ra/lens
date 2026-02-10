@@ -19,8 +19,36 @@ function BillingContent() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="space-y-8 animate-pulse">
+        <div>
+          <div className="h-7 w-32 rounded bg-muted" />
+          <div className="mt-2 h-4 w-64 rounded bg-muted" />
+        </div>
+        <div className="rounded-xl border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="h-4 w-24 rounded bg-muted" />
+              <div className="mt-2 h-6 w-20 rounded bg-muted" />
+            </div>
+            <div className="h-7 w-16 rounded-full bg-muted" />
+          </div>
+        </div>
+        <div>
+          <div className="mb-4 h-4 w-28 rounded bg-muted" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-xl border border-border bg-card p-6">
+                <div className="h-5 w-20 rounded bg-muted" />
+                <div className="mt-3 h-8 w-16 rounded bg-muted" />
+                <div className="mt-4 space-y-2">
+                  {[0, 1, 2].map((j) => (
+                    <div key={j} className="h-4 w-3/4 rounded bg-muted" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

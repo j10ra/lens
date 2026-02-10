@@ -8,15 +8,7 @@ export function CloudAuthGuard({ children }: { children: React.ReactNode }) {
     placeholderData: keepPreviousData,
   });
 
-  if (auth.isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (!auth.data?.authenticated) {
+  if (!auth.isLoading && !auth.data?.authenticated) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="rounded-xl border bg-card p-8 text-center max-w-sm">

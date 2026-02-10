@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync, statSync, watch } from "node:f
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import type { Db, Capabilities } from "@lens/engine";
+import { getCloudUrl } from "./config";
 import {
   registerRepo,
   getRepo,
@@ -84,8 +85,8 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     const path = new URL(c.req.url).pathname;
     const source = deriveSource(c.req.raw, path);
 
-    // Don't log dashboard static file requests
     if (path.startsWith("/dashboard/") && !path.startsWith("/api/")) return;
+    if (path === "/health") return;
 
     try {
       logQueries.insert(db, c.req.method, path, c.res.status, duration, source);
@@ -469,7 +470,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   // --- Cloud Proxy ---
 
-  const CLOUD_API_URL = process.env.LENS_CLOUD_URL ?? "https://lens.dev";
+  const CLOUD_API_URL = getCloudUrl();
 
   function readApiKey(): string | null {
     const authPath = join(homedir(), ".lens", "auth.json");

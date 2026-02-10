@@ -213,9 +213,9 @@ export const api = {
     request<{ url: string | null }>("/api/cloud/billing/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ interval }),
+      body: JSON.stringify({ interval, return_url: window.location.href }),
     }),
 
   cloudPortal: () =>
-    request<{ url: string | null }>("/api/cloud/billing/portal"),
+    request<{ url: string | null }>(`/api/cloud/billing/portal?return_url=${encodeURIComponent(window.location.href)}`),
 };

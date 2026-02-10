@@ -4,6 +4,8 @@ import { homedir } from "node:os";
 import { openDb, closeDb } from "@lens/engine";
 import type { Capabilities } from "@lens/engine";
 
+import { getCloudUrl } from "./config";
+
 const PID_FILE = join(homedir(), ".lens", "daemon.pid");
 
 function writePid() {
@@ -16,16 +18,42 @@ function removePid() {
   } catch {}
 }
 
+async function ensureApiKey(data: Record<string, unknown>): Promise<string | undefined> {
+  if (data.api_key) return data.api_key as string;
+  if (!data.access_token) return undefined;
+
+  const cloudUrl = getCloudUrl();
+  try {
+    const res = await fetch(`${cloudUrl}/auth/key`, {
+      headers: { Authorization: `Bearer ${data.access_token}` },
+    });
+    if (!res.ok) {
+      console.error(`[LENS] API key provisioning failed (${res.status})`);
+      return undefined;
+    }
+    const { api_key } = (await res.json()) as { api_key: string };
+    data.api_key = api_key;
+    const authPath = join(homedir(), ".lens", "auth.json");
+    writeFileSync(authPath, JSON.stringify(data, null, 2), { mode: 0o600 });
+    console.error("[LENS] API key auto-provisioned");
+    return api_key;
+  } catch (e: any) {
+    console.error(`[LENS] API key provisioning error: ${e?.message}`);
+    return undefined;
+  }
+}
+
 async function loadCapabilities(): Promise<Capabilities | undefined> {
   try {
     const authPath = join(homedir(), ".lens", "auth.json");
     const data = JSON.parse(readFileSync(authPath, "utf-8"));
-    if (!data.api_key) return undefined;
+    const apiKey = await ensureApiKey(data);
+    if (!apiKey) return undefined;
 
     // Check plan — only Pro users get cloud capabilities
-    const cloudUrl = process.env.LENS_CLOUD_URL ?? "https://lens.dev";
+    const cloudUrl = getCloudUrl();
     const res = await fetch(`${cloudUrl}/api/usage/current`, {
-      headers: { Authorization: `Bearer ${data.api_key}` },
+      headers: { Authorization: `Bearer ${apiKey}` },
     });
     if (!res.ok) {
       console.error(`[LENS] Plan check failed (${res.status}), capabilities disabled`);
@@ -38,7 +66,7 @@ async function loadCapabilities(): Promise<Capabilities | undefined> {
     }
 
     const { createCloudCapabilities } = await import("./cloud-capabilities");
-    const caps = createCloudCapabilities(data.api_key);
+    const caps = createCloudCapabilities(apiKey);
     console.error("[LENS] Cloud capabilities enabled (Pro plan)");
     return caps;
   } catch {

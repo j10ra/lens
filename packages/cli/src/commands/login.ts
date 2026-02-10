@@ -6,7 +6,9 @@ import { output, error } from "../util/format.js";
 const SUPABASE_URL = "https://kuvsaycpvbbmyyxiklap.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dnNheWNwdmJibXl5eGlrbGFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2MzIxNzQsImV4cCI6MjA4NjIwODE3NH0.yllrNUWVHUyFBwegoIeBkiHiIiWcsspHL9126nT2o2Q";
-const CLOUD_API_URL = process.env.LENS_CLOUD_URL ?? "https://lens.dev";
+import { getCloudUrl } from "../util/config.js";
+
+const CLOUD_API_URL = getCloudUrl();
 
 interface LoginOpts {
   github?: boolean;
@@ -83,8 +85,8 @@ function callbackPage(): string {
     });
 
     if (r.ok) {
-      document.querySelector("h1").textContent = "Authenticated!";
-      msg.textContent = "You can close this tab and return to the terminal.";
+      window.location.href = "http://127.0.0.1:4111/dashboard/";
+      return;
     } else {
       msg.textContent = "Failed to save tokens. Please try again.";
     }
@@ -123,7 +125,7 @@ export async function loginCommand(opts: LoginOpts): Promise<void> {
 
             const tokens = { access_token, refresh_token, user_email, expires_at } as import("../util/auth.js").AuthTokens;
 
-            // Fetch cloud API key (non-blocking on failure)
+            // Provision cloud API key
             try {
               const keyRes = await fetch(`${CLOUD_API_URL}/auth/key`, {
                 headers: { Authorization: `Bearer ${access_token}` },
@@ -131,8 +133,12 @@ export async function loginCommand(opts: LoginOpts): Promise<void> {
               if (keyRes.ok) {
                 const { api_key } = await keyRes.json() as { api_key: string };
                 tokens.api_key = api_key;
+              } else {
+                error(`Cloud API key failed (${keyRes.status}). Cloud features unavailable until daemon restarts.`);
               }
-            } catch {}
+            } catch (e: any) {
+              error(`Cloud unreachable: ${e?.message ?? "unknown"}. Daemon will retry on next start.`);
+            }
 
             await writeAuth(tokens);
 

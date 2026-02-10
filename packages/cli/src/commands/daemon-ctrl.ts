@@ -52,7 +52,10 @@ export async function startCommand(): Promise<void> {
   });
   child.unref();
 
-  await new Promise((r) => setTimeout(r, 500));
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    if (isDaemonRunning().running) break;
+  }
 
   const check = isDaemonRunning();
   if (check.running) {
