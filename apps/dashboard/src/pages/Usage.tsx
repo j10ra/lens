@@ -130,6 +130,8 @@ export function Usage() {
     enabled: !!isAuthed,
   });
 
+  const plan = cloud?.plan ?? "free";
+  const isPro = plan === "pro";
   const quota = cloud?.quota;
   const today = local?.today;
 
@@ -151,13 +153,30 @@ export function Usage() {
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : (
-          <section className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-5">
-            <UsageBar label="Context Queries" used={today.context_queries} limit={quota?.contextQueries} />
-            <UsageBar label="Embedding Requests" used={today.embedding_requests} limit={quota?.embeddingRequests} />
-            <UsageBar label="Embedding Chunks" used={today.embedding_chunks} limit={quota?.embeddingChunks} />
-            <UsageBar label="Purpose Summaries" used={today.purpose_requests} limit={quota?.purposeRequests} />
-            <UsageBar label="Repos Indexed" used={today.repos_indexed} limit={quota?.reposIndexed} />
-          </section>
+          <>
+            <section className={`grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 ${isPro ? "@5xl/main:grid-cols-5" : ""}`}>
+              <UsageBar label="Context Queries" used={today.context_queries} />
+              <UsageBar label="Repos Indexed" used={today.repos_indexed} />
+              {isPro && (
+                <>
+                  <UsageBar label="Embedding Requests" used={today.embedding_requests} limit={quota?.embeddingRequests} />
+                  <UsageBar label="Embedding Chunks" used={today.embedding_chunks} limit={quota?.embeddingChunks} />
+                  <UsageBar label="Purpose Summaries" used={today.purpose_requests} limit={quota?.purposeRequests} />
+                </>
+              )}
+            </section>
+
+            {!isPro && (
+              <section className="px-4 lg:px-6">
+                <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 p-4">
+                  <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Upgrade to Pro</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Semantic search, vocab clusters, and purpose summaries — powered by Voyage + OpenRouter.
+                  </p>
+                </div>
+              </section>
+            )}
+          </>
         )}
 
         <SyncStatusCard />
@@ -165,7 +184,7 @@ export function Usage() {
         {!isAuthed && (
           <section className="px-4 lg:px-6">
             <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center">
-              <p className="text-sm text-muted-foreground">Connect to LENS Cloud to see quota limits and sync usage.</p>
+              <p className="text-sm text-muted-foreground">Connect to LENS Cloud to sync usage across devices.</p>
               <code className="mt-2 inline-block rounded-lg bg-muted px-4 py-1.5 text-xs font-mono">lens login</code>
             </div>
           </section>

@@ -10,11 +10,11 @@ import { getDb } from "../lib/db";
 
 const QUOTAS: Record<string, Record<string, number>> = {
   free: {
-    contextQueries: 100,
-    embeddingRequests: 50,
-    embeddingChunks: 5000,
-    purposeRequests: 20,
-    reposIndexed: 3,
+    contextQueries: 0,
+    embeddingRequests: 0,
+    embeddingChunks: 0,
+    purposeRequests: 0,
+    reposIndexed: 0,
   },
   pro: {
     contextQueries: 10000,
