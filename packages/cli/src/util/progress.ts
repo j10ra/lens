@@ -94,8 +94,8 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
       lines.push(`  ${dim("○")} Import graph    ${dim("...")}`);
       lines.push(`  ${dim("○")} Co-changes      ${dim("...")}`);
       if (hasCaps) {
-        lines.push(`  ${dim("○")} Embeddings      ${dim("...")}`);
         lines.push(`  ${dim("○")} Vocab clusters  ${dim("...")}`);
+        lines.push(`  ${dim("○")} Embeddings      ${dim("...")}`);
         lines.push(`  ${dim("○")} Summaries       ${dim("...")}`);
       } else {
         lines.push(``);
@@ -123,6 +123,12 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
       );
 
       if (hasCaps) {
+        // Vocab clusters
+        if (s.vocab_cluster_count > 0) {
+          lines.push(`  ${green("✓")} Vocab clusters  ${dim(`${s.vocab_cluster_count} clusters`)}`);
+        } else {
+          lines.push(`  ${cyan(f)} Vocab clusters  ${dim("building...")}`);
+        }
         // Embeddings
         const embDone = s.embedded_count >= s.embeddable_count && s.embeddable_count > 0;
         if (embDone) {
@@ -133,12 +139,6 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
           lines.push(
             `  ${cyan(f)} Embeddings      ${createBar(s.embedded_pct, 20)} ${dim(`${s.embedded_count}/${s.embeddable_count}`)}`,
           );
-        }
-        // Vocab clusters
-        if (s.vocab_cluster_count > 0) {
-          lines.push(`  ${green("✓")} Vocab clusters  ${dim(`${s.vocab_cluster_count} clusters`)}`);
-        } else {
-          lines.push(`  ${cyan(f)} Vocab clusters  ${dim("building...")}`);
         }
         // Summaries
         const sumDone = s.purpose_count >= s.purpose_total && s.purpose_total > 0;

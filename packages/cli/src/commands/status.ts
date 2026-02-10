@@ -66,8 +66,8 @@ export async function statusCommand(opts: { json: boolean }): Promise<void> {
     const purposeLabel = s.purpose_total > 0 ? `${s.purpose_count}/${s.purpose_total} files` : "no files";
     const purposeIcon = s.purpose_count > 0 && s.purpose_count >= s.purpose_total ? check : pending;
 
-    lines.push(`  ${embIcon} Embeddings    ${dim(embLabel)}`);
     lines.push(`  ${vocabIcon} Vocab clust.  ${dim(vocabLabel)}`);
+    lines.push(`  ${embIcon} Embeddings    ${dim(embLabel)}`);
     lines.push(`  ${purposeIcon} Summaries     ${dim(purposeLabel)}`);
   } else {
     lines.push(``);
