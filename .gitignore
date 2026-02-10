@@ -8,6 +8,8 @@ node_modules
 # Build outputs
 dist
 publish
+.output
+.nitro
 *.js
 *.js.map
 *.d.ts
