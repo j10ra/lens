@@ -2,6 +2,7 @@ import type { Capabilities } from "../capabilities";
 import type { Db } from "../db/connection";
 import { repoQueries } from "../db/queries";
 import { ensureIndexed } from "../index/engine";
+import { track } from "../telemetry";
 import type { ContextData, ContextResponse } from "../types";
 import { formatContextPack } from "./formatter";
 import { interpretQuery, isNoisePath } from "./query-interpreter";
@@ -64,6 +65,7 @@ export async function buildContext(
     const key = cacheKey(repoId, goal, commit);
     const cached = cacheGet(key);
     if (cached) {
+      track(db, "context", { duration_ms: Date.now() - start, result_count: cached.stats.files_in_context, cache_hit: true });
       return { ...cached, stats: { ...cached.stats, cached: true, duration_ms: Date.now() - start } };
     }
 
@@ -199,6 +201,7 @@ export async function buildContext(
     };
 
     cacheSet(key, response);
+    track(db, "context", { duration_ms: response.stats.duration_ms, result_count: response.stats.files_in_context, cache_hit: false });
     return response;
   } catch {
     return {

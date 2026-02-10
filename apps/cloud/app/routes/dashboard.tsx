@@ -3,17 +3,11 @@ import {
   createFileRoute,
   Outlet,
   useNavigate,
-  useRouterState,
 } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { AuthCtx, type AuthContext } from "@/lib/auth-context";
 import type { Session } from "@supabase/supabase-js";
-import {
-  SidebarProvider,
-  SidebarInset,
-  PageHeader,
-  ModeToggle,
-} from "@lens/ui";
+import { SidebarProvider, SidebarInset } from "@lens/ui";
 import { CloudSidebar } from "@/components/AppSidebar";
 
 export const Route = createFileRoute("/dashboard")({
@@ -29,20 +23,10 @@ function isAdmin(email: string): boolean {
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-const ROUTE_TITLES: Record<string, string> = {
-  "/dashboard": "Admin Overview",
-  "/dashboard/users": "Users",
-  "/dashboard/keys": "API Keys",
-  "/dashboard/usage": "Usage",
-  "/dashboard/billing": "Billing",
-};
-
 function DashboardLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const routerState = useRouterState();
-  const pathname = routerState.location.pathname;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -111,22 +95,8 @@ function DashboardLayout() {
     <AuthCtx.Provider value={authValue}>
       <SidebarProvider className="bg-muted h-svh">
         <CloudSidebar />
-        <SidebarInset className="bg-background rounded-xl overflow-hidden md:my-2 md:mr-2 md:border">
-          <PageHeader>
-            <h1 className="text-sm font-semibold">
-              {ROUTE_TITLES[pathname] ?? "Dashboard"}
-            </h1>
-            <div className="ml-auto flex items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
-                <div className="h-2 w-2 rounded-full bg-success" />
-                Admin
-              </div>
-              <ModeToggle variant="button" />
-            </div>
-          </PageHeader>
-          <main className="flex-1 overflow-auto p-4 lg:p-6">
-            <Outlet />
-          </main>
+        <SidebarInset className="@container/main bg-background rounded-xl overflow-hidden md:my-2 md:mr-2 md:border">
+          <Outlet />
         </SidebarInset>
       </SidebarProvider>
     </AuthCtx.Provider>

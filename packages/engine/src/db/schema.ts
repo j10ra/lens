@@ -154,3 +154,18 @@ export const requestLogs = sqliteTable(
   },
   (t) => [index("idx_request_logs_created").on(t.created_at), index("idx_request_logs_source").on(t.source)],
 );
+
+export const telemetryEvents = sqliteTable(
+  "telemetry_events",
+  {
+    id: uuid(),
+    event_type: text("event_type").notNull(),
+    event_data: text("event_data"),
+    created_at: now(),
+    synced_at: text("synced_at"),
+  },
+  (t) => [
+    index("idx_telemetry_events_type").on(t.event_type),
+    index("idx_telemetry_events_synced").on(t.synced_at),
+  ],
+);

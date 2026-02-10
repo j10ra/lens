@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import type { Db } from "./connection";
-import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos, requestLogs, usageCounters } from "./schema";
+import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos, requestLogs, telemetryEvents, usageCounters } from "./schema";
 
 // --- Helpers ---
 
@@ -783,6 +783,47 @@ export const usageQueries = {
   getToday(db: Db) {
     const today = new Date().toISOString().slice(0, 10);
     return this.getByDate(db, today);
+  },
+};
+
+// --- Telemetry Queries ---
+
+export const telemetryQueries = {
+  insert(db: Db, eventType: string, eventData?: Record<string, unknown>): void {
+    db.insert(telemetryEvents)
+      .values({
+        id: randomUUID(),
+        event_type: eventType,
+        event_data: eventData ? JSON.stringify(eventData) : null,
+      })
+      .run();
+  },
+
+  getUnsynced(db: Db, limit = 500) {
+    return db
+      .select()
+      .from(telemetryEvents)
+      .where(isNull(telemetryEvents.synced_at))
+      .orderBy(telemetryEvents.created_at)
+      .limit(limit)
+      .all();
+  },
+
+  markSynced(db: Db, ids: string[]): void {
+    if (!ids.length) return;
+    db.update(telemetryEvents)
+      .set({ synced_at: sql`datetime('now')` })
+      .where(inArray(telemetryEvents.id, ids))
+      .run();
+  },
+
+  prune(db: Db, maxAgeDays = 30): number {
+    const cutoff = new Date(Date.now() - maxAgeDays * 86_400_000).toISOString();
+    const result = db
+      .delete(telemetryEvents)
+      .where(sql`synced_at IS NOT NULL AND created_at < ${cutoff}`)
+      .run();
+    return result.changes;
   },
 };
 

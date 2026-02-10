@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { PageHeader } from "@lens/ui";
+import { DataTable } from "@/components/DataTable";
 import { adminGetUsers } from "@/lib/server-fns";
 
 export const Route = createFileRoute("/dashboard/users")({
@@ -13,6 +15,20 @@ interface User {
   last_sign_in_at: string | null;
 }
 
+const fmtDate = (d: string | null) =>
+  d ? new Date(d).toLocaleDateString("en-CA") : "Never";
+
+const columns = [
+  { key: "email", label: "Email", render: (r: User) => <span className="font-medium">{r.email}</span> },
+  {
+    key: "id",
+    label: "User ID",
+    render: (r: User) => <span className="text-muted-foreground">{r.id.slice(0, 8)}...</span>,
+  },
+  { key: "created_at", label: "Signed Up", render: (r: User) => <span className="text-muted-foreground">{fmtDate(r.created_at)}</span> },
+  { key: "last_sign_in_at", label: "Last Sign In", render: (r: User) => <span className="text-muted-foreground">{fmtDate(r.last_sign_in_at)}</span> },
+];
+
 function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,50 +40,33 @@ function UsersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const fmtDate = (d: string | null) =>
-    d ? new Date(d).toLocaleDateString("en-CA") : "Never";
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Users</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <>
+      <PageHeader>
+        <span className="text-sm font-medium">Users</span>
+        <span className="text-xs text-muted-foreground tabular-nums">
           {users.length} registered user{users.length !== 1 ? "s" : ""}
-        </p>
+        </span>
+      </PageHeader>
+      <div className="flex flex-col flex-1 min-h-0">
+        {loading ? (
+          <Spinner />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={users as Array<Record<string, unknown>>}
+            emptyMessage="No users found"
+          />
+        )}
       </div>
+    </>
+  );
+}
 
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted">
-              <th className="px-4 py-3 text-left font-medium">Email</th>
-              <th className="px-4 py-3 text-left font-medium">User ID</th>
-              <th className="px-4 py-3 text-left font-medium">Signed Up</th>
-              <th className="px-4 py-3 text-left font-medium">Last Sign In</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Loading...</td>
-              </tr>
-            ) : users.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No users found.</td>
-              </tr>
-            ) : (
-              users.map((u) => (
-                <tr key={u.id} className="border-b border-border/50 last:border-0">
-                  <td className="px-4 py-3 font-medium">{u.email}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.id.slice(0, 8)}...</td>
-                  <td className="px-4 py-3 text-muted-foreground">{fmtDate(u.created_at)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{fmtDate(u.last_sign_in_at)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+function Spinner() {
+  return (
+    <div className="flex flex-1 items-center justify-center py-16">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
     </div>
   );
 }

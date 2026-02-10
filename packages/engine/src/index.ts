@@ -71,5 +71,9 @@ export {
   cochangeQueries,
   logQueries,
   usageQueries,
+  telemetryQueries,
   type UsageCounter,
 } from "./db/queries";
+
+// Telemetry
+export { track, setTelemetryEnabled } from "./telemetry";

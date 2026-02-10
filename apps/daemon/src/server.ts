@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync, statSync, watch } from "node:f
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import type { Db, Capabilities } from "@lens/engine";
-import { getCloudUrl } from "./config";
+import { getCloudUrl, ensureTelemetryId, isTelemetryEnabled, getTelemetryId } from "./config";
 import {
   registerRepo,
   getRepo,
@@ -24,6 +24,9 @@ import {
   enrichPurpose,
   getRawDb,
   usageQueries,
+  telemetryQueries,
+  track,
+  setTelemetryEnabled,
 } from "@lens/engine";
 
 const TEMPLATE = `<!-- LENS — Repo Context Daemon -->
@@ -66,12 +69,30 @@ const MIME_TYPES: Record<string, string> = {
   ".ttf": "font/ttf",
 };
 
-export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): Hono & { stopSync?: () => void } {
-  const app = new Hono() as Hono & { stopSync?: () => void };
+export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): Hono & { stopSync?: () => void; stopTelemetrySync?: () => void } {
+  const app = new Hono() as Hono & { stopSync?: () => void; stopTelemetrySync?: () => void };
+
+  // --- Telemetry Init ---
+  const telemetryEnabled = isTelemetryEnabled();
+  setTelemetryEnabled(telemetryEnabled);
+  const { telemetry_id, first_run } = ensureTelemetryId();
+
+  if (first_run) {
+    console.log(
+      "[LENS] Anonymous telemetry is enabled. No PII, no repo paths, no code.\n" +
+      "[LENS] Opt out: lens config set telemetry false",
+    );
+    track(db, "install", {
+      os: process.platform,
+      arch: process.arch,
+      node_version: process.version,
+      lens_version: "0.1.0",
+    });
+  }
 
   // Collect registered route paths for /api/dashboard/routes
   const registeredRoutes: Array<{ method: string; path: string }> = [];
-  function track(method: string, path: string) {
+  function trackRoute(method: string, path: string) {
     registeredRoutes.push({ method: method.toUpperCase(), path });
   }
 
@@ -101,12 +122,27 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   // --- Health ---
 
-  track("GET", "/health");
+  trackRoute("GET", "/health");
   app.get("/health", (c) => c.json({ status: "ok", version: "0.1.0" }));
+
+  // --- Telemetry Track (for CLI) ---
+
+  trackRoute("POST", "/telemetry/track");
+  app.post("/telemetry/track", async (c) => {
+    try {
+      if (!isTelemetryEnabled()) return c.json({ ok: true, skipped: true });
+      const { event_type, event_data } = await c.req.json();
+      if (!event_type || typeof event_type !== "string") return c.json({ error: "event_type required" }, 400);
+      track(db, event_type, event_data);
+      return c.json({ ok: true });
+    } catch {
+      return c.json({ ok: true });
+    }
+  });
 
   // --- Repo ---
 
-  track("POST", "/repo/register");
+  trackRoute("POST", "/repo/register");
   app.post("/repo/register", async (c) => {
     try {
       const { root_path, name, remote_url } = await c.req.json();
@@ -138,7 +174,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/repo/list");
+  trackRoute("GET", "/repo/list");
   app.get("/repo/list", (c) => {
     try {
       return c.json({ repos: listRepos(db) });
@@ -147,7 +183,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/repo/list/detailed");
+  trackRoute("GET", "/repo/list/detailed");
   app.get("/repo/list/detailed", (c) => {
     try {
       const repos = listRepos(db);
@@ -171,10 +207,10 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/repo/template");
+  trackRoute("GET", "/repo/template");
   app.get("/repo/template", (c) => c.json({ content: TEMPLATE }));
 
-  track("GET", "/repo/:id");
+  trackRoute("GET", "/repo/:id");
   app.get("/repo/:id", (c) => {
     try {
       const repo = getRepo(db, c.req.param("id"));
@@ -185,7 +221,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("DELETE", "/repo/:id");
+  trackRoute("DELETE", "/repo/:id");
   app.delete("/repo/:id", async (c) => {
     try {
       const id = c.req.param("id");
@@ -199,7 +235,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/repo/:id/status");
+  trackRoute("GET", "/repo/:id/status");
   app.get("/repo/:id/status", async (c) => {
     try {
       const status = await getRepoStatus(db, c.req.param("id"));
@@ -212,7 +248,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   // --- Context ---
 
-  track("POST", "/context");
+  trackRoute("POST", "/context");
   app.post("/context", async (c) => {
     try {
       const { repo_id, goal } = await c.req.json();
@@ -230,7 +266,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   // --- Index ---
 
-  track("POST", "/index/run");
+  trackRoute("POST", "/index/run");
   app.post("/index/run", async (c) => {
     try {
       const { repo_id, force } = await c.req.json();
@@ -252,7 +288,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/index/status/:repo_id");
+  trackRoute("GET", "/index/status/:repo_id");
   app.get("/index/status/:repo_id", async (c) => {
     try {
       const repoId = c.req.param("repo_id");
@@ -283,7 +319,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("POST", "/index/watch");
+  trackRoute("POST", "/index/watch");
   app.post("/index/watch", async (c) => {
     try {
       const { repo_id } = await c.req.json();
@@ -298,7 +334,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("POST", "/index/unwatch");
+  trackRoute("POST", "/index/unwatch");
   app.post("/index/unwatch", async (c) => {
     try {
       const { repo_id } = await c.req.json();
@@ -311,7 +347,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/index/watch-status/:repo_id");
+  trackRoute("GET", "/index/watch-status/:repo_id");
   app.get("/index/watch-status/:repo_id", (c) => {
     try {
       return c.json(getWatcherStatus(c.req.param("repo_id")));
@@ -322,7 +358,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   // --- Daemon ---
 
-  track("GET", "/daemon/stats");
+  trackRoute("GET", "/daemon/stats");
   app.get("/daemon/stats", (c) => {
     try {
       const repos = listRepos(db);
@@ -398,7 +434,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   }
 
-  track("GET", "/api/repo/events");
+  trackRoute("GET", "/api/repo/events");
   app.get("/api/repo/events", (c) => {
     const stream = new ReadableStream({
       start(ctrl) { repoClients.add(ctrl); },
@@ -426,7 +462,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     });
   } catch {}
 
-  track("GET", "/api/auth/events");
+  trackRoute("GET", "/api/auth/events");
   app.get("/api/auth/events", (c) => {
     const stream = new ReadableStream({
       start(ctrl) { authClients.add(ctrl); },
@@ -441,7 +477,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     });
   });
 
-  track("GET", "/api/auth/status");
+  trackRoute("GET", "/api/auth/status");
   app.get("/api/auth/status", async (c) => {
     try {
       let auth = readAuthSync();
@@ -504,39 +540,39 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
   }
 
   // Usage
-  track("GET", "/api/cloud/usage");
+  trackRoute("GET", "/api/cloud/usage");
   app.get("/api/cloud/usage", async (c) => {
     const start = c.req.query("start");
     const end = c.req.query("end");
     return cloudProxy("GET", `/api/usage?start=${start}&end=${end}`);
   });
 
-  track("GET", "/api/cloud/usage/current");
+  trackRoute("GET", "/api/cloud/usage/current");
   app.get("/api/cloud/usage/current", async () =>
     cloudProxy("GET", "/api/usage/current"),
   );
 
   // Subscription
-  track("GET", "/api/cloud/subscription");
+  trackRoute("GET", "/api/cloud/subscription");
   app.get("/api/cloud/subscription", async () =>
     cloudProxy("GET", "/api/subscription"),
   );
 
   // Billing
-  track("POST", "/api/cloud/billing/checkout");
+  trackRoute("POST", "/api/cloud/billing/checkout");
   app.post("/api/cloud/billing/checkout", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     return cloudProxy("POST", "/api/billing/checkout", body);
   });
 
-  track("GET", "/api/cloud/billing/portal");
+  trackRoute("GET", "/api/cloud/billing/portal");
   app.get("/api/cloud/billing/portal", async () =>
     cloudProxy("GET", "/api/billing/portal"),
   );
 
   // --- Dashboard API ---
 
-  track("GET", "/api/dashboard/stats");
+  trackRoute("GET", "/api/dashboard/stats");
   app.get("/api/dashboard/stats", (c) => {
     try {
       const repos = listRepos(db);
@@ -566,7 +602,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/api/dashboard/repos");
+  trackRoute("GET", "/api/dashboard/repos");
   app.get("/api/dashboard/repos", (c) => {
     try {
       const repos = listRepos(db);
@@ -605,7 +641,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/api/dashboard/repos/:id");
+  trackRoute("GET", "/api/dashboard/repos/:id");
   app.get("/api/dashboard/repos/:id", async (c) => {
     try {
       const id = c.req.param("id");
@@ -636,7 +672,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/api/dashboard/logs");
+  trackRoute("GET", "/api/dashboard/logs");
   app.get("/api/dashboard/logs", (c) => {
     try {
       const q = c.req.query();
@@ -655,7 +691,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/api/dashboard/tables");
+  trackRoute("GET", "/api/dashboard/tables");
   app.get("/api/dashboard/tables", (c) => {
     try {
       const raw = getRawDb();
@@ -672,7 +708,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/api/dashboard/tables/:name");
+  trackRoute("GET", "/api/dashboard/tables/:name");
   app.get("/api/dashboard/tables/:name", (c) => {
     try {
       const name = c.req.param("name");
@@ -707,7 +743,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/api/dashboard/jobs");
+  trackRoute("GET", "/api/dashboard/jobs");
   app.get("/api/dashboard/jobs", async (c) => {
     try {
       const repos = listRepos(db);
@@ -745,7 +781,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/api/dashboard/usage");
+  trackRoute("GET", "/api/dashboard/usage");
   app.get("/api/dashboard/usage", (c) => {
     try {
       const today = usageQueries.getToday(db);
@@ -766,7 +802,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     }
   });
 
-  track("GET", "/api/dashboard/sync");
+  trackRoute("GET", "/api/dashboard/sync");
   app.get("/api/dashboard/sync", (c) => {
     const unsynced = usageQueries.getUnsynced(db);
     return c.json({
@@ -776,7 +812,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
     });
   });
 
-  track("GET", "/api/dashboard/routes");
+  trackRoute("GET", "/api/dashboard/routes");
   app.get("/api/dashboard/routes", (c) => {
     return c.json({ routes: registeredRoutes });
   });
@@ -888,6 +924,42 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
   const syncTimer = setInterval(syncUsageToCloud, SYNC_INTERVAL);
   syncUsageToCloud().catch(() => {}); // initial sync on startup
   app.stopSync = () => clearInterval(syncTimer);
+
+  // --- Telemetry Sync Timer (hourly, sync buffered events to cloud) ---
+
+  async function syncTelemetryToCloud() {
+    if (!isTelemetryEnabled()) return;
+    const tid = getTelemetryId();
+    if (!tid) return;
+
+    const unsynced = telemetryQueries.getUnsynced(db, 500);
+    if (unsynced.length === 0) return;
+
+    const events = unsynced.map((e) => ({
+      event_type: e.event_type,
+      event_data: e.event_data ? JSON.parse(e.event_data) : null,
+      created_at: e.created_at,
+    }));
+
+    try {
+      const res = await fetch(`${CLOUD_API_URL}/api/telemetry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telemetry_id: tid, events }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) {
+        telemetryQueries.markSynced(db, unsynced.map((e) => e.id));
+      }
+    } catch {}
+
+    // Prune old synced events
+    telemetryQueries.prune(db);
+  }
+
+  const telemetrySyncTimer = setInterval(syncTelemetryToCloud, SYNC_INTERVAL);
+  syncTelemetryToCloud().catch(() => {});
+  app.stopTelemetrySync = () => clearInterval(telemetrySyncTimer);
 
   return app;
 }

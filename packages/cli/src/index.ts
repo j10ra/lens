@@ -15,8 +15,20 @@ import { dashboardCommand } from "./commands/dashboard.js";
 import { loginCommand } from "./commands/login.js";
 import { logoutCommand } from "./commands/logout.js";
 import { error } from "./util/format.js";
+import { isTelemetryEnabled } from "./util/config.js";
 
 const program = new Command().name("lens").description("LENS — Local-first repo context engine").version("0.1.0");
+
+function trackCommand(name: string): void {
+  if (!isTelemetryEnabled()) return;
+  const BASE_URL = process.env.LENS_HOST ?? "http://127.0.0.1:4111";
+  fetch(`${BASE_URL}/telemetry/track`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event_type: "command", event_data: { command_name: name } }),
+    signal: AbortSignal.timeout(2000),
+  }).catch(() => {});
+}
 
 // lens repo register | list | remove
 const repo = program.command("repo").description("Repo management");
@@ -25,7 +37,7 @@ repo
   .description("Register current repo with the daemon")
   .option("--json", "Output as JSON", false)
   .option("--inject", "Inject LENS instructions into existing CLAUDE.md", false)
-  .action((opts) => run(() => registerCommand(opts)));
+  .action((opts) => run(() => registerCommand(opts), "repo register"));
 
 repo
   .command("list")
@@ -63,7 +75,7 @@ program
   .command("context <goal>")
   .description("Build an intelligent context pack for a goal")
   .option("--json", "Output as JSON", false)
-  .action((goal, opts) => run(() => contextCommand(goal, opts)));
+  .action((goal, opts) => run(() => contextCommand(goal, opts), "context"));
 
 // lens index
 program
@@ -72,14 +84,14 @@ program
   .option("--json", "Output as JSON", false)
   .option("--force", "Full re-scan (default: diff scan, changed files only)", false)
   .option("--status", "Show index status", false)
-  .action((opts) => run(() => indexCommand(opts)));
+  .action((opts) => run(() => indexCommand(opts), "index"));
 
 // lens status
 program
   .command("status")
   .description("Show repo index/embedding status")
   .option("--json", "Output as JSON", false)
-  .action((opts) => run(() => statusCommand(opts)));
+  .action((opts) => run(() => statusCommand(opts), "status"));
 
 // lens daemon stats
 const daemon = program.command("daemon").description("Daemon management");
@@ -131,7 +143,8 @@ cfg
 
 program.parse();
 
-async function run(fn: () => Promise<void>): Promise<void> {
+async function run(fn: () => Promise<void>, commandName?: string): Promise<void> {
+  if (commandName) trackCommand(commandName);
   try {
     await fn();
   } catch (err) {

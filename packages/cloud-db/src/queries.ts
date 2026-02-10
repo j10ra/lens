@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, sql, sum, desc } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, sql, sum, desc } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "./schema";
 import { apiKeys, subscriptions, usageDaily } from "./schema";
@@ -188,6 +188,11 @@ export const usageQueries = {
 export const adminQueries = {
   allKeys(db: Db) {
     return db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt));
+  },
+
+  deleteKeys(db: Db, ids: string[]) {
+    if (!ids.length) return;
+    return db.delete(apiKeys).where(inArray(apiKeys.id, ids));
   },
 
   allSubscriptions(db: Db) {

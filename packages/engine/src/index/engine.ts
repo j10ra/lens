@@ -9,6 +9,7 @@ import { extractAndPersistMetadata } from "./extract-metadata";
 import { buildAndPersistImportGraph } from "./import-graph";
 import { buildVocabClusters } from "./vocab-clusters";
 import { analyzeGitHistory } from "./git-analysis";
+import { track } from "../telemetry";
 
 const MAX_CHUNKS_PER_REPO = 100_000;
 
@@ -136,13 +137,21 @@ export async function runIndex(db: Db, repoId: string, caps?: Capabilities, forc
     repoQueries.updateIndexState(db, repoId, headCommit, "ready");
     onProgress?.();
 
-    return {
+    const result: IndexResult = {
       files_scanned: files.length,
       chunks_created: chunksCreated,
       chunks_unchanged: chunksUnchanged,
       chunks_deleted: chunksDeleted,
       duration_ms: Date.now() - start,
     };
+
+    track(db, "index", {
+      file_count: result.files_scanned,
+      chunk_count: result.chunks_created,
+      duration_ms: result.duration_ms,
+    });
+
+    return result;
   });
 }
 

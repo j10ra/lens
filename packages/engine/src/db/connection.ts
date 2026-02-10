@@ -163,5 +163,15 @@ function createTablesSql(): string {
     );
     CREATE INDEX IF NOT EXISTS idx_request_logs_created ON request_logs(created_at);
     CREATE INDEX IF NOT EXISTS idx_request_logs_source ON request_logs(source);
+
+    CREATE TABLE IF NOT EXISTS telemetry_events (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      event_data TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      synced_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_type ON telemetry_events(event_type);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_synced ON telemetry_events(synced_at);
   `;
 }
