@@ -899,7 +899,7 @@ export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): 
 
   // --- Telemetry Sync Timer (hourly, sync buffered events to cloud) ---
 
-  const SYNC_INTERVAL = 3_600_000;
+  const SYNC_INTERVAL = 60_000;
 
   async function syncTelemetryToCloud() {
     if (!isTelemetryEnabled()) return;

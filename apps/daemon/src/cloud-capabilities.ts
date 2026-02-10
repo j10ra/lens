@@ -1,8 +1,8 @@
 import type { Capabilities } from "@lens/engine";
-
-const CLOUD_API_URL = process.env.LENS_CLOUD_URL ?? "https://lens.dev";
+import { getCloudUrl } from "./config";
 
 export function createCloudCapabilities(apiKey: string): Capabilities {
+  const CLOUD_API_URL = getCloudUrl();
   const headers = {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",

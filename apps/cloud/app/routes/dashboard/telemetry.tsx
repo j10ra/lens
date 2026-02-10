@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@lens/ui";
 import { DataTable } from "@/components/DataTable";
@@ -37,13 +37,19 @@ function TelemetryPage() {
   const [data, setData] = useState<TelemetryStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     if (!accessToken) return;
     adminGetTelemetryStats({ data: { accessToken } })
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [accessToken]);
+
+  useEffect(() => {
+    fetchData();
+    const timer = setInterval(fetchData, 10_000);
+    return () => clearInterval(timer);
+  }, [fetchData]);
 
   const totalEvents = data?.countsByType.reduce((s, r) => s + r.count, 0) ?? 0;
 

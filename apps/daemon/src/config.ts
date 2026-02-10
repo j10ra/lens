@@ -5,6 +5,9 @@ import { randomUUID } from "node:crypto";
 
 const CONFIG_PATH = join(homedir(), ".lens", "config.json");
 
+/** Default cloud API base URL — override via LENS_CLOUD_URL env or cloud_url in ~/.lens/config.json */
+export const DEFAULT_CLOUD_URL = "https://lens.dev";
+
 function readConfig(): Record<string, unknown> {
   try {
     return JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
@@ -22,7 +25,7 @@ export function getCloudUrl(): string {
   if (process.env.LENS_CLOUD_URL) return process.env.LENS_CLOUD_URL;
   const cfg = readConfig();
   if (cfg.cloud_url) return cfg.cloud_url as string;
-  return "https://lens.dev";
+  return DEFAULT_CLOUD_URL;
 }
 
 export function ensureTelemetryId(): { telemetry_id: string; first_run: boolean } {
