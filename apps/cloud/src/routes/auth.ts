@@ -71,6 +71,39 @@ auth.get("/callback", async (c) => {
   return c.json({ ok: true, email: user.email });
 });
 
+// GET /auth/key — exchange Supabase Bearer token for an API key
+auth.get("/key", async (c) => {
+  const header = c.req.header("Authorization");
+  if (!header?.startsWith("Bearer ")) {
+    return c.json({ error: "Missing Bearer token" }, 401);
+  }
+
+  const token = header.slice(7);
+  const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_KEY);
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    return c.json({ error: "Invalid token" }, 401);
+  }
+
+  const db = getDb(c.env.DATABASE_URL);
+
+  // Revoke existing cli-auth key to prevent accumulation
+  const existing = await keyQueries.listByUser(db, user.id);
+  for (const k of existing) {
+    if (k.name === "cli-auth" && !k.revokedAt) {
+      await keyQueries.revoke(db, k.id, user.id);
+    }
+  }
+
+  // Generate new key
+  const { full, prefix } = generateApiKey();
+  const hash = await hashKey(full);
+  await keyQueries.create(db, user.id, hash, prefix, "cli-auth");
+
+  return c.json({ api_key: full });
+});
+
 // GET /auth/status — poll for login completion or validate existing key
 auth.get("/status", async (c) => {
   const codeParam = c.req.query("code");

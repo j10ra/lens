@@ -1,224 +1,82 @@
 import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useAuth } from "../dashboard";
-import { getSubscription, createCheckoutSession, getPortalUrl } from "@/lib/server-fns";
-import { Check } from "lucide-react";
+import { adminGetAllSubscriptions, adminGetUsers } from "@/lib/server-fns";
 
 export const Route = createFileRoute("/dashboard/billing")({
-  component: BillingPage,
+  component: AdminSubscriptionsPage,
 });
 
-interface Subscription {
-  plan: string | null;
-  status: string | null;
-  currentPeriodEnd: Date | null;
-  cancelAtPeriodEnd: boolean | null;
-  stripeCustomerId: string | null;
-}
-
-const PLANS = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    features: [
-      "Unlimited local context queries",
-      "TF-IDF + Import graph",
-      "MCP integration",
-      "1 API key",
-    ],
-  },
-  {
-    name: "Pro",
-    price: "$9",
-    period: "/mo",
-    features: [
-      "Everything in Free",
-      "Voyage embeddings",
-      "Purpose summaries",
-      "Vocab clusters",
-      "5 API keys",
-    ],
-  },
-];
-
-function BillingPage() {
-  const { userId } = useAuth();
-  const [sub, setSub] = useState<Subscription | null>(null);
+function AdminSubscriptionsPage() {
+  const [subs, setSubs] = useState<Array<Record<string, unknown>>>([]);
+  const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!userId) return;
-    (async () => {
-      const data = await getSubscription({ data: { userId } });
-      setSub(data);
+    Promise.all([
+      adminGetAllSubscriptions().catch(() => []),
+      adminGetUsers().catch(() => ({ users: [] })),
+    ]).then(([allSubs, users]) => {
+      setSubs(allSubs as Array<Record<string, unknown>>);
+      const map: Record<string, string> = {};
+      for (const u of users.users) map[u.id] = u.email;
+      setUserMap(map);
       setLoading(false);
-    })();
-  }, [userId]);
+    });
+  }, []);
 
-  const currentPlan = sub?.plan ?? "free";
-  const isActive = sub?.status === "active";
-  const nextBilling = sub?.currentPeriodEnd
-    ? new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : null;
+  const fmtDate = (d: unknown) =>
+    d ? new Date(d as string).toLocaleDateString("en-CA") : "—";
 
-  async function handleManageSubscription() {
-    setActionLoading("portal");
-    try {
-      const result = await getPortalUrl({ data: { userId } });
-      if (result.url) window.location.href = result.url;
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function handleUpgrade() {
-    setActionLoading("checkout");
-    try {
-      const result = await createCheckoutSession({ data: { userId } });
-      if (result.url) window.location.href = result.url;
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
+  const proCount = subs.filter((s) => s.plan === "pro" && s.status === "active").length;
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Billing</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Subscriptions</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage your subscription and payment method.
+          {subs.length} total, {proCount} active Pro.
         </p>
       </div>
 
-      {/* Current plan */}
-      <div className="rounded-xl border bg-card p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">Current Plan</p>
-            <p className="mt-1 text-xl font-bold text-card-foreground capitalize">
-              {currentPlan}{" "}
-              {currentPlan === "pro" && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  &mdash; $9/mo
-                </span>
-              )}
-            </p>
-          </div>
-          <div
-            className={`inline-flex items-center rounded-full border px-3 py-1 ${
-              isActive
-                ? "border-success/30 bg-success/10"
-                : "border-border bg-muted"
-            }`}
-          >
-            <span
-              className={`text-xs font-medium ${
-                isActive ? "text-success" : "text-muted-foreground"
-              }`}
-            >
-              {sub?.status ? sub.status.charAt(0).toUpperCase() + sub.status.slice(1) : "Active"}
-            </span>
-          </div>
-        </div>
-
-        {nextBilling && (
-          <div className="mt-4 flex items-center gap-4 border-t pt-4">
-            <p className="text-sm text-muted-foreground">
-              {sub?.cancelAtPeriodEnd ? "Access until: " : "Next billing date: "}
-              <span className="text-foreground">{nextBilling}</span>
-            </p>
-          </div>
-        )}
-
-        {currentPlan === "pro" && sub?.stripeCustomerId && (
-          <div className="mt-4 flex gap-3">
-            <button
-              onClick={handleManageSubscription}
-              disabled={actionLoading !== null}
-              className="rounded-lg bg-secondary px-4 py-2 text-sm text-secondary-foreground transition-colors hover:bg-accent disabled:opacity-50"
-            >
-              {actionLoading === "portal" ? "Loading..." : "Manage Subscription"}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Plan comparison */}
-      <div>
-        <h3 className="mb-4 text-sm font-semibold text-foreground">
-          Available Plans
-        </h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {PLANS.map((plan) => {
-            const isCurrent = plan.name.toLowerCase() === currentPlan;
-            return (
-              <div
-                key={plan.name}
-                className={`rounded-xl border p-6 ${
-                  isCurrent
-                    ? "border-primary/50 bg-card ring-1 ring-primary/20"
-                    : "border-border bg-card"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-card-foreground">{plan.name}</h4>
-                  {isCurrent && (
-                    <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                      Current
+      <div className="overflow-x-auto rounded-xl border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted">
+              <th className="px-4 py-3 text-left font-medium">User</th>
+              <th className="px-4 py-3 text-left font-medium">Plan</th>
+              <th className="px-4 py-3 text-left font-medium">Status</th>
+              <th className="px-4 py-3 text-left font-medium">Period End</th>
+              <th className="px-4 py-3 text-left font-medium">Cancel?</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
+            ) : subs.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No subscriptions found.</td></tr>
+            ) : (
+              subs.map((sub) => (
+                <tr key={sub.id as string} className="border-b border-border/50 last:border-0">
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {userMap[sub.userId as string] ?? (sub.userId as string).slice(0, 8)}
+                  </td>
+                  <td className="px-4 py-3 font-medium capitalize">{sub.plan as string}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${
+                      sub.status === "active"
+                        ? "bg-success/10 text-success"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      {(sub.status as string)?.charAt(0).toUpperCase() + (sub.status as string)?.slice(1)}
                     </span>
-                  )}
-                </div>
-                <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-card-foreground">{plan.price}</span>
-                  <span className="text-sm text-muted-foreground">{plan.period}</span>
-                </div>
-                <ul className="mt-4 space-y-2">
-                  {plan.features.map((feature) => (
-                    <li
-                      key={feature}
-                      className="flex items-center gap-2 text-sm text-muted-foreground"
-                    >
-                      <Check className="size-4 text-success" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                {!isCurrent && plan.name === "Pro" && (
-                  <button
-                    onClick={handleUpgrade}
-                    disabled={actionLoading !== null}
-                    className="mt-6 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    {actionLoading === "checkout" ? "Loading..." : "Upgrade to Pro"}
-                  </button>
-                )}
-                {!isCurrent && plan.name === "Free" && (
-                  <button
-                    onClick={handleManageSubscription}
-                    disabled={actionLoading !== null}
-                    className="mt-6 w-full rounded-lg bg-secondary py-2.5 text-sm font-medium text-secondary-foreground transition-colors hover:bg-accent disabled:opacity-50"
-                  >
-                    {actionLoading === "portal" ? "Loading..." : "Downgrade to Free"}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{fmtDate(sub.currentPeriodEnd)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{sub.cancelAtPeriodEnd ? "Yes" : "No"}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

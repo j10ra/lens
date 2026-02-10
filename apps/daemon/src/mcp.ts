@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Db } from "@lens/engine";
+import type { Db, Capabilities } from "@lens/engine";
 import { registerRepo, buildContext, listRepos, getRepoStatus, runIndex, repoQueries } from "@lens/engine";
 
 function text(s: string) {
@@ -18,7 +18,7 @@ function findOrRegisterRepo(db: Db, repoPath: string) {
   return result.repo_id;
 }
 
-export function createMcpServer(db: Db): McpServer {
+export function createMcpServer(db: Db, caps?: Capabilities): McpServer {
   const server = new McpServer({ name: "lens", version: "0.1.0" }, { capabilities: { tools: {} } });
 
   server.registerTool(
@@ -31,7 +31,7 @@ export function createMcpServer(db: Db): McpServer {
     async ({ repo_path, goal }) => {
       try {
         const repoId = findOrRegisterRepo(db, repo_path);
-        const result = await buildContext(db, repoId, goal);
+        const result = await buildContext(db, repoId, goal, caps);
         return text(result.context_pack);
       } catch (e: any) {
         return error(e.message);
@@ -82,7 +82,7 @@ export function createMcpServer(db: Db): McpServer {
     async ({ repo_path, force }) => {
       try {
         const repoId = findOrRegisterRepo(db, repo_path);
-        const result = await runIndex(db, repoId, undefined, force ?? false);
+        const result = await runIndex(db, repoId, caps, force ?? false);
         return text(JSON.stringify(result, null, 2));
       } catch (e: any) {
         return error(e.message);

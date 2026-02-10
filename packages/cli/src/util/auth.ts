@@ -10,6 +10,7 @@ export interface AuthTokens {
   refresh_token: string;
   user_email: string;
   expires_at: number;
+  api_key?: string;
 }
 
 export async function readAuth(): Promise<AuthTokens | null> {

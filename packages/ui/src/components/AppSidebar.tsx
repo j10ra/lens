@@ -7,6 +7,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -20,8 +21,14 @@ export interface NavItem {
   href: string;
 }
 
+export interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   navItems: NavItem[];
+  navGroups?: NavGroup[];
   currentPath: string;
   renderLink: (props: { href: string; className?: string; children: React.ReactNode }) => React.ReactNode;
   brand?: { title: string; subtitle: string };
@@ -31,6 +38,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({
   navItems,
+  navGroups,
   currentPath,
   renderLink,
   brand = { title: "LENS", subtitle: "Workspace" },
@@ -75,6 +83,32 @@ export function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {navGroups?.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map(({ href, icon: Icon, label }) => {
+                  const isActive = currentPath.startsWith(href);
+                  return (
+                    <SidebarMenuItem key={href}>
+                      {renderLink({
+                        href,
+                        children: (
+                          <SidebarMenuButton isActive={isActive}>
+                            <Icon />
+                            <span>{label}</span>
+                          </SidebarMenuButton>
+                        ),
+                      })}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
 
         <SidebarSeparator />
 

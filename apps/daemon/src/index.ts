@@ -1,7 +1,8 @@
-import { writeFileSync, unlinkSync } from "node:fs";
+import { writeFileSync, unlinkSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { openDb, closeDb } from "@lens/engine";
+import type { Capabilities } from "@lens/engine";
 
 const PID_FILE = join(homedir(), ".lens", "daemon.pid");
 
@@ -15,15 +16,31 @@ function removePid() {
   } catch {}
 }
 
+async function loadCapabilities(): Promise<Capabilities | undefined> {
+  try {
+    const authPath = join(homedir(), ".lens", "auth.json");
+    const data = JSON.parse(readFileSync(authPath, "utf-8"));
+    if (!data.api_key) return undefined;
+
+    const { createCloudCapabilities } = await import("./cloud-capabilities");
+    const caps = createCloudCapabilities(data.api_key);
+    console.error("[LENS] Cloud capabilities enabled");
+    return caps;
+  } catch {
+    return undefined;
+  }
+}
+
 async function main() {
   const db = openDb();
+  const caps = await loadCapabilities();
 
   if (process.argv.includes("--stdio")) {
     // MCP stdio mode — stdout reserved for JSON-RPC
     const { createMcpServer } = await import("./mcp");
     const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
 
-    const mcpServer = createMcpServer(db);
+    const mcpServer = createMcpServer(db, caps);
     const transport = new StdioServerTransport();
 
     process.on("SIGTERM", () => {
@@ -57,7 +74,7 @@ async function main() {
     ];
     const dashboardDist = candidates.find((p) => existsSync(p));
 
-    const app = createApp(db, dashboardDist);
+    const app = createApp(db, dashboardDist, caps);
 
     const server = serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, () => {
       console.error(`[LENS] HTTP server listening on 127.0.0.1:${port}`);

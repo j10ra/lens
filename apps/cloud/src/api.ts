@@ -7,6 +7,7 @@ import { keyRoutes } from "./routes/keys";
 import { usageRoutes } from "./routes/usage";
 import { proxyRoutes } from "./routes/proxy";
 import { billingRoutes } from "./routes/billing";
+import { subscriptionRoutes } from "./routes/subscription";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -29,5 +30,6 @@ app.route("/api/keys", keyRoutes);
 app.route("/api/usage", usageRoutes);
 app.route("/api/proxy", proxyRoutes);
 app.route("/api/billing", billingRoutes);
+app.route("/api/subscription", subscriptionRoutes);
 
 export default app;

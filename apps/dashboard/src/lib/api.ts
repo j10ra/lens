@@ -150,4 +150,66 @@ export const api = {
       expires_at?: number;
       expired?: boolean;
     }>("/api/auth/status"),
+
+  // Cloud proxy methods
+  cloudKeys: () =>
+    request<{
+      keys: Array<{
+        id: string;
+        keyPrefix: string;
+        name: string | null;
+        lastUsedAt: string | null;
+        expiresAt: string | null;
+        revokedAt: string | null;
+        createdAt: string | null;
+      }>;
+    }>("/api/cloud/keys"),
+
+  cloudCreateKey: (name: string) =>
+    request<{ id: string; key: string; prefix: string; name: string; createdAt: string }>(
+      "/api/cloud/keys",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      },
+    ),
+
+  cloudRevokeKey: (id: string) =>
+    request<{ ok: boolean }>(`/api/cloud/keys/${id}`, { method: "DELETE" }),
+
+  cloudUsageCurrent: () =>
+    request<{
+      plan: string;
+      periodStart: string;
+      usage: Record<string, number> | null;
+      quota: Record<string, number>;
+    }>("/api/cloud/usage/current"),
+
+  cloudUsageRange: (start: string, end: string) =>
+    request<{
+      usage: Array<{
+        date: string;
+        contextQueries: number | null;
+        embeddingRequests: number | null;
+        purposeRequests: number | null;
+      }>;
+    }>(`/api/cloud/usage?start=${start}&end=${end}`),
+
+  cloudSubscription: () =>
+    request<{
+      subscription: {
+        plan: string | null;
+        status: string | null;
+        currentPeriodEnd: string | null;
+        cancelAtPeriodEnd: boolean | null;
+        stripeCustomerId: string | null;
+      };
+    }>("/api/cloud/subscription"),
+
+  cloudCheckout: () =>
+    request<{ url: string | null }>("/api/cloud/billing/checkout", { method: "POST" }),
+
+  cloudPortal: () =>
+    request<{ url: string | null }>("/api/cloud/billing/portal"),
 };

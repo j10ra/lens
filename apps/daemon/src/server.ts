@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { existsSync, readFileSync, writeFileSync, statSync, watch } from "node:fs";
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
-import type { Db } from "@lens/engine";
+import type { Db, Capabilities } from "@lens/engine";
 import {
   registerRepo,
   getRepo,
@@ -64,7 +64,7 @@ const MIME_TYPES: Record<string, string> = {
   ".ttf": "font/ttf",
 };
 
-export function createApp(db: Db, dashboardDist?: string): Hono {
+export function createApp(db: Db, dashboardDist?: string, caps?: Capabilities): Hono {
   const app = new Hono();
 
   // Collect registered route paths for /api/dashboard/routes
@@ -113,8 +113,8 @@ export function createApp(db: Db, dashboardDist?: string): Hono {
       const result = registerRepo(db, root_path, name, remote_url);
 
       if (result.created) {
-        runIndex(db, result.repo_id)
-          .then(() => Promise.all([ensureEmbedded(db, result.repo_id), enrichPurpose(db, result.repo_id)]))
+        runIndex(db, result.repo_id, caps)
+          .then(() => Promise.all([ensureEmbedded(db, result.repo_id, caps), enrichPurpose(db, result.repo_id, caps)]))
           .catch((e) => console.error("[LENS] post-register index failed:", e));
       }
 
@@ -203,7 +203,7 @@ export function createApp(db: Db, dashboardDist?: string): Hono {
     try {
       const { repo_id, goal } = await c.req.json();
       if (!repo_id || !goal) return c.json({ error: "repo_id and goal required" }, 400);
-      const result = await buildContext(db, repo_id, goal);
+      const result = await buildContext(db, repo_id, goal, caps);
       return c.json(result);
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -217,8 +217,8 @@ export function createApp(db: Db, dashboardDist?: string): Hono {
     try {
       const { repo_id, force } = await c.req.json();
       if (!repo_id) return c.json({ error: "repo_id required" }, 400);
-      const result = await runIndex(db, repo_id, undefined, force ?? false);
-      Promise.all([ensureEmbedded(db, repo_id), enrichPurpose(db, repo_id)]).catch((e) =>
+      const result = await runIndex(db, repo_id, caps, force ?? false);
+      Promise.all([ensureEmbedded(db, repo_id, caps), enrichPurpose(db, repo_id, caps)]).catch((e) =>
         console.error("[LENS] post-index embed/enrich failed:", e),
       );
       return c.json(result);
@@ -413,6 +413,86 @@ export function createApp(db: Db, dashboardDist?: string): Hono {
       return c.json({ authenticated: false });
     }
   });
+
+  // --- Cloud Proxy ---
+
+  const CLOUD_API_URL = process.env.LENS_CLOUD_URL ?? "https://lens.dev";
+
+  function readApiKey(): string | null {
+    const authPath = join(homedir(), ".lens", "auth.json");
+    try {
+      const data = JSON.parse(readFileSync(authPath, "utf-8"));
+      return data.api_key ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function cloudProxy(method: string, path: string, body?: unknown): Promise<Response> {
+    const apiKey = readApiKey();
+    if (!apiKey) {
+      return Response.json({ error: "Not authenticated. Run: lens login" }, { status: 401 });
+    }
+    const init: RequestInit = {
+      method,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+    };
+    if (body) init.body = JSON.stringify(body);
+    const res = await fetch(`${CLOUD_API_URL}${path}`, init);
+    const data = await res.text();
+    return new Response(data, {
+      status: res.status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Keys
+  track("GET", "/api/cloud/keys");
+  app.get("/api/cloud/keys", async () => cloudProxy("GET", "/api/keys"));
+
+  track("POST", "/api/cloud/keys");
+  app.post("/api/cloud/keys", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    return cloudProxy("POST", "/api/keys", body);
+  });
+
+  track("DELETE", "/api/cloud/keys/:id");
+  app.delete("/api/cloud/keys/:id", async (c) =>
+    cloudProxy("DELETE", `/api/keys/${c.req.param("id")}`),
+  );
+
+  // Usage
+  track("GET", "/api/cloud/usage");
+  app.get("/api/cloud/usage", async (c) => {
+    const start = c.req.query("start");
+    const end = c.req.query("end");
+    return cloudProxy("GET", `/api/usage?start=${start}&end=${end}`);
+  });
+
+  track("GET", "/api/cloud/usage/current");
+  app.get("/api/cloud/usage/current", async () =>
+    cloudProxy("GET", "/api/usage/current"),
+  );
+
+  // Subscription
+  track("GET", "/api/cloud/subscription");
+  app.get("/api/cloud/subscription", async () =>
+    cloudProxy("GET", "/api/subscription"),
+  );
+
+  // Billing
+  track("POST", "/api/cloud/billing/checkout");
+  app.post("/api/cloud/billing/checkout", async () =>
+    cloudProxy("POST", "/api/billing/checkout"),
+  );
+
+  track("GET", "/api/cloud/billing/portal");
+  app.get("/api/cloud/billing/portal", async () =>
+    cloudProxy("GET", "/api/billing/portal"),
+  );
 
   // --- Dashboard API ---
 

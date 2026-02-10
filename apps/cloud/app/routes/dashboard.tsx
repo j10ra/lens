@@ -32,11 +32,21 @@ export function useAuth(): AuthContext {
   return ctx;
 }
 
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS ?? "")
+  .split(",")
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+function isAdmin(email: string): boolean {
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
 const ROUTE_TITLES: Record<string, string> = {
-  "/dashboard": "Overview",
+  "/dashboard": "Admin Overview",
+  "/dashboard/users": "Users",
   "/dashboard/keys": "API Keys",
   "/dashboard/usage": "Usage",
-  "/dashboard/billing": "Billing",
+  "/dashboard/billing": "Subscriptions",
 };
 
 function DashboardLayout() {
@@ -81,11 +91,25 @@ function DashboardLayout() {
 
   if (loading) {
     return (
-      <AuthCtx.Provider value={authValue}>
-        <div className="flex min-h-screen items-center justify-center bg-background">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
-      </AuthCtx.Provider>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!isAdmin(authValue.email)) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+        <div className="text-4xl font-bold text-destructive">403</div>
+        <p className="text-muted-foreground">Admin access only</p>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="text-sm underline text-muted-foreground hover:text-foreground"
+        >
+          Sign out
+        </button>
+      </div>
     );
   }
 
@@ -101,7 +125,7 @@ function DashboardLayout() {
             <div className="ml-auto flex items-center gap-2">
               <div className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
                 <div className="h-2 w-2 rounded-full bg-success" />
-                Cloud
+                Admin
               </div>
               <ModeToggle variant="button" />
             </div>

@@ -45,7 +45,7 @@ export {
 } from "./components/ui/sidebar";
 
 // Layout components
-export { AppSidebar, type NavItem } from "./components/AppSidebar";
+export { AppSidebar, type NavItem, type NavGroup } from "./components/AppSidebar";
 export { PageHeader } from "./components/PageHeader";
 export { NavUser } from "./components/NavUser";
 export { ModeToggle } from "./components/ModeToggle";

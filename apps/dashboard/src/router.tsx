@@ -6,6 +6,9 @@ import { Requests } from "./pages/Requests";
 import { Data } from "./pages/Data";
 import { Jobs } from "./pages/Jobs";
 import { Context } from "./pages/Context";
+import { Keys } from "./pages/Keys";
+import { Usage } from "./pages/Usage";
+import { Billing } from "./pages/Billing";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -47,6 +50,24 @@ const contextRoute = createRoute({
   component: Context,
 });
 
+const keysRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/keys",
+  component: Keys,
+});
+
+const usageRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/usage",
+  component: Usage,
+});
+
+const billingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/billing",
+  component: Billing,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reposRoute,
@@ -54,6 +75,9 @@ const routeTree = rootRoute.addChildren([
   dataRoute,
   jobsRoute,
   contextRoute,
+  keysRoute,
+  usageRoute,
+  billingRoute,
 ]);
 
 export const router = createRouter({

@@ -1,103 +1,55 @@
 import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useAuth } from "../dashboard";
-import { getUsageCurrent, getUsageRange } from "@/lib/server-fns";
+import { adminGetGlobalUsage, adminGetUsers } from "@/lib/server-fns";
 
 export const Route = createFileRoute("/dashboard/usage")({
-  component: UsagePage,
+  component: AdminUsagePage,
 });
 
-interface PeriodData {
-  periodStart: string;
-  periodEnd: string;
-  plan: string;
-  quotas: {
-    contextQueries: number;
-    embeddingRequests: number;
-    purposeRequests: number;
-  };
-  usage: {
-    contextQueries: number;
-    embeddingRequests: number;
-    purposeRequests: number;
-  };
+interface GlobalUsage {
+  totalUsers: number;
+  contextQueries: number;
+  embeddingRequests: number;
+  embeddingChunks: number;
+  purposeRequests: number;
+  reposIndexed: number;
 }
 
-interface DailyRow {
-  date: string;
-  contextQueries: number | null;
-  embeddingRequests: number | null;
-  purposeRequests: number | null;
-}
-
-function UsageBar({
-  label,
-  used,
-  limit,
-}: {
-  label: string;
-  used: number;
-  limit: number;
-}) {
-  const pct = Math.min((used / limit) * 100, 100);
-  const color =
-    pct > 90 ? "bg-destructive" : pct > 70 ? "bg-warning" : "bg-primary";
-
+function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border bg-card p-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="text-xs text-muted-foreground/70">
-          {used.toLocaleString()} / {limit.toLocaleString()}
-        </p>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-        <div
-          className={`h-full rounded-full ${color}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-card-foreground">{value}</p>
     </div>
   );
 }
 
-function fmtPeriod(start: string, end: string): string {
-  const s = new Date(start + "T00:00:00");
-  const e = new Date(end + "T00:00:00");
-  const fmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
-  return `${fmt.format(s)} \u2013 ${fmt.format(e)}`;
-}
-
-function UsagePage() {
-  const { userId } = useAuth();
-  const [period, setPeriod] = useState<PeriodData | null>(null);
-  const [daily, setDaily] = useState<DailyRow[]>([]);
+function AdminUsagePage() {
+  const [data, setData] = useState<GlobalUsage | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userId) return;
-    (async () => {
-      const p = await getUsageCurrent({ data: { userId } });
-      setPeriod(p);
+    const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .slice(0, 10);
 
-      const rows = await getUsageRange({
-        data: { userId, start: p.periodStart, end: p.periodEnd },
+    Promise.all([
+      adminGetGlobalUsage({ data: { periodStart } }).catch(() => null),
+      adminGetUsers().catch(() => ({ users: [] })),
+    ]).then(([usage, _users]) => {
+      setData({
+        totalUsers: usage?.totalUsers ?? 0,
+        contextQueries: usage?.contextQueries ?? 0,
+        embeddingRequests: usage?.embeddingRequests ?? 0,
+        embeddingChunks: usage?.embeddingChunks ?? 0,
+        purposeRequests: usage?.purposeRequests ?? 0,
+        reposIndexed: usage?.reposIndexed ?? 0,
       });
-      setDaily(
-        rows
-          .map((r: DailyRow & { date: string }) => ({
-            date: r.date,
-            contextQueries: r.contextQueries,
-            embeddingRequests: r.embeddingRequests,
-            purposeRequests: r.purposeRequests,
-          }))
-          .reverse(),
-      );
       setLoading(false);
-    })();
-  }, [userId]);
+    });
+  }, []);
 
-  if (loading || !period) {
+  if (loading || !data) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -110,86 +62,16 @@ function UsagePage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Usage</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Current billing period: {fmtPeriod(period.periodStart, period.periodEnd)}
+          Global usage for current billing period ({data.totalUsers} active user{data.totalUsers !== 1 ? "s" : ""}).
         </p>
       </div>
 
-      {/* Period totals */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <UsageBar
-          label="Context Queries"
-          used={period.usage.contextQueries}
-          limit={period.quotas.contextQueries}
-        />
-        <UsageBar
-          label="Embedding Requests"
-          used={period.usage.embeddingRequests}
-          limit={period.quotas.embeddingRequests}
-        />
-        <UsageBar
-          label="Purpose Summaries"
-          used={period.usage.purposeRequests}
-          limit={period.quotas.purposeRequests}
-        />
-      </div>
-
-      {/* Daily breakdown */}
-      <div>
-        <h3 className="mb-4 text-sm font-semibold text-foreground">
-          Daily Breakdown
-        </h3>
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted">
-                <th className="px-4 py-3 text-left font-medium text-foreground">
-                  Date
-                </th>
-                <th className="px-4 py-3 text-right font-medium text-foreground">
-                  Queries
-                </th>
-                <th className="px-4 py-3 text-right font-medium text-foreground">
-                  Embeddings
-                </th>
-                <th className="px-4 py-3 text-right font-medium text-foreground">
-                  Summaries
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {daily.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-8 text-center text-muted-foreground"
-                  >
-                    No usage data for this period.
-                  </td>
-                </tr>
-              ) : (
-                daily.map((day) => (
-                  <tr
-                    key={day.date}
-                    className="border-b border-border/50 last:border-0"
-                  >
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                      {day.date}
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-foreground">
-                      {(day.contextQueries ?? 0).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-foreground">
-                      {(day.embeddingRequests ?? 0).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-foreground">
-                      {(day.purposeRequests ?? 0).toLocaleString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <StatCard label="Context Queries" value={data.contextQueries.toLocaleString()} />
+        <StatCard label="Embedding Requests" value={data.embeddingRequests.toLocaleString()} />
+        <StatCard label="Embedding Chunks" value={data.embeddingChunks.toLocaleString()} />
+        <StatCard label="Purpose Summaries" value={data.purposeRequests.toLocaleString()} />
+        <StatCard label="Repos Indexed" value={data.reposIndexed.toLocaleString()} />
       </div>
     </div>
   );

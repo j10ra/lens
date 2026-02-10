@@ -4,9 +4,12 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
+  BarChart3,
   Cpu,
+  CreditCard,
   Database,
   FolderGit2,
+  Key,
   LayoutDashboard,
   Send,
 } from "lucide-react";
@@ -16,6 +19,7 @@ import {
   SidebarInset,
   SidebarProvider,
   type NavItem,
+  type NavGroup,
 } from "@lens/ui";
 import { api } from "@/lib/api";
 
@@ -26,6 +30,17 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/data", icon: Database, label: "Data" },
   { href: "/jobs", icon: Cpu, label: "Jobs" },
   { href: "/context", icon: Send, label: "Context" },
+];
+
+const CLOUD_GROUPS: NavGroup[] = [
+  {
+    label: "Cloud",
+    items: [
+      { href: "/keys", icon: Key, label: "API Keys" },
+      { href: "/usage", icon: BarChart3, label: "Usage" },
+      { href: "/billing", icon: CreditCard, label: "Billing" },
+    ],
+  },
 ];
 
 export function RootLayout() {
@@ -62,6 +77,7 @@ export function RootLayout() {
     <SidebarProvider className="bg-muted h-svh">
       <AppSidebar
         navItems={NAV_ITEMS}
+        navGroups={CLOUD_GROUPS}
         currentPath={currentPath}
         renderLink={({ href, children }) => (
           <Link to={href}>{children}</Link>

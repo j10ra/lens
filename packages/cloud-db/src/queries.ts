@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, sql, sum } from "drizzle-orm";
+import { and, eq, gte, lte, sql, sum, desc } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "./schema";
 import { apiKeys, subscriptions, usageDaily } from "./schema";
@@ -181,6 +181,39 @@ export const usageQueries = {
           gte(usageDaily.date, periodStart),
         ),
       )
+      .then((rows) => rows[0] ?? null);
+  },
+};
+
+export const adminQueries = {
+  allKeys(db: Db) {
+    return db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt));
+  },
+
+  allSubscriptions(db: Db) {
+    return db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
+  },
+
+  allUsage(db: Db, startDate: string, endDate: string) {
+    return db
+      .select()
+      .from(usageDaily)
+      .where(and(gte(usageDaily.date, startDate), lte(usageDaily.date, endDate)))
+      .orderBy(desc(usageDaily.date));
+  },
+
+  globalUsageSummary(db: Db, periodStart: string) {
+    return db
+      .select({
+        totalUsers: sql<number>`count(distinct ${usageDaily.userId})`,
+        contextQueries: sum(usageDaily.contextQueries).mapWith(Number),
+        embeddingRequests: sum(usageDaily.embeddingRequests).mapWith(Number),
+        embeddingChunks: sum(usageDaily.embeddingChunks).mapWith(Number),
+        purposeRequests: sum(usageDaily.purposeRequests).mapWith(Number),
+        reposIndexed: sum(usageDaily.reposIndexed).mapWith(Number),
+      })
+      .from(usageDaily)
+      .where(gte(usageDaily.date, periodStart))
       .then((rows) => rows[0] ?? null);
   },
 };

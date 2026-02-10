@@ -6,6 +6,7 @@ import { output, error } from "../util/format.js";
 const SUPABASE_URL = "https://kuvsaycpvbbmyyxiklap.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dnNheWNwdmJibXl5eGlrbGFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2MzIxNzQsImV4cCI6MjA4NjIwODE3NH0.yllrNUWVHUyFBwegoIeBkiHiIiWcsspHL9126nT2o2Q";
+const CLOUD_API_URL = process.env.LENS_CLOUD_URL ?? "https://lens.dev";
 
 interface LoginOpts {
   github?: boolean;
@@ -120,12 +121,26 @@ export async function loginCommand(opts: LoginOpts): Promise<void> {
             const { access_token, refresh_token, expires_in, user_email } = JSON.parse(body);
             const expires_at = Math.floor(Date.now() / 1000) + Number(expires_in || 3600);
 
-            await writeAuth({ access_token, refresh_token, user_email, expires_at });
+            const tokens = { access_token, refresh_token, user_email, expires_at } as import("../util/auth.js").AuthTokens;
+
+            // Fetch cloud API key (non-blocking on failure)
+            try {
+              const keyRes = await fetch(`${CLOUD_API_URL}/auth/key`, {
+                headers: { Authorization: `Bearer ${access_token}` },
+              });
+              if (keyRes.ok) {
+                const { api_key } = await keyRes.json() as { api_key: string };
+                tokens.api_key = api_key;
+              }
+            } catch {}
+
+            await writeAuth(tokens);
 
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true }));
 
             output(`Logged in as ${user_email}`, false);
+            if (tokens.api_key) output("Cloud API key provisioned", false);
             cleanup();
             resolve();
             setTimeout(() => process.exit(0), 100);
