@@ -1,10 +1,12 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect } from "react";
 import {
   createFileRoute,
   Outlet,
   useNavigate,
+  useRouterState,
 } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
+import { AuthCtx, type AuthContext } from "@/lib/auth-context";
 import type { Session } from "@supabase/supabase-js";
 import {
   SidebarProvider,
@@ -17,20 +19,6 @@ import { CloudSidebar } from "@/components/AppSidebar";
 export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
 });
-
-interface AuthContext {
-  userId: string;
-  email: string;
-  onSignOut: () => void;
-}
-
-const AuthCtx = createContext<AuthContext | null>(null);
-
-export function useAuth(): AuthContext {
-  const ctx = useContext(AuthCtx);
-  if (!ctx) return { userId: "", email: "", onSignOut: () => {} };
-  return ctx;
-}
 
 const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS ?? "")
   .split(",")
@@ -46,13 +34,15 @@ const ROUTE_TITLES: Record<string, string> = {
   "/dashboard/users": "Users",
   "/dashboard/keys": "API Keys",
   "/dashboard/usage": "Usage",
-  "/dashboard/billing": "Subscriptions",
+  "/dashboard/billing": "Billing",
 };
 
 function DashboardLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const routerState = useRouterState();
+  const pathname = routerState.location.pathname;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -81,12 +71,16 @@ function DashboardLayout() {
   }, [navigate]);
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
-    navigate({ to: "/login" });
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    window.location.href = "/login";
   }
 
   const authValue: AuthContext = session
-    ? { userId: session.user.id, email: session.user.email ?? "", onSignOut: handleSignOut }
+    ? {
+        userId: session.user.id,
+        email: session.user.email ?? "",
+        onSignOut: handleSignOut,
+      }
     : { userId: "", email: "", onSignOut: handleSignOut };
 
   if (loading) {
@@ -120,7 +114,7 @@ function DashboardLayout() {
         <SidebarInset className="bg-background rounded-xl overflow-hidden md:my-2 md:mr-2 md:border">
           <PageHeader>
             <h1 className="text-sm font-semibold">
-              {ROUTE_TITLES[location.pathname] ?? "Dashboard"}
+              {ROUTE_TITLES[pathname] ?? "Dashboard"}
             </h1>
             <div className="ml-auto flex items-center gap-2">
               <div className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-muted-foreground">

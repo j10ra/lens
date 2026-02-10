@@ -30,7 +30,11 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   navItems: NavItem[];
   navGroups?: NavGroup[];
   currentPath: string;
-  renderLink: (props: { href: string; className?: string; children: React.ReactNode }) => React.ReactNode;
+  renderLink: (props: {
+    href: string;
+    className?: string;
+    children: React.ReactNode;
+  }) => React.ReactNode;
   brand?: { title: string; subtitle: string };
   healthy?: boolean;
   footer?: React.ReactNode;
@@ -52,7 +56,11 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" className="hover:bg-transparent">
-              <Logo healthy={healthy} title={brand.title} subtitle={brand.subtitle} />
+              <Logo
+                healthy={healthy}
+                title={brand.title}
+                subtitle={brand.subtitle}
+              />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -109,8 +117,6 @@ export function AppSidebar({
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
-
-        <SidebarSeparator />
 
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>

@@ -63,12 +63,10 @@ export function Hero() {
             Get Started
           </a>
           <a
-            href="https://github.com/j10ra/lens"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/docs"
             className="rounded-lg border bg-card px-6 py-3 text-sm font-semibold text-card-foreground transition-colors hover:bg-accent"
           >
-            View on GitHub
+            View Docs
           </a>
         </div>
       </div>

@@ -1,5 +1,15 @@
 import { Check as CheckIcon } from "lucide-react";
 
+const features = [
+  { name: "Context queries", free: "Unlimited", pro: "Unlimited" },
+  { name: "TF-IDF + Import graph", free: true, pro: true },
+  { name: "MCP integration", free: true, pro: true },
+  { name: "Local repos", free: "Unlimited", pro: "Unlimited" },
+  { name: "Voyage embeddings", free: false, pro: true },
+  { name: "Purpose summaries", free: false, pro: true },
+  { name: "Vocab clusters", free: false, pro: true },
+];
+
 const tiers = [
   {
     name: "Free",
@@ -8,32 +18,23 @@ const tiers = [
     cta: "Install Free",
     ctaHref: "#how-it-works",
     highlight: false,
-    features: [
-      { name: "Context queries", value: "Unlimited", included: true },
-      { name: "TF-IDF + Import graph", value: null, included: true },
-      { name: "MCP integration", value: null, included: true },
-      { name: "Local repos", value: "Unlimited", included: true },
-      { name: "Voyage embeddings", value: null, included: false },
-      { name: "Purpose summaries", value: null, included: false },
-      { name: "Vocab clusters", value: null, included: false },
-    ],
   },
   {
     name: "Pro",
     price: "$9",
     period: "/mo",
-    cta: "Upgrade to Pro",
+    cta: "Go Monthly",
     ctaHref: "/login",
     highlight: true,
-    features: [
-      { name: "Context queries", value: "Unlimited", included: true },
-      { name: "TF-IDF + Import graph", value: null, included: true },
-      { name: "MCP integration", value: null, included: true },
-      { name: "Local repos", value: "Unlimited", included: true },
-      { name: "Voyage embeddings", value: null, included: true },
-      { name: "Purpose summaries", value: null, included: true },
-      { name: "Vocab clusters", value: null, included: true },
-    ],
+  },
+  {
+    name: "Pro Yearly",
+    price: "$90",
+    period: "/yr",
+    badge: "Save 17%",
+    cta: "Go Yearly",
+    ctaHref: "/login",
+    highlight: false,
   },
 ];
 
@@ -41,10 +42,18 @@ function Dash() {
   return <span className="text-muted-foreground/50">&mdash;</span>;
 }
 
+function FeatureValue({ value }: { value: boolean | string }) {
+  if (value === true) return <CheckIcon className="size-4 text-success" />;
+  if (value === false) return <Dash />;
+  return (
+    <span className="text-xs text-muted-foreground">{value}</span>
+  );
+}
+
 export function Pricing() {
   return (
     <section id="pricing" className="border-t border-border py-24">
-      <div className="mx-auto max-w-4xl px-6">
+      <div className="mx-auto max-w-5xl px-6">
         <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           Pricing
         </h2>
@@ -53,7 +62,7 @@ export function Pricing() {
           features.
         </p>
 
-        <div className="mt-16 grid gap-8 md:grid-cols-2">
+        <div className="mt-16 grid gap-8 md:grid-cols-3">
           {tiers.map((tier) => (
             <div
               key={tier.name}
@@ -64,7 +73,14 @@ export function Pricing() {
               }`}
             >
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-card-foreground">{tier.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-card-foreground">{tier.name}</h3>
+                  {tier.badge && (
+                    <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                      {tier.badge}
+                    </span>
+                  )}
+                </div>
                 <div className="mt-2 flex items-baseline gap-1">
                   <span className="text-4xl font-bold text-card-foreground">{tier.price}</span>
                   <span className="text-sm text-muted-foreground">{tier.period}</span>
@@ -72,25 +88,18 @@ export function Pricing() {
               </div>
 
               <ul className="mb-8 space-y-3">
-                {tier.features.map((feature) => (
-                  <li key={feature.name} className="flex items-center gap-3">
-                    {feature.included ? (
-                      <CheckIcon className="size-4 text-success" />
-                    ) : (
-                      <Dash />
-                    )}
-                    <span
-                      className={`text-sm ${feature.included ? "text-card-foreground" : "text-muted-foreground"}`}
-                    >
-                      {feature.name}
-                      {feature.value && feature.included && (
-                        <span className="ml-1 text-muted-foreground">
-                          ({feature.value})
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                ))}
+                {features.map((f) => {
+                  const value = tier.name === "Free" ? f.free : f.pro;
+                  const included = value !== false;
+                  return (
+                    <li key={f.name} className="flex items-center gap-3">
+                      <FeatureValue value={value} />
+                      <span className={`text-sm ${included ? "text-card-foreground" : "text-muted-foreground"}`}>
+                        {f.name}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
 
               <a
@@ -105,6 +114,20 @@ export function Pricing() {
               </a>
             </div>
           ))}
+        </div>
+
+        {/* Enterprise */}
+        <div className="mt-8 rounded-xl border border-border bg-card px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-card-foreground">Enterprise</h3>
+            <p className="text-sm text-muted-foreground">Custom volume, SLA, and on-prem deployment</p>
+          </div>
+          <a
+            href="mailto:sales@lens.dev"
+            className="rounded-lg border bg-secondary px-6 py-3 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-accent whitespace-nowrap"
+          >
+            Contact Sales
+          </a>
         </div>
       </div>
     </section>

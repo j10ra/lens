@@ -39,14 +39,6 @@ export function Nav() {
           >
             Docs
           </Link>
-          <a
-            href="https://github.com/j10ra/lens"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            GitHub
-          </a>
           <ThemeToggle />
           <Link
             to="/login"
