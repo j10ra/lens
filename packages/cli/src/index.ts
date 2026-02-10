@@ -10,7 +10,7 @@ import { daemonStatsCommand } from "./commands/daemon-stats.js";
 import { watchCommand, unwatchCommand, watchStatusCommand } from "./commands/watch.js";
 import { configGetCommand, configSetCommand } from "./commands/config.js";
 import { startCommand, stopCommand } from "./commands/daemon-ctrl.js";
-import { initCommand } from "./commands/init.js";
+
 import { dashboardCommand } from "./commands/dashboard.js";
 import { loginCommand } from "./commands/login.js";
 import { logoutCommand } from "./commands/logout.js";
@@ -98,12 +98,6 @@ daemon
   .command("stop")
   .description("Stop the LENS daemon")
   .action(() => run(() => stopCommand()));
-
-// lens init
-program
-  .command("init")
-  .description("Write .mcp.json for Claude Code MCP auto-discovery")
-  .action(() => run(() => initCommand()));
 
 // lens dashboard
 program

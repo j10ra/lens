@@ -2,6 +2,7 @@ import { detectRepo } from "../util/repo.js";
 import { post } from "../util/client.js";
 import { output } from "../util/format.js";
 import { injectClaudeMd } from "../util/inject-claude-md.js";
+import { injectMcp } from "../util/inject-mcp.js";
 import { showProgress } from "../util/progress.js";
 import { readConfig } from "../util/config.js";
 
@@ -25,14 +26,17 @@ export async function registerCommand(opts: { json: boolean; inject: boolean }):
     return;
   }
 
+  // Always ensure MCP config exists
+  const mcpResult = injectMcp(info.root_path);
+
   if (res.created) {
-    // Inject CLAUDE.md
     await injectClaudeMd(info.root_path);
 
     output(`Registered ${res.name} (repo_id: ${res.repo_id})`, false);
-    output(`Created CLAUDE.md with LENS instructions`, false);
+    if (mcpResult === "created" || mcpResult === "updated") {
+      output(`Wrote .mcp.json → Claude Code will auto-discover LENS`, false);
+    }
 
-    // Show progress if enabled
     const config = await readConfig();
     if (config.show_progress) {
       await showProgress(res.repo_id, res.name);
@@ -42,7 +46,10 @@ export async function registerCommand(opts: { json: boolean; inject: boolean }):
   } else {
     output(`Already registered ${res.name} (repo_id: ${res.repo_id})`, false);
 
-    // Allow manual injection with --inject flag
+    if (mcpResult === "created" || mcpResult === "updated") {
+      output(`Wrote .mcp.json → Claude Code will auto-discover LENS`, false);
+    }
+
     if (opts.inject) {
       await injectClaudeMd(info.root_path);
       output(`Injected LENS instructions into CLAUDE.md`, false);
