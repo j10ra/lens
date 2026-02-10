@@ -1,8 +1,0 @@
-{
-  "name": "@lens/types",
-  "private": true,
-  "version": "0.1.0",
-  "description": "Shared types and interfaces",
-  "type": "module",
-  "main": "./src/index.ts"
-}
