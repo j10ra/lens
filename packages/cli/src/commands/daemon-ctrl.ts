@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { spawn } from "node:child_process";
@@ -44,6 +44,7 @@ export async function startCommand(): Promise<void> {
     }
   }
 
+  mkdirSync(LENS_DIR, { recursive: true });
   const logFd = openSync(LOG_FILE, "a");
   const child = spawn(process.execPath, [daemonScript], {
     detached: true,
