@@ -20,5 +20,15 @@ tsconfig.tsbuildinfo
 .env
 .dev.vars
 
+# Generated
+routeTree.gen.ts
+.tanstack/tmp
+
+# Supabase CLI temp
+supabase/.temp
+
+# Misc
+temp.md
+
 # OS
 .DS_Store
