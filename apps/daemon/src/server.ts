@@ -566,12 +566,10 @@ export function createApp(
 
   const CLOUD_API_URL = getCloudUrl();
 
-  async function readApiKey(): Promise<string | null> {
+  async function provisionApiKey(): Promise<string | null> {
     const authPath = join(homedir(), ".lens", "auth.json");
     try {
       const data = JSON.parse(readFileSync(authPath, "utf-8"));
-      if (data.api_key) return data.api_key;
-      // Auto-provision if access_token exists but api_key missing
       if (!data.access_token) return null;
       const res = await fetch(`${CLOUD_API_URL}/auth/key`, {
         headers: { Authorization: `Bearer ${data.access_token}` },
@@ -581,6 +579,17 @@ export function createApp(
       data.api_key = api_key;
       writeFileSync(authPath, JSON.stringify(data, null, 2), { mode: 0o600 });
       return api_key;
+    } catch {
+      return null;
+    }
+  }
+
+  async function readApiKey(): Promise<string | null> {
+    const authPath = join(homedir(), ".lens", "auth.json");
+    try {
+      const data = JSON.parse(readFileSync(authPath, "utf-8"));
+      if (data.api_key) return data.api_key;
+      return provisionApiKey();
     } catch {
       return null;
     }
@@ -955,8 +964,25 @@ export function createApp(
             console.error("[LENS] Cloud capabilities recovered (Pro plan)");
           }
         }
+      } else if (res.status === 401) {
+        // Key revoked or invalid — try re-provisioning
+        const newKey = await provisionApiKey();
+        if (newKey) {
+          console.error("[LENS] API key re-provisioned after 401");
+          return refreshQuotaCache(); // Retry with new key
+        }
+        quotaCache = { plan: "free", usage: {}, quota: {}, fetchedAt: Date.now() };
+        caps = undefined;
+      } else {
+        // Other failure (5xx, etc.) — reset to free so stale Pro doesn't persist
+        quotaCache = { plan: "free", usage: {}, quota: {}, fetchedAt: Date.now() };
+        caps = undefined;
       }
-    } catch {}
+    } catch {
+      // Network error — also reset to prevent stale Pro
+      quotaCache = { plan: "free", usage: {}, quota: {}, fetchedAt: Date.now() };
+      caps = undefined;
+    }
   }
 
   const quotaTimer = setInterval(refreshQuotaCache, QUOTA_TTL);
