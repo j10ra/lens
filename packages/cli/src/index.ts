@@ -8,6 +8,7 @@ import { listCommand } from "./commands/list.js";
 import { removeCommand } from "./commands/remove.js";
 import { daemonStatsCommand } from "./commands/daemon-stats.js";
 import { watchCommand, unwatchCommand, watchStatusCommand } from "./commands/watch.js";
+import { mcpCommand } from "./commands/mcp.js";
 import { configGetCommand, configSetCommand } from "./commands/config.js";
 import { startCommand, stopCommand } from "./commands/daemon-ctrl.js";
 
@@ -69,6 +70,11 @@ repo
   .description("Show file watcher status for current repo")
   .option("--json", "Output as JSON", false)
   .action((opts) => run(() => watchStatusCommand(opts)));
+
+repo
+  .command("mcp")
+  .description("Write .mcp.json for MCP agent integration")
+  .action(() => run(() => mcpCommand()));
 
 // lens context "<goal>" — primary command
 program

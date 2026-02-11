@@ -30,7 +30,7 @@ const features: { title: string; description: string; icon: LucideIcon }[] = [
   {
     title: "MCP Native",
     description:
-      "Drop a .mcp.json in your repo. Claude Code, Cursor, and any MCP-compatible agent auto-discover LENS. Zero configuration.",
+      "Run `lens repo register` — it writes .mcp.json automatically. Claude Code, Cursor, and any MCP-compatible agent auto-discovers LENS and calls it when needed. Zero friction.",
     icon: Link2,
   },
   {
@@ -63,13 +63,16 @@ export function Features() {
           {features.map((feature) => (
             <div
               key={feature.title}
-              className="group rounded-xl border bg-card p-6 transition-colors hover:border-primary/30"
+              className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card/70 p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_14px_30px_-24px_rgba(37,99,235,0.45)]"
             >
-              <div className="mb-4 inline-flex rounded-lg bg-primary/10 p-2.5 text-primary">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/55 to-transparent opacity-80" />
+              <div className="mb-5 inline-flex rounded-xl border border-primary/15 bg-primary/10 p-2.5 text-primary">
                 <feature.icon className="size-6" />
               </div>
-              <h3 className="mb-2 font-semibold text-card-foreground">{feature.title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <h3 className="mb-2 text-lg font-semibold tracking-tight text-card-foreground">
+                {feature.title}
+              </h3>
+              <p className="text-[15px] leading-7 text-muted-foreground">
                 {feature.description}
               </p>
             </div>

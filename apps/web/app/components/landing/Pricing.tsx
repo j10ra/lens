@@ -12,7 +12,7 @@ const features = [
   { name: "Co-change analysis", free: true, pro: true, section: "core" },
   { name: "MCP integration", free: true, pro: true, section: "core" },
 
-  { name: "Voyage embeddings", free: false, pro: true, section: "pro" },
+  { name: "Semantic embeddings", free: false, pro: true, section: "pro" },
   { name: "Purpose summaries", free: false, pro: true, section: "pro" },
   { name: "Vocab clusters", free: false, pro: true, section: "pro" },
 ];
@@ -24,6 +24,8 @@ const tiers = [
     name: "Free",
     price: "$0",
     period: "forever",
+    summary: "Core local retrieval and MCP workflows.",
+    accent: "from-muted-foreground/50 via-muted-foreground/10 to-transparent",
     cta: "Get Started",
     ctaHref: "/docs",
     highlight: false,
@@ -32,6 +34,8 @@ const tiers = [
     name: "Pro",
     price: "$9",
     period: "/mo",
+    summary: "Semantic ranking for higher retrieval accuracy.",
+    accent: "from-primary/70 via-primary/20 to-transparent",
     cta: "Subscribe",
     ctaHref: cloudApi
       ? `${cloudApi}/api/billing/subscribe?interval=monthly`
@@ -42,6 +46,8 @@ const tiers = [
     name: "Pro Yearly",
     price: "$90",
     period: "/yr",
+    summary: "Same Pro capabilities with annual savings.",
+    accent: "from-success/70 via-success/20 to-transparent",
     badge: "Save 17%",
     cta: "Subscribe",
     ctaHref: cloudApi
@@ -52,13 +58,29 @@ const tiers = [
 ];
 
 function Dash() {
-  return <span className="text-muted-foreground/50">&mdash;</span>;
+  return <span className="text-muted-foreground/50">-</span>;
 }
 
 function FeatureValue({ value }: { value: boolean | string }) {
-  if (value === true) return <CheckIcon className="size-4 text-success" />;
+  if (value === true)
+    return (
+      <span className="inline-flex size-4 items-center justify-center rounded-full bg-success/12 text-success">
+        <CheckIcon className="size-3" />
+      </span>
+    );
   if (value === false) return <Dash />;
-  return <span className="text-xs text-muted-foreground">{value}</span>;
+  return (
+    <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground">
+      {value}
+    </span>
+  );
+}
+
+function getTierValue(
+  tierName: string,
+  feature: (typeof features)[number],
+): boolean | string {
+  return tierName === "Free" ? feature.free : feature.pro;
 }
 
 export function Pricing() {
@@ -67,7 +89,7 @@ export function Pricing() {
 
   return (
     <section id="pricing" className="border-t border-border py-24">
-      <div className="mx-auto max-w-5xl px-6">
+      <div className="mx-auto max-w-6xl px-6">
         <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           Pricing
         </h2>
@@ -75,17 +97,21 @@ export function Pricing() {
           Free forever for local-only workflows. Upgrade for semantic search
           that makes your AI agent significantly more accurate.
         </p>
+        <p className="mx-auto mt-3 max-w-xl text-center text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          All plans include local indexing, import graph, and MCP integration
+        </p>
 
-        <div className="mt-16 grid gap-8 md:grid-cols-3">
+        <div className="mt-14 grid gap-6 md:grid-cols-3">
           {tiers.map((tier) => (
-            <div
+            <article
               key={tier.name}
-              className={`rounded-xl border p-8 ${
+              className={`relative overflow-hidden rounded-2xl border p-7 ${
                 tier.highlight
-                  ? "border-primary/50 bg-card ring-1 ring-primary/20"
-                  : "border-border bg-card"
+                  ? "border-primary/50 bg-card/90 ring-1 ring-primary/20"
+                  : "border-border/80 bg-card/70"
               }`}
             >
+              <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r ${tier.accent}`} />
               <div className="mb-6">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-semibold text-card-foreground">
@@ -105,39 +131,54 @@ export function Pricing() {
                     {tier.period}
                   </span>
                 </div>
+                <p className="mt-2 text-sm text-muted-foreground">{tier.summary}</p>
               </div>
 
-              <ul className="mb-8 space-y-3">
-                {coreFeatures.map((f) => {
-                  const value = tier.name === "Free" ? f.free : f.pro;
-                  const included = value !== false;
-                  return (
-                    <li key={f.name} className="flex items-center gap-3">
-                      <FeatureValue value={value} />
-                      <span
-                        className={`text-sm ${included ? "text-card-foreground" : "text-muted-foreground"}`}
-                      >
-                        {f.name}
-                      </span>
-                    </li>
-                  );
-                })}
+              <div className="mb-8 space-y-5">
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Core
+                  </p>
+                  <ul className="space-y-2.5">
+                    {coreFeatures.map((f) => {
+                      const value = getTierValue(tier.name, f);
+                      const included = value !== false;
+                      return (
+                        <li key={f.name} className="flex items-center gap-3">
+                          <FeatureValue value={value} />
+                          <span
+                            className={`text-sm ${included ? "text-card-foreground" : "text-muted-foreground"}`}
+                          >
+                            {f.name}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
 
-                {proFeatures.map((f) => {
-                  const value = tier.name === "Free" ? f.free : f.pro;
-                  const included = value !== false;
-                  return (
-                    <li key={f.name} className="flex items-center gap-3">
-                      <FeatureValue value={value} />
-                      <span
-                        className={`text-sm ${included ? "text-card-foreground" : "text-muted-foreground"}`}
-                      >
-                        {f.name}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Pro Add-ons
+                  </p>
+                  <ul className="space-y-2.5">
+                    {proFeatures.map((f) => {
+                      const value = getTierValue(tier.name, f);
+                      const included = value !== false;
+                      return (
+                        <li key={f.name} className="flex items-center gap-3">
+                          <FeatureValue value={value} />
+                          <span
+                            className={`text-sm ${included ? "text-card-foreground" : "text-muted-foreground"}`}
+                          >
+                            {f.name}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
 
               <a
                 href={tier.ctaHref}
@@ -149,12 +190,11 @@ export function Pricing() {
               >
                 {tier.cta}
               </a>
-            </div>
+            </article>
           ))}
         </div>
 
-        {/* Enterprise */}
-        <div className="mt-8 rounded-xl border border-border bg-card px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="mt-8 flex flex-col items-center justify-between gap-4 rounded-2xl border border-border/70 bg-card/60 px-8 py-6 sm:flex-row">
           <div>
             <h3 className="text-lg font-semibold text-card-foreground">
               Enterprise
@@ -164,7 +204,7 @@ export function Pricing() {
             </p>
           </div>
           <a
-            href="mailto:hi@lens-engine.dev"
+            href="mailto:hi@lens-engine.com"
             className="rounded-lg border bg-secondary px-6 py-3 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-accent whitespace-nowrap"
           >
             Contact Sales

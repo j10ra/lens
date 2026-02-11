@@ -34,6 +34,68 @@ Context pack: 12 files, 3.2KB
   },
 ];
 
+type Token = { text: string; cls?: string };
+
+const CODE = {
+  prompt: "text-muted-foreground/60",
+  cmd: "text-primary",
+  flag: "text-success",
+  output: "text-foreground/80",
+  info: "text-muted-foreground",
+  path: "text-primary/85",
+  dim: "text-muted-foreground/70",
+} as const;
+
+function highlightLine(line: string): Token[] {
+  if (!line) return [{ text: " " }];
+
+  if (line.startsWith("$ ")) {
+    const tokens: Token[] = [{ text: "$ ", cls: CODE.prompt }];
+    const rest = line.slice(2);
+    const parts = rest.split(/(\s+)/);
+    let seenCmd = false;
+
+    for (const part of parts) {
+      if (/^\s+$/.test(part)) {
+        tokens.push({ text: part });
+      } else if (!seenCmd) {
+        tokens.push({ text: part, cls: CODE.cmd });
+        seenCmd = true;
+      } else if (part.startsWith("-")) {
+        tokens.push({ text: part, cls: CODE.flag });
+      } else {
+        tokens.push({ text: part });
+      }
+    }
+
+    return tokens;
+  }
+
+  const trimmed = line.trimStart();
+  if (trimmed.startsWith("src/")) return [{ text: line, cls: CODE.path }];
+  if (trimmed === "...") return [{ text: line, cls: CODE.dim }];
+  if (trimmed.includes("done")) return [{ text: line, cls: CODE.output }];
+
+  return [{ text: line, cls: CODE.info }];
+}
+
+function renderCode(code: string) {
+  return code.split("\n").map((line, i) => {
+    const tokens = highlightLine(line);
+    const commandGap = i > 0 && line.startsWith("$ ") ? "mt-2.5" : "";
+
+    return (
+      <div key={`${i}-${line}`} className={commandGap}>
+        {tokens.map((token, j) => (
+          <span key={`${j}-${token.text}`} className={token.cls}>
+            {token.text}
+          </span>
+        ))}
+      </div>
+    );
+  });
+}
+
 export function HowItWorks() {
   return (
     <section id="how-it-works" className="border-t border-border py-24">
@@ -56,9 +118,10 @@ export function HowItWorks() {
               </div>
               <h3 className="mb-2 text-lg font-semibold text-card-foreground">{step.title}</h3>
               <p className="mb-4 text-sm text-muted-foreground">{step.description}</p>
-              <div className="overflow-hidden rounded-lg bg-background p-4">
-                <pre className="overflow-x-auto font-mono text-xs leading-relaxed text-foreground/80">
-                  {step.code}
+              <div className="overflow-hidden rounded-lg border border-border/60 bg-background/70">
+                <div className="h-1 bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
+                <pre className="overflow-x-auto px-4 py-3 font-mono text-xs leading-relaxed">
+                  {renderCode(step.code)}
                 </pre>
               </div>
             </div>

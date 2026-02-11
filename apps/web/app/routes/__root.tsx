@@ -7,6 +7,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import globalCss from "@/global.css?url";
+import faviconSvg from "@/assets/favicon.svg?url";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -22,6 +23,7 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "stylesheet", href: globalCss },
+      { rel: "icon", type: "image/svg+xml", href: faviconSvg },
       {
         rel: "preconnect",
         href: "https://fonts.googleapis.com",

@@ -39,6 +39,20 @@ export function Nav() {
           >
             Docs
           </Link>
+          <Link
+            to="/dashboard"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Dashboard
+          </Link>
+          <a
+            href="https://www.npmjs.com/package/lens-engine"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full border border-border/70 bg-muted/45 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+          >
+            npm
+          </a>
           <ThemeToggle />
           <Link
             to="/docs"

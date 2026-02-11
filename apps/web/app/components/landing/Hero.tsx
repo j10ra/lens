@@ -1,83 +1,118 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Copy, Check } from "lucide-react";
 
-const BASE_NODES = [
-  // Row 1 (y ~5–20)
-  { x: 5, y: 8 },  { x: 20, y: 14 }, { x: 35, y: 6 },  { x: 52, y: 18 },
-  { x: 68, y: 10 }, { x: 84, y: 16 }, { x: 95, y: 5 },
-  // Row 2 (y ~25–40)
-  { x: 10, y: 30 }, { x: 28, y: 36 }, { x: 44, y: 28 }, { x: 60, y: 38 },
-  { x: 76, y: 32 }, { x: 92, y: 38 },
-  // Row 3 (y ~42–58)
-  { x: 4, y: 48 },  { x: 18, y: 54 }, { x: 36, y: 46 }, { x: 52, y: 56 },
-  { x: 68, y: 44 }, { x: 84, y: 52 }, { x: 96, y: 48 },
-  // Row 4 (y ~62–78)
-  { x: 8, y: 66 },  { x: 24, y: 72 }, { x: 40, y: 64 }, { x: 56, y: 74 },
-  { x: 72, y: 68 }, { x: 88, y: 76 },
-  // Row 5 (y ~82–96)
-  { x: 12, y: 86 }, { x: 30, y: 92 }, { x: 50, y: 84 }, { x: 70, y: 90 },
-];
+type Vertex4 = { x: number; y: number; z: number; w: number };
+type Edge4 = { a: number; b: number; dim: number };
+type ProjectedPoint = { x: number; y: number; z: number; w: number; depth: number };
 
-const EDGES: [number, number][] = [
-  // Row chains
-  [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6],
-  [7, 8], [8, 9], [9, 10], [10, 11], [11, 12],
-  [13, 14], [14, 15], [15, 16], [16, 17], [17, 18], [18, 19],
-  [20, 21], [21, 22], [22, 23], [23, 24], [24, 25],
-  [26, 27], [27, 28], [28, 29],
-  // Vertical connections
-  [0, 7], [1, 8], [3, 10], [5, 12],
-  [7, 13], [8, 14], [9, 15], [11, 17], [12, 19],
-  [13, 20], [14, 21], [16, 23], [17, 24], [19, 25],
-  [20, 26], [22, 27], [23, 28], [25, 29],
-  // Diagonals
-  [2, 9], [4, 11], [10, 16], [15, 22], [18, 25], [24, 29],
-];
-
-// Each node gets a unique phase offset + speed for organic drift
-const DRIFT = BASE_NODES.map((_, i) => ({
-  phaseX: (i * 2.39) % (Math.PI * 2), // golden-angle spacing
-  phaseY: (i * 1.73) % (Math.PI * 2),
-  speedX: 0.35 + (i % 5) * 0.08,      // 0.35–0.67 rad/s
-  speedY: 0.28 + (i % 7) * 0.06,      // 0.28–0.64 rad/s
-  ampX: 0.8 + (i % 3) * 0.4,          // 0.8–1.6 units
-  ampY: 0.6 + (i % 4) * 0.3,          // 0.6–1.5 units
+const TESSERACT_VERTICES: Vertex4[] = Array.from({ length: 16 }, (_, i) => ({
+  x: i & 1 ? 1 : -1,
+  y: i & 2 ? 1 : -1,
+  z: i & 4 ? 1 : -1,
+  w: i & 8 ? 1 : -1,
 }));
+
+const TESSERACT_EDGES: Edge4[] = [];
+for (let i = 0; i < 16; i++) {
+  for (let dim = 0; dim < 4; dim++) {
+    const j = i ^ (1 << dim);
+    if (i < j) TESSERACT_EDGES.push({ a: i, b: j, dim });
+  }
+}
+
+const ANIMATION_SPEED = 0.22;
+const VIEWBOX_CENTER = 50;
+const GRAPH_SCALE = 17.5;
+const FOUR_D_DISTANCE = 3.5;
+const THREE_D_DISTANCE = 4.1;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function rotate2D(a: number, b: number, angle: number): [number, number] {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [a * c - b * s, a * s + b * c];
+}
+
+function projectTesseract(sec: number): ProjectedPoint[] {
+  return TESSERACT_VERTICES.map((v, i) => {
+    let x = v.x;
+    let y = v.y;
+    let z = v.z;
+    let w = v.w;
+
+    // Multi-plane 4D rotation to emulate a tesseract turning through hyperspace.
+    [x, y] = rotate2D(x, y, sec * 0.51 + i * 0.02);
+    [z, w] = rotate2D(z, w, sec * 0.47 - i * 0.01);
+    [x, w] = rotate2D(x, w, sec * 0.33);
+    [y, z] = rotate2D(y, z, sec * 0.29);
+    [x, z] = rotate2D(x, z, sec * 0.24);
+    [y, w] = rotate2D(y, w, sec * 0.21);
+
+    const wPerspective = FOUR_D_DISTANCE / (FOUR_D_DISTANCE - w);
+    const x3 = x * wPerspective;
+    const y3 = y * wPerspective;
+    const z3 = z * wPerspective;
+
+    const zPerspective = THREE_D_DISTANCE / (THREE_D_DISTANCE - z3);
+    const sx = VIEWBOX_CENTER + x3 * zPerspective * GRAPH_SCALE;
+    const sy = VIEWBOX_CENTER + y3 * zPerspective * GRAPH_SCALE;
+    const depth = clamp((z3 + 2.2) / 4.4, 0, 1);
+
+    return { x: sx, y: sy, z: z3, w, depth };
+  });
+}
 
 function NetworkGraph() {
   const svgRef = useRef<SVGSVGElement>(null);
   const frameRef = useRef(0);
+  const initialPoints = projectTesseract(0);
 
   const animate = useCallback((t: number) => {
     const svg = svgRef.current;
     if (!svg) return;
 
-    const sec = t / 1000;
-    const lines = svg.querySelectorAll("line");
-    const circles = svg.querySelectorAll("circle");
+    const sec = (t / 1000) * ANIMATION_SPEED;
+    const lines = svg.querySelectorAll<SVGLineElement>("line");
+    const circles = svg.querySelectorAll<SVGCircleElement>("circle");
+    const projected = projectTesseract(sec);
 
-    for (let i = 0; i < BASE_NODES.length; i++) {
-      const d = DRIFT[i];
-      const nx = BASE_NODES[i].x + Math.sin(sec * d.speedX + d.phaseX) * d.ampX;
-      const ny = BASE_NODES[i].y + Math.cos(sec * d.speedY + d.phaseY) * d.ampY;
-      circles[i]?.setAttribute("cx", String(nx));
-      circles[i]?.setAttribute("cy", String(ny));
+    for (let i = 0; i < projected.length; i++) {
+      const node = projected[i];
+      const circle = circles[i];
+      if (!circle) continue;
+
+      circle.setAttribute("cx", String(node.x));
+      circle.setAttribute("cy", String(node.y));
+      circle.setAttribute("r", String(0.14 + node.depth * 0.34));
+      circle.setAttribute(
+        "opacity",
+        String(clamp(0.26 + node.depth * 0.56 + Math.abs(node.w) * 0.08, 0.18, 0.95)),
+      );
     }
 
-    for (let i = 0; i < EDGES.length; i++) {
-      const [a, b] = EDGES[i];
-      const da = DRIFT[a];
-      const db = DRIFT[b];
-      const ax = BASE_NODES[a].x + Math.sin(sec * da.speedX + da.phaseX) * da.ampX;
-      const ay = BASE_NODES[a].y + Math.cos(sec * da.speedY + da.phaseY) * da.ampY;
-      const bx = BASE_NODES[b].x + Math.sin(sec * db.speedX + db.phaseX) * db.ampX;
-      const by = BASE_NODES[b].y + Math.cos(sec * db.speedY + db.phaseY) * db.ampY;
+    for (let i = 0; i < TESSERACT_EDGES.length; i++) {
+      const edge = TESSERACT_EDGES[i];
+      const aNode = projected[edge.a];
+      const bNode = projected[edge.b];
       const line = lines[i];
       if (line) {
-        line.setAttribute("x1", String(ax));
-        line.setAttribute("y1", String(ay));
-        line.setAttribute("x2", String(bx));
-        line.setAttribute("y2", String(by));
+        const depth = (aNode.depth + bNode.depth) / 2;
+        const hyper = (Math.abs(aNode.w) + Math.abs(bNode.w)) / 2;
+        const bridgeBoost = edge.dim === 3 ? 1.34 : 1;
+
+        line.setAttribute("x1", String(aNode.x));
+        line.setAttribute("y1", String(aNode.y));
+        line.setAttribute("x2", String(bNode.x));
+        line.setAttribute("y2", String(bNode.y));
+        line.setAttribute("stroke", edge.dim === 3 ? "var(--color-primary)" : "currentColor");
+        line.setAttribute("stroke-width", String((0.045 + depth * 0.13) * bridgeBoost));
+        line.setAttribute(
+          "opacity",
+          String(clamp(0.08 + depth * 0.3 + hyper * 0.07, 0.08, 0.72)),
+        );
       }
     }
 
@@ -92,28 +127,28 @@ function NetworkGraph() {
   return (
     <svg
       ref={svgRef}
-      className="absolute inset-0 h-full w-full opacity-[0.07]"
+      className="absolute inset-0 h-full w-full opacity-[0.2]"
       viewBox="0 0 100 100"
       preserveAspectRatio="xMidYMid slice"
       aria-hidden
     >
-      {EDGES.map(([a, b], i) => (
+      {TESSERACT_EDGES.map((edge, i) => (
         <line
           key={i}
-          x1={BASE_NODES[a].x}
-          y1={BASE_NODES[a].y}
-          x2={BASE_NODES[b].x}
-          y2={BASE_NODES[b].y}
+          x1={initialPoints[edge.a].x}
+          y1={initialPoints[edge.a].y}
+          x2={initialPoints[edge.b].x}
+          y2={initialPoints[edge.b].y}
           stroke="currentColor"
-          strokeWidth="0.15"
+          strokeWidth="0.12"
         />
       ))}
-      {BASE_NODES.map((n, i) => (
+      {initialPoints.map((p, i) => (
         <circle
           key={i}
-          cx={n.x}
-          cy={n.y}
-          r="0.4"
+          cx={p.x}
+          cy={p.y}
+          r="0.28"
           fill="currentColor"
         />
       ))}
@@ -149,10 +184,10 @@ export function Hero() {
           <span className="text-primary">Query with intent.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-          Give your AI agent the context it actually needs.
-          LENS maps your repo — TF-IDF scoring, import graph traversal,
-          co-change analysis — and delivers ranked files in one call.
-          Fewer tokens wasted, smarter output.
+          Give your AI agent the context it actually needs. LENS maps your repo
+          — <span className="whitespace-nowrap">TF-IDF</span> scoring, import
+          graph traversal, co-change analysis — and delivers ranked files in
+          one call. Fewer tokens wasted, smarter output.
         </p>
 
         {/* terminal box */}

@@ -126,10 +126,10 @@ function PrivacyPage() {
           <p>
             For privacy-related questions or data requests, contact us at{" "}
             <a
-              href="mailto:hi@lens-engine.dev"
+              href="mailto:hi@lens-engine.com"
               className="text-primary hover:text-primary/80"
             >
-              hi@lens-engine.dev
+              hi@lens-engine.com
             </a>
             .
           </p>
