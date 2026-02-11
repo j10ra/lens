@@ -1,6 +1,24 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 
+// Static network graph nodes + edges for hero background
+const nodes = [
+  { x: 10, y: 15 }, { x: 25, y: 8 }, { x: 40, y: 22 }, { x: 55, y: 12 },
+  { x: 70, y: 25 }, { x: 85, y: 10 }, { x: 15, y: 40 }, { x: 35, y: 45 },
+  { x: 50, y: 38 }, { x: 65, y: 48 }, { x: 80, y: 42 }, { x: 92, y: 35 },
+  { x: 8, y: 65 }, { x: 22, y: 72 }, { x: 45, y: 60 }, { x: 60, y: 70 },
+  { x: 78, y: 62 }, { x: 90, y: 75 }, { x: 30, y: 85 }, { x: 50, y: 82 },
+  { x: 72, y: 88 }, { x: 18, y: 55 }, { x: 48, y: 50 }, { x: 88, y: 55 },
+];
+
+const edges = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [0, 6], [6, 7], [7, 8],
+  [8, 9], [9, 10], [10, 11], [6, 12], [12, 13], [13, 14], [14, 15],
+  [15, 16], [16, 17], [18, 19], [19, 20], [2, 8], [8, 14], [4, 10],
+  [10, 16], [1, 3], [7, 14], [9, 15], [21, 6], [21, 12], [22, 8],
+  [22, 14], [23, 11], [23, 17], [13, 18], [15, 19], [16, 20],
+];
+
 export function Hero() {
   const [copied, setCopied] = useState(false);
   const installCmd = "npm install -g lens-engine";
@@ -13,7 +31,41 @@ export function Hero() {
 
   return (
     <section className="relative overflow-hidden py-32">
+      {/* Radial gradient base */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
+
+      {/* Network graph background */}
+      <svg
+        className="absolute inset-0 h-full w-full opacity-[0.07]"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="xMidYMid slice"
+        aria-hidden
+      >
+        {edges.map(([a, b], i) => (
+          <line
+            key={i}
+            x1={nodes[a].x}
+            y1={nodes[a].y}
+            x2={nodes[b].x}
+            y2={nodes[b].y}
+            stroke="currentColor"
+            strokeWidth="0.15"
+          />
+        ))}
+        {nodes.map((n, i) => (
+          <circle
+            key={i}
+            cx={n.x}
+            cy={n.y}
+            r="0.4"
+            fill="currentColor"
+          />
+        ))}
+      </svg>
+
+      {/* Fade edges */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_30%,_var(--color-background)_75%)]" />
+
       <div className="relative mx-auto max-w-4xl px-6 text-center">
         <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
           Index your codebase.
