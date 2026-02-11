@@ -1,12 +1,15 @@
-import { writeFileSync, unlinkSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { writeFileSync, unlinkSync, readFileSync, statSync, watchFile, openSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { homedir } from "node:os";
+import { spawn } from "node:child_process";
 import { openDb, closeDb } from "@lens/engine";
 import type { Capabilities } from "@lens/engine";
 
 import { getCloudUrl } from "./config";
 
-const PID_FILE = join(homedir(), ".lens", "daemon.pid");
+const LENS_DIR = join(homedir(), ".lens");
+const PID_FILE = join(LENS_DIR, "daemon.pid");
+const LOG_FILE = join(LENS_DIR, "daemon.log");
 
 function writePid() {
   writeFileSync(PID_FILE, String(process.pid));
@@ -152,6 +155,32 @@ async function main() {
 
     process.on("SIGTERM", shutdown);
     process.on("SIGINT", shutdown);
+
+    // --- Auto-restart on package update ---
+    const scriptPath = process.argv[1];
+    if (scriptPath) {
+      try {
+        const startMtime = statSync(scriptPath).mtimeMs;
+        watchFile(scriptPath, { interval: 30_000 }, (curr) => {
+          if (curr.mtimeMs !== startMtime) {
+            console.error("[LENS] Binary updated, restarting...");
+            app.stopTelemetrySync?.();
+            server.close();
+            closeDb();
+            removePid();
+            // Re-spawn daemon with same entry point
+            const logFd = openSync(LOG_FILE, "a");
+            const child = spawn(process.execPath, [scriptPath], {
+              detached: true,
+              stdio: ["ignore", logFd, logFd],
+              env: { ...process.env, LENS_DAEMON: "1" },
+            });
+            child.unref();
+            process.exit(0);
+          }
+        });
+      } catch {}
+    }
   }
 }
 
