@@ -99,7 +99,7 @@ export function Usage() {
   });
 
   const plan = local?.plan ?? "free";
-  const isPro = plan === "pro" || local?.has_capabilities === true;
+  const isPro = plan === "pro";
   const quota = local?.quota;
   const today = local?.today;
 

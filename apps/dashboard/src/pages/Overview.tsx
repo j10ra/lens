@@ -37,7 +37,7 @@ export function Overview() {
     queryFn: api.localUsage,
     refetchInterval: 30_000,
   });
-  const isPro = (usage?.plan ?? "free") === "pro" || usage?.has_capabilities === true;
+  const isPro = (usage?.plan ?? "free") === "pro";
 
   if (!stats && isLoading) return <Loading />;
 

@@ -951,6 +951,11 @@ export function createApp(
           quota: data.quota ?? {},
           fetchedAt: Date.now(),
         };
+        // Clear capabilities on downgrade
+        if (caps && data.plan !== "pro") {
+          caps = undefined;
+          console.error("[LENS] Cloud capabilities disabled (plan changed to free)");
+        }
         // Lazy capability recovery — if caps failed at startup but plan is Pro now
         if (!caps && data.plan === "pro") {
           const apiKey = await readApiKey();
