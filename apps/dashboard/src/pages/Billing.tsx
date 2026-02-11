@@ -1,7 +1,7 @@
 import { PageHeader } from "@lens/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Mail } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CloudAuthGuard } from "@/components/CloudAuthGuard";
 import { api } from "@/lib/api";
 
@@ -16,6 +16,20 @@ const PRO_FEATURES = [
 
 function BillingContent() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // After Stripe checkout redirect, force daemon to refresh plan cache
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      api.refreshPlan().then(() => {
+        queryClient.invalidateQueries({ queryKey: ["cloud-subscription"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard-usage"] });
+      }).catch(() => {});
+      // Clean URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [queryClient]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["cloud-subscription"],

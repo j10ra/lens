@@ -200,4 +200,10 @@ export const api = {
 
   cloudPortal: () =>
     request<{ url: string | null }>(`/api/cloud/billing/portal?return_url=${encodeURIComponent(window.location.href)}`),
+
+  refreshPlan: () =>
+    request<{ plan: string; has_capabilities: boolean; refreshed_at: number | null }>(
+      "/api/dashboard/refresh-plan",
+      { method: "POST" },
+    ),
 };

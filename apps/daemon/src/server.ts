@@ -515,6 +515,8 @@ export function createApp(
         try { ctrl.enqueue(new TextEncoder().encode("data: auth-changed\n\n")); }
         catch { authClients.delete(ctrl); }
       }
+      // Auto-refresh plan status when auth changes (login/logout/key provision)
+      refreshQuotaCache().catch(() => {});
     });
   } catch {}
 
@@ -872,6 +874,20 @@ export function createApp(
         plan: quotaCache?.plan ?? null,
         quota: quotaCache?.quota ?? null,
         has_capabilities: !!caps,
+      });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  trackRoute("POST", "/api/dashboard/refresh-plan");
+  app.post("/api/dashboard/refresh-plan", async (c) => {
+    try {
+      await refreshQuotaCache();
+      return c.json({
+        plan: quotaCache?.plan ?? "free",
+        has_capabilities: !!caps,
+        refreshed_at: quotaCache?.fetchedAt ?? null,
       });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);

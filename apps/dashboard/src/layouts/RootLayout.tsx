@@ -63,7 +63,16 @@ export function RootLayout() {
 
   useEffect(() => {
     const es = new EventSource("/api/auth/events");
-    es.onmessage = () => qc.invalidateQueries({ queryKey: ["auth-status"] });
+    es.onmessage = () => {
+      qc.invalidateQueries({ queryKey: ["auth-status"] });
+      // Auth changed (login/logout) — refresh daemon's plan cache then re-fetch usage
+      api.refreshPlan()
+        .then(() => {
+          qc.invalidateQueries({ queryKey: ["dashboard-usage"] });
+          qc.invalidateQueries({ queryKey: ["cloud-subscription"] });
+        })
+        .catch(() => {});
+    };
     return () => es.close();
   }, [qc]);
 
