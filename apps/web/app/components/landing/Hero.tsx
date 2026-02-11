@@ -22,8 +22,8 @@ export function Hero() {
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
           Give your AI agent the context it actually needs.
-          LENS understands your repo's structure — imports, dependencies,
-          git history — and delivers the right files in one call.
+          LENS maps your repo — TF-IDF scoring, import graph traversal,
+          co-change analysis — and delivers ranked files in one call.
           Fewer tokens wasted, smarter output.
         </p>
 
