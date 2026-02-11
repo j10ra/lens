@@ -18,6 +18,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggle}
+      aria-label="Toggle theme"
       className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
     >
       {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -32,28 +33,41 @@ export function Nav() {
         <Link to="/" className="text-xl font-bold tracking-tight">
           <span className="text-primary">LENS</span>
         </Link>
-        <div className="flex items-center gap-6">
-          <Link
-            to="/docs"
-            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Docs
-          </Link>
-          <Link
-            to="/dashboard"
-            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Dashboard
-          </Link>
-          <a
-            href="https://www.npmjs.com/package/lens-engine"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full border border-border/70 bg-muted/45 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
-          >
-            npm
-          </a>
-          <ThemeToggle />
+        <div className="flex items-center gap-4 sm:gap-5">
+          <div className="flex items-center gap-4 sm:gap-5">
+            <Link
+              to="/docs"
+              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Docs
+            </Link>
+            <Link
+              to="/dashboard"
+              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Dashboard
+            </Link>
+          </div>
+          <div className="h-4 w-px bg-border/70" />
+          <div className="flex items-center gap-1.5">
+            <a
+              href="https://www.npmjs.com/package/lens-engine"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="npm package"
+              className="inline-flex size-8 items-center justify-center rounded-lg text-[#CB3837] transition-colors hover:bg-accent"
+            >
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                className="size-[18px]"
+                fill="currentColor"
+              >
+                <path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323l13.837.019-.009 13.836h-3.464l.01-10.382h-3.456L12.04 19.17H5.113z" />
+              </svg>
+            </a>
+            <ThemeToggle />
+          </div>
           <Link
             to="/docs"
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
