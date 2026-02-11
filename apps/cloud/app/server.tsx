@@ -4,6 +4,9 @@ import {
 } from "@tanstack/react-start/server";
 import api from "../src/api";
 import type { Env, KVStore } from "../src/env";
+import { startCron } from "../src/cron";
+
+if (process.env.DATABASE_URL) startCron(process.env.DATABASE_URL);
 
 /** Map-based KV stub for Node.js (CF Workers compat) */
 function createKVStub(): KVStore {
