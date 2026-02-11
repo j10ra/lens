@@ -82,6 +82,15 @@ export const subscriptionQueries = {
       .then((rows) => rows[0] ?? null);
   },
 
+  getByStripeCustomerId(db: Db, customerId: string) {
+    return db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.stripeCustomerId, customerId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+  },
+
   upsert(
     db: Db,
     data: {

@@ -121,8 +121,15 @@ billing.post("/webhooks/stripe", async (c) => {
 
     case "customer.subscription.updated": {
       const sub = event.data.object;
-      const userId = sub.metadata?.userId;
-      if (!userId) break;
+      let userId = sub.metadata?.userId;
+      if (!userId) {
+        const existing = await subscriptionQueries.getByStripeCustomerId(db, sub.customer as string);
+        userId = existing?.userId;
+      }
+      if (!userId) {
+        console.error(`[webhook] subscription.updated: no userId for customer ${sub.customer}`);
+        break;
+      }
 
       const plan = sub.status === "active" ? "pro" : "free";
       await subscriptionQueries.upsert(db, {
@@ -140,8 +147,15 @@ billing.post("/webhooks/stripe", async (c) => {
 
     case "customer.subscription.deleted": {
       const sub = event.data.object;
-      const userId = sub.metadata?.userId;
-      if (!userId) break;
+      let userId = sub.metadata?.userId;
+      if (!userId) {
+        const existing = await subscriptionQueries.getByStripeCustomerId(db, sub.customer as string);
+        userId = existing?.userId;
+      }
+      if (!userId) {
+        console.error(`[webhook] subscription.deleted: no userId for customer ${sub.customer}`);
+        break;
+      }
 
       await subscriptionQueries.upsert(db, {
         userId,
@@ -162,8 +176,15 @@ billing.post("/webhooks/stripe", async (c) => {
       if (!subId || invoice.billing_reason !== "subscription_create") break;
 
       const sub = await stripe.subscriptions.retrieve(subId);
-      const userId = sub.metadata?.userId;
-      if (!userId) break;
+      let userId = sub.metadata?.userId;
+      if (!userId) {
+        const existing = await subscriptionQueries.getByStripeCustomerId(db, sub.customer as string);
+        userId = existing?.userId;
+      }
+      if (!userId) {
+        console.error(`[webhook] invoice.paid: no userId for customer ${sub.customer}`);
+        break;
+      }
 
       await subscriptionQueries.upsert(db, {
         userId,
@@ -184,8 +205,15 @@ billing.post("/webhooks/stripe", async (c) => {
       if (!subId) break;
 
       const sub = await stripe.subscriptions.retrieve(subId);
-      const userId = sub.metadata?.userId;
-      if (!userId) break;
+      let userId = sub.metadata?.userId;
+      if (!userId) {
+        const existing = await subscriptionQueries.getByStripeCustomerId(db, sub.customer as string);
+        userId = existing?.userId;
+      }
+      if (!userId) {
+        console.error(`[webhook] invoice.payment_failed: no userId for customer ${sub.customer}`);
+        break;
+      }
 
       await subscriptionQueries.upsert(db, {
         userId,
