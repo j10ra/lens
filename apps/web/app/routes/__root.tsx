@@ -17,7 +17,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Your AI agent reads the wrong files. LENS indexes your repo locally and serves exactly the right context in under a second.",
+          "Index your codebase, query with intent. LENS serves precise context packs to AI agents — the right files, in under a second.",
       },
     ],
     links: [
