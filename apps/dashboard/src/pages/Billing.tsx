@@ -18,15 +18,14 @@ function BillingContent() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // After Stripe checkout redirect, force daemon to refresh plan cache
+  // After Stripe redirect (checkout success or portal return), refresh plan cache
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("success") === "true") {
+    if (params.get("success") === "true" || document.referrer.includes("stripe.com") || document.referrer.includes("billing.stripe")) {
       api.refreshPlan().then(() => {
         queryClient.invalidateQueries({ queryKey: ["cloud-subscription"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard-usage"] });
       }).catch(() => {});
-      // Clean URL
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [queryClient]);
@@ -108,6 +107,23 @@ function BillingContent() {
 
   const isFree = currentPlan === "free";
   const isPro = currentPlan === "pro";
+  const isCanceling = isPro && sub?.cancelAtPeriodEnd;
+
+  const statusLabel = isCanceling
+    ? "Canceling"
+    : sub?.status
+      ? sub.status.charAt(0).toUpperCase() + sub.status.slice(1)
+      : "Active";
+  const statusColor = isCanceling
+    ? "border-amber-500/30 bg-amber-500/10"
+    : isActive
+      ? "border-success/30 bg-success/10"
+      : "border-border bg-muted";
+  const statusText = isCanceling
+    ? "text-amber-600 dark:text-amber-400"
+    : isActive
+      ? "text-success"
+      : "text-muted-foreground";
 
   return (
     <div className="space-y-8">
@@ -124,7 +140,7 @@ function BillingContent() {
             <p className="text-sm text-muted-foreground">Current Plan</p>
             <p className="mt-1 text-xl font-bold capitalize">
               {currentPlan}{" "}
-              {isPro && (
+              {isPro && !isCanceling && (
                 <span className="text-sm font-normal text-muted-foreground">
                   &mdash; $9/mo
                 </span>
@@ -132,28 +148,42 @@ function BillingContent() {
             </p>
           </div>
           <div
-            className={`inline-flex items-center rounded-full border px-3 py-1 ${isActive ? "border-success/30 bg-success/10" : "border-border bg-muted"}`}
+            className={`inline-flex items-center rounded-full border px-3 py-1 ${statusColor}`}
           >
-            <span
-              className={`text-xs font-medium ${isActive ? "text-success" : "text-muted-foreground"}`}
-            >
-              {sub?.status
-                ? sub.status.charAt(0).toUpperCase() + sub.status.slice(1)
-                : "Active"}
+            <span className={`text-xs font-medium ${statusText}`}>
+              {statusLabel}
             </span>
           </div>
         </div>
-        {nextBilling && (
+        {isCanceling && nextBilling && (
+          <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+            <p className="text-sm font-medium text-foreground">
+              Your Pro access ends {nextBilling}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              You'll lose Voyage embeddings, purpose summaries, and vocab clusters.
+              Resubscribe anytime to keep your Pro features.
+            </p>
+            <div className="mt-3 flex gap-3">
+              <button
+                onClick={handleManage}
+                disabled={actionLoading !== null}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {actionLoading === "portal" ? "Loading..." : "Resubscribe"}
+              </button>
+            </div>
+          </div>
+        )}
+        {!isCanceling && nextBilling && (
           <div className="mt-4 flex items-center gap-4 border-t pt-4">
             <p className="text-sm text-muted-foreground">
-              {sub?.cancelAtPeriodEnd
-                ? "Access until: "
-                : "Next billing date: "}
+              Next billing date:{" "}
               <span className="text-foreground">{nextBilling}</span>
             </p>
           </div>
         )}
-        {isPro && sub?.stripeCustomerId && (
+        {isPro && !isCanceling && sub?.stripeCustomerId && (
           <div className="mt-4 flex gap-3">
             <button
               onClick={handleManage}
@@ -240,13 +270,13 @@ function BillingContent() {
                 </li>
               ))}
             </ul>
-            {isFree && (
+            {(isFree || isCanceling) && (
               <button
                 onClick={() => handleUpgrade("monthly")}
                 disabled={actionLoading !== null}
                 className="mt-6 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                {actionLoading === "monthly" ? "Loading..." : "Go Monthly"}
+                {actionLoading === "monthly" ? "Loading..." : isCanceling ? "Resubscribe Monthly" : "Go Monthly"}
               </button>
             )}
           </div>
@@ -273,13 +303,13 @@ function BillingContent() {
                 </li>
               ))}
             </ul>
-            {isFree && (
+            {(isFree || isCanceling) && (
               <button
                 onClick={() => handleUpgrade("yearly")}
                 disabled={actionLoading !== null}
                 className="mt-6 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                {actionLoading === "yearly" ? "Loading..." : "Go Yearly"}
+                {actionLoading === "yearly" ? "Loading..." : isCanceling ? "Switch to Yearly" : "Go Yearly"}
               </button>
             )}
           </div>

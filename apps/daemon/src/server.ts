@@ -645,9 +645,11 @@ export function createApp(
   });
 
   trackRoute("GET", "/api/cloud/billing/portal");
-  app.get("/api/cloud/billing/portal", async () =>
-    cloudProxy("GET", "/api/billing/portal"),
-  );
+  app.get("/api/cloud/billing/portal", async (c) => {
+    const returnUrl = c.req.query("return_url") || "";
+    const qs = returnUrl ? `?return_url=${encodeURIComponent(returnUrl)}` : "";
+    return cloudProxy("GET", `/api/billing/portal${qs}`);
+  });
 
   // --- Dashboard API ---
 
