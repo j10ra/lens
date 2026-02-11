@@ -21,9 +21,9 @@ export function Hero() {
           <span className="text-primary">Query with intent.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-          LENS indexes your repos locally and serves precise context packs
-          to AI agents. The right files, in under a second — no glob/grep
-          loops burning through your token budget.
+          Give your AI agent the context it actually needs.
+          LENS indexes your repos locally and delivers the right files
+          in one call — fewer tokens wasted, smarter output.
         </p>
 
         {/* terminal box */}
