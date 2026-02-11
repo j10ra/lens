@@ -18,7 +18,7 @@ import { logoutCommand } from "./commands/logout.js";
 import { error } from "./util/format.js";
 import { isTelemetryEnabled } from "./util/config.js";
 
-const program = new Command().name("lens").description("LENS — Local-first repo context engine").version("0.1.14");
+const program = new Command().name("lens").description("LENS — Local-first repo context engine").version("0.1.15");
 
 function trackCommand(name: string): void {
   if (!isTelemetryEnabled()) return;
