@@ -8,11 +8,12 @@ $ lens daemon start`,
   },
   {
     number: "02",
-    title: "Register",
+    title: "Register & Index",
     description:
-      "Register a repo. Indexing (TF-IDF, import graph, git history) runs automatically.",
+      "Register a repo — indexing kicks off automatically. TF-IDF, import graph, and git history in one pass.",
     code: `$ lens repo register
 
+Registered: my-project
 Scanning files... 847 files
 Building import graph... done
 Analyzing git history... done

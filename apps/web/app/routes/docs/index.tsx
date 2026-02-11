@@ -69,9 +69,7 @@ function DocsIndex() {
 LENS daemon running on http://localhost:4111
 
 $ lens repo register
-Registered: my-project (847 files)
-
-$ lens index
+Registered: my-project
 Scanning files... 847 files
 Building import graph... done
 Analyzing git history... done
