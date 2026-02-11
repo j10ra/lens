@@ -40,9 +40,9 @@ const features: { title: string; description: string; icon: LucideIcon }[] = [
     icon: ShieldCheck,
   },
   {
-    title: "Sub-Second Queries",
+    title: "One Call, Done",
     description:
-      "~10ms cached, under 1s cold. Pro adds Voyage semantic embeddings for deeper accuracy at +100-300ms.",
+      "One context query replaces dozens of glob/grep tool calls. ~10ms cached, under 1s cold. Fewer tokens spent searching, more spent building.",
     icon: Zap,
   },
 ];

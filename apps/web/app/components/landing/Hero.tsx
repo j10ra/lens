@@ -22,7 +22,8 @@ export function Hero() {
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
           LENS indexes your repos locally and serves precise context packs
-          to AI agents. The right files, in under a second.
+          to AI agents. The right files, in under a second — no glob/grep
+          loops burning through your token budget.
         </p>
 
         {/* terminal box */}
