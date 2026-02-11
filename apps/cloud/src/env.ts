@@ -18,4 +18,5 @@ export interface Env {
   SENTRY_DSN: string;
   RATE_LIMIT: KVStore;
   ENVIRONMENT: string;
+  WEBSITE_URL: string;
 }

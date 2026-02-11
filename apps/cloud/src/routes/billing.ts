@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { subscriptionQueries } from "@lens/cloud-db";
+import { sql } from "drizzle-orm";
 import type { Env } from "../env";
 import { apiKeyAuth } from "../middleware/auth";
 import { getDb } from "../lib/db";
@@ -7,12 +8,40 @@ import { createStripe } from "../lib/stripe";
 
 const billing = new Hono<{ Bindings: Env }>();
 
-// Authenticated routes
-const authed = new Hono<{ Bindings: Env }>();
-authed.use("*", apiKeyAuth);
+// GET /api/billing/subscribe — public (no auth), creates Stripe Checkout and redirects
+billing.get("/subscribe", async (c) => {
+  if (!c.env.STRIPE_SECRET_KEY || c.env.STRIPE_SECRET_KEY.includes("REPLACE_ME")) {
+    return c.json({ error: "Stripe not configured" }, 503);
+  }
 
-// POST /api/billing/checkout — create Stripe Checkout session
-authed.post("/checkout", async (c) => {
+  const interval = c.req.query("interval") === "yearly" ? "yearly" : "monthly";
+  const priceId =
+    interval === "yearly" ? c.env.STRIPE_PRICE_YEARLY : c.env.STRIPE_PRICE_MONTHLY;
+  const returnUrl = c.env.WEBSITE_URL || c.env.APP_URL;
+
+  const stripe = createStripe(c.env.STRIPE_SECRET_KEY);
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
+      subscription_data: { metadata: { source: "website" } },
+      success_url: `${returnUrl}/docs?success=true`,
+      cancel_url: `${returnUrl}/#pricing`,
+      metadata: { source: "website" },
+    });
+
+    if (!session.url) return c.json({ error: "No checkout URL" }, 500);
+    return c.redirect(session.url);
+  } catch (e: any) {
+    console.error("[billing/subscribe]", e?.message);
+    return c.json({ error: e?.message ?? "Checkout failed" }, 500);
+  }
+});
+
+// POST /api/billing/checkout — create Stripe Checkout session (authenticated)
+billing.post("/checkout", apiKeyAuth, async (c) => {
   const userId = c.get("userId");
   const db = getDb(c.env.DATABASE_URL);
 
@@ -49,8 +78,8 @@ authed.post("/checkout", async (c) => {
   }
 });
 
-// GET /api/billing/portal — Stripe Customer Portal
-authed.get("/portal", async (c) => {
+// GET /api/billing/portal — Stripe Customer Portal (authenticated)
+billing.get("/portal", apiKeyAuth, async (c) => {
   const userId = c.get("userId");
   const db = getDb(c.env.DATABASE_URL);
 
@@ -99,12 +128,29 @@ billing.post("/webhooks/stripe", async (c) => {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object;
-      const userId = session.metadata?.userId ?? session.client_reference_id;
+      let userId = session.metadata?.userId ?? session.client_reference_id;
+
+      // Website purchases have no userId — resolve by customer email
+      if (!userId && session.customer_details?.email) {
+        const email = session.customer_details.email;
+        const [row] = await db.execute<{ id: string }>(
+          sql`SELECT id FROM auth.users WHERE email = ${email} LIMIT 1`,
+        );
+        if (row?.id) userId = row.id;
+        else console.error(`[webhook] checkout: no user for email ${email}`);
+      }
       if (!userId) break;
 
       const subscription = await stripe.subscriptions.retrieve(
         session.subscription as string,
       );
+
+      // Attach userId to Stripe subscription metadata for future webhooks
+      if (!subscription.metadata?.userId) {
+        await stripe.subscriptions.update(subscription.id, {
+          metadata: { userId },
+        });
+      }
 
       await subscriptionQueries.upsert(db, {
         userId,
@@ -231,8 +277,5 @@ billing.post("/webhooks/stripe", async (c) => {
 
   return c.json({ received: true });
 });
-
-// Mount authed routes (checkout, portal) after webhook
-billing.route("/", authed);
 
 export { billing as billingRoutes };

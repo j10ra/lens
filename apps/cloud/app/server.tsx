@@ -48,6 +48,7 @@ function buildEnv(): Env {
     OPENROUTER_API_KEY: e.OPENROUTER_API_KEY ?? "",
     SENTRY_DSN: e.SENTRY_DSN ?? "",
     ENVIRONMENT: e.ENVIRONMENT ?? "development",
+    WEBSITE_URL: e.WEBSITE_URL ?? "https://lens-website.pages.dev",
     RATE_LIMIT: createKVStub(),
   };
 }
