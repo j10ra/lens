@@ -20,7 +20,7 @@ auth.post("/login", async (c) => {
     expirationTtl: 300,
   });
 
-  const appUrl = c.env.APP_URL || "https://lens.dev";
+  const appUrl = c.env.APP_URL || "https://cloud.lens-engine.com";
   const loginUrl = `${c.env.SUPABASE_URL}/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent(`${appUrl}/auth/callback?code=${code}`)}`;
 
   return c.json({ code, login_url: loginUrl });

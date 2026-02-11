@@ -66,7 +66,7 @@ export function getCloudUrl(): string {
     const cfg = JSON.parse(fsSync.readFileSync(CONFIG_FILE, "utf-8"));
     if (cfg.cloud_url) return cfg.cloud_url;
   } catch {}
-  return "https://lens-production-e9fd.up.railway.app";
+  return "https://cloud.lens-engine.com";
 }
 
 export function readConfigSync(): Config {

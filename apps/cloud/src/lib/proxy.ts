@@ -24,7 +24,7 @@ export async function proxyOpenRouter(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer": "https://lens.dev",
+      "HTTP-Referer": "https://lens-engine.com",
       "X-Title": "LENS",
     },
     body: JSON.stringify(body),

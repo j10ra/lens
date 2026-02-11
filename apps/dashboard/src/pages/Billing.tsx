@@ -318,7 +318,7 @@ function BillingContent() {
 
       {/* Enterprise */}
       <a
-        href="mailto:support@lens.dev?subject=LENS Enterprise Inquiry"
+        href="mailto:support@lens-engine.com?subject=LENS Enterprise Inquiry"
         className="flex items-center justify-between rounded-xl border border-border bg-card p-5 transition-colors hover:bg-accent"
       >
         <div>

@@ -142,9 +142,9 @@ function LoginPage() {
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
           By signing in, you agree to our{" "}
-          <a href="https://lens.dev/terms" className="text-primary hover:underline">Terms</a>
+          <a href="https://lens-engine.com/terms" className="text-primary hover:underline">Terms</a>
           {" "}and{" "}
-          <a href="https://lens.dev/privacy" className="text-primary hover:underline">Privacy Policy</a>.
+          <a href="https://lens-engine.com/privacy" className="text-primary hover:underline">Privacy Policy</a>.
         </p>
       </div>
     </div>

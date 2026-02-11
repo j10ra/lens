@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 const CONFIG_PATH = join(homedir(), ".lens", "config.json");
 
 /** Default cloud API base URL — override via LENS_CLOUD_URL env or cloud_url in ~/.lens/config.json */
-export const DEFAULT_CLOUD_URL = "https://lens-production-e9fd.up.railway.app";
+export const DEFAULT_CLOUD_URL = "https://cloud.lens-engine.com";
 
 function readConfig(): Record<string, unknown> {
   try {

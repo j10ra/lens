@@ -144,7 +144,7 @@ wrangler deploy          # deploys to CF Workers
 ### Step 5: Custom Domain
 
 ```bash
-wrangler domains add lens.dev      # or api.lens.dev
+wrangler domains add cloud.lens-engine.com
 ```
 
 Or configure in Cloudflare Dashboard → Workers → lens-cloud → Custom Domains.
@@ -152,7 +152,7 @@ Or configure in Cloudflare Dashboard → Workers → lens-cloud → Custom Domai
 ### Step 6: Stripe Webhook
 
 1. Go to Stripe Dashboard → Developers → Webhooks
-2. Add endpoint: `https://lens.dev/api/billing/webhooks/stripe`
+2. Add endpoint: `https://cloud.lens-engine.com/api/billing/webhooks/stripe`
 3. Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
 4. Copy signing secret → `wrangler secret put STRIPE_WEBHOOK_SECRET`
 
@@ -160,13 +160,13 @@ Or configure in Cloudflare Dashboard → Workers → lens-cloud → Custom Domai
 
 ```bash
 # Health check
-curl https://lens.dev/api/health
+curl https://cloud.lens-engine.com/api/health
 
 # Auth callback (should redirect)
-curl -I https://lens.dev/auth/callback
+curl -I https://cloud.lens-engine.com/auth/callback
 
 # Admin panel (should render login)
-curl https://lens.dev/dashboard
+curl https://cloud.lens-engine.com/dashboard
 ```
 
 ---
@@ -223,7 +223,7 @@ All tables have Row-Level Security enabled. `api_keys`, `subscriptions`, and `us
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `cloud_url` | `https://lens.dev` | Cloud API base URL |
+| `cloud_url` | `https://cloud.lens-engine.com` | Cloud API base URL |
 | `telemetry` | `true` | Enable anonymous telemetry |
 | `telemetry_id` | auto-generated UUID | Installation identifier |
 

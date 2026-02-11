@@ -196,7 +196,7 @@ Dashboard subscribes to both for real-time updates.
 
 ```
 1. User: lens login
-2. CLI opens browser → https://lens.dev/auth/login?device_code=<uuid>
+2. CLI opens browser → https://cloud.lens-engine.com/auth/login?device_code=<uuid>
 3. User authenticates via Supabase (GitHub OAuth, Google, or magic link)
 4. Cloud callback: /auth/callback
    a. Upserts Supabase user
@@ -263,7 +263,7 @@ Daemon auto-refreshes expired Supabase JWTs via `/auth/v1/token?grant_type=refre
 
 ### Cloud URL Resolution
 
-Priority: `LENS_CLOUD_URL` env → `~/.lens/config.json` → `DEFAULT_CLOUD_URL` (`https://lens.dev`).
+Priority: `LENS_CLOUD_URL` env → `~/.lens/config.json` → `DEFAULT_CLOUD_URL` (`https://cloud.lens-engine.com`).
 
 Single source of truth: `apps/daemon/src/config.ts`.
 
