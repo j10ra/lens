@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
-    "build:publish": "pnpm -r build && rm -rf publish && tsup --config tsup.config.publish.ts && cp -r apps/dashboard/dist publish/dashboard && cp publish.json publish/package.json && cd publish && npm install --omit=dev",
+    "build:publish": "pnpm -r build && rm -rf publish && tsup --config tsup.config.publish.ts && cp -r apps/dashboard/dist publish/dashboard && cp publish.json publish/package.json && cp README.md publish/README.md && cd publish && npm install --omit=dev",
     "deploy:local": "pnpm -w build:publish && cd publish && npm install -g . && lens daemon stop && lens daemon start",
     "release": "./scripts/release.sh",
     "release:patch": "./scripts/release.sh patch",
