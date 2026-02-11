@@ -1,17 +1,17 @@
 const steps = [
   {
     number: "01",
-    title: "Install & Register",
-    description: "Install the CLI globally, then register your repo.",
+    title: "Install & Start",
+    description: "Install the CLI globally and start the background daemon.",
     code: `$ npm install -g lens-engine
-$ lens repo register /path/to/repo`,
+$ lens daemon start`,
   },
   {
     number: "02",
-    title: "Index",
+    title: "Register",
     description:
-      "Build TF-IDF scores, import graph, and co-change analysis automatically.",
-    code: `$ lens index
+      "Register a repo. Indexing (TF-IDF, import graph, git history) runs automatically.",
+    code: `$ lens repo register
 
 Scanning files... 847 files
 Building import graph... done
@@ -22,7 +22,7 @@ Index complete in 2.3s`,
     number: "03",
     title: "Query",
     description:
-      "Ask with intent. Get a context pack for your AI agent instantly.",
+      "Ask with intent. Get a ranked context pack for your AI agent.",
     code: `$ lens context "add auth middleware"
 
 Context pack: 12 files, 3.2KB
@@ -41,7 +41,7 @@ export function HowItWorks() {
           How It Works
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
-          Three steps. No API keys required. Everything runs locally.
+          Three commands. No API keys. Your code never leaves your machine.
         </p>
 
         <div className="mt-16 grid gap-8 md:grid-cols-3">

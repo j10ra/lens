@@ -19,35 +19,37 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/#pricing"
+                <a
+                  href="/#pricing"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
                   Pricing
-                </Link>
+                </a>
               </li>
             </ul>
           </div>
           <div>
             <h3 className="mb-3 text-sm font-semibold text-foreground">
-              Account
+              Resources
             </h3>
             <ul className="space-y-2">
               <li>
                 <Link
-                  to="/login"
+                  to="/docs"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Login
+                  Get Started
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/dashboard"
+                <a
+                  href="https://github.com/j10ra/lens"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Dashboard
-                </Link>
+                  GitHub
+                </a>
               </li>
             </ul>
           </div>

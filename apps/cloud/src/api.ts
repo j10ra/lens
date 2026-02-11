@@ -16,7 +16,7 @@ app.use(
   "*",
   cors({
     origin: (origin) => {
-      const allowed = ["https://lens.dev", "https://getlens.dev", "http://localhost:3000"];
+      const allowed = ["https://lens.dev", "https://getlens.dev", "http://localhost:3000", "https://lens-website.pages.dev"];
       if (allowed.includes(origin)) return origin;
       if (origin.endsWith(".up.railway.app")) return origin;
       return null;

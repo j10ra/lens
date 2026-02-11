@@ -15,18 +15,23 @@ function CodeBlock({ children }: { children: string }) {
 }
 
 const cliCommands = [
-  { command: "lens init", description: "Initialize LENS config in current directory" },
-  { command: "lens repo register <path>", description: "Register a repo for indexing" },
-  { command: "lens repo list", description: "List registered repos" },
-  { command: "lens repo remove <id>", description: "Remove a registered repo" },
-  { command: "lens repo watch <id>", description: "Enable file watcher for a repo" },
-  { command: "lens index", description: "Index the current repo (or all registered)" },
-  { command: 'lens context "<goal>"', description: "Generate a context pack for a goal" },
   { command: "lens daemon start", description: "Start the HTTP daemon on :4111" },
   { command: "lens daemon stop", description: "Stop the running daemon" },
-  { command: "lens daemon stats", description: "Show daemon status and uptime" },
-  { command: "lens status", description: "Show repo index status" },
-  { command: "lens config", description: "Show current config" },
+  { command: "lens daemon stats", description: "Show global statistics" },
+  { command: "lens repo register", description: "Register current repo for indexing" },
+  { command: "lens repo list", description: "List registered repos" },
+  { command: "lens repo remove", description: "Remove current repo" },
+  { command: "lens repo watch", description: "Start file watcher for current repo" },
+  { command: "lens repo unwatch", description: "Stop file watcher for current repo" },
+  { command: "lens repo watch-status", description: "Show watcher status" },
+  { command: "lens index", description: "Index the current repo" },
+  { command: 'lens context "<goal>"', description: "Build a context pack for a goal" },
+  { command: "lens status", description: "Show repo index/embedding status" },
+  { command: "lens dashboard", description: "Open local dashboard in browser" },
+  { command: "lens login", description: "Authenticate via OAuth (GitHub/Google)" },
+  { command: "lens logout", description: "Clear cloud authentication" },
+  { command: "lens config get <key>", description: "Get a config value" },
+  { command: "lens config set <key> <val>", description: "Set a config value" },
 ];
 
 function DocsIndex() {
@@ -57,13 +62,13 @@ function DocsIndex() {
       <section>
         <h2 className="text-xl font-semibold">Quick Start</h2>
         <p className="mt-3 text-sm text-muted-foreground">
-          Initialize, register your repo, and query in seconds.
+          Start the daemon, register your repo, and query in seconds.
         </p>
         <div className="mt-4 space-y-3">
-          <CodeBlock>{`$ lens init
-Config written to ~/.lens/config.json
+          <CodeBlock>{`$ lens daemon start
+LENS daemon running on http://localhost:4111
 
-$ lens repo register .
+$ lens repo register
 Registered: my-project (847 files)
 
 $ lens index
@@ -85,15 +90,37 @@ Context pack: 12 files, 3.2KB
       <section>
         <h2 className="text-xl font-semibold">Daemon Mode</h2>
         <p className="mt-3 text-sm text-muted-foreground">
-          Start the HTTP daemon for persistent access on port 4111.
+          The daemon runs on port 4111 and serves the REST API, MCP stdio, and
+          local dashboard.
         </p>
         <div className="mt-4">
           <CodeBlock>{`$ lens daemon start
 LENS daemon running on http://localhost:4111
 
+$ lens dashboard
+Opening http://localhost:4111/dashboard/
+
 $ curl http://localhost:4111/context \\
   -H "Content-Type: application/json" \\
   -d '{"goal": "add auth middleware"}'`}</CodeBlock>
+        </div>
+      </section>
+
+      {/* Pro Features */}
+      <section>
+        <h2 className="text-xl font-semibold">Pro Features</h2>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Authenticate to unlock Voyage semantic embeddings, purpose summaries,
+          and vocab clusters.
+        </p>
+        <div className="mt-4">
+          <CodeBlock>{`$ lens login --github
+Authenticated as user@example.com
+
+$ lens status
+Pro: active
+Embeddings: 847/847 files
+Vocab clusters: 42 clusters`}</CodeBlock>
         </div>
       </section>
 
@@ -125,7 +152,9 @@ $ curl http://localhost:4111/context \\
       <section>
         <h2 className="text-xl font-semibold">CLI Reference</h2>
         <p className="mt-3 text-sm text-muted-foreground">
-          All available commands.
+          All commands support{" "}
+          <code className="rounded bg-card px-1.5 py-0.5 text-xs">--json</code>{" "}
+          for machine-readable output.
         </p>
         <div className="mt-4 overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">

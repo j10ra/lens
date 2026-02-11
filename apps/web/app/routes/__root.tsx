@@ -17,7 +17,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Index your codebase locally and serve context packs to AI agents. Zero LLM calls on the query path.",
+          "Your AI agent reads the wrong files. LENS indexes your repo locally and serves exactly the right context in under a second.",
       },
     ],
     links: [

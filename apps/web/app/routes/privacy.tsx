@@ -35,7 +35,7 @@ function PrivacyPage() {
 
         <div className="mt-8 text-muted-foreground leading-relaxed">
           <p>
-            LENS ("we", "us", "our") operates the lens.dev website and the LENS
+            LENS ("we", "us", "our") operates the LENS website and the LENS
             CLI tool. This policy describes how we collect, use, and protect your
             information.
           </p>
@@ -126,10 +126,10 @@ function PrivacyPage() {
           <p>
             For privacy-related questions or data requests, contact us at{" "}
             <a
-              href="mailto:privacy@lens.dev"
+              href="mailto:hi@lens-engine.dev"
               className="text-primary hover:text-primary/80"
             >
-              privacy@lens.dev
+              hi@lens-engine.dev
             </a>
             .
           </p>

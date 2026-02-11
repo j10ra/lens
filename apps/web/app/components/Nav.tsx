@@ -41,10 +41,10 @@ export function Nav() {
           </Link>
           <ThemeToggle />
           <Link
-            to="/login"
-            className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-accent"
+            to="/docs"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Login
+            Get Started
           </Link>
         </div>
       </div>

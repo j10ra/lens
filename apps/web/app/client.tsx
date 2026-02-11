@@ -8,7 +8,7 @@ Sentry.init({
   environment: import.meta.env.VITE_ENVIRONMENT ?? "development",
   integrations: [Sentry.browserTracingIntegration()],
   tracesSampleRate: 1.0,
-  tracePropagationTargets: ["localhost", /^https:\/\/lens\.dev\/api/],
+  tracePropagationTargets: ["localhost", /^\/api/],
 });
 
 hydrateRoot(document, <StartClient />);

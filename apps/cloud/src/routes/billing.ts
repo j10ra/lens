@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { subscriptionQueries } from "@lens/cloud-db";
-import { sql } from "drizzle-orm";
+import { createClient } from "@supabase/supabase-js";
 import type { Env } from "../env";
 import { apiKeyAuth } from "../middleware/auth";
 import { getDb } from "../lib/db";
@@ -8,34 +8,75 @@ import { createStripe } from "../lib/stripe";
 
 const billing = new Hono<{ Bindings: Env }>();
 
-// GET /api/billing/subscribe — public (no auth), creates Stripe Checkout and redirects
+// GET /api/billing/subscribe — public, redirects through OAuth then to Stripe
 billing.get("/subscribe", async (c) => {
   if (!c.env.STRIPE_SECRET_KEY || c.env.STRIPE_SECRET_KEY.includes("REPLACE_ME")) {
     return c.json({ error: "Stripe not configured" }, 503);
   }
 
   const interval = c.req.query("interval") === "yearly" ? "yearly" : "monthly";
-  const priceId =
-    interval === "yearly" ? c.env.STRIPE_PRICE_YEARLY : c.env.STRIPE_PRICE_MONTHLY;
-  const returnUrl = c.env.WEBSITE_URL || c.env.APP_URL;
+
+  // Generate state token, store interval
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const state = Array.from(bytes).map((b) => b.toString(36)).join("").slice(0, 32);
+  await c.env.RATE_LIMIT.put(`subscribe:${state}`, interval, { expirationTtl: 600 });
+
+  const appUrl = c.env.APP_URL;
+  const callbackUrl = `${appUrl}/api/billing/subscribe/callback?state=${state}`;
+  const oauthUrl = `${c.env.SUPABASE_URL}/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent(callbackUrl)}`;
+
+  return c.redirect(oauthUrl);
+});
+
+// GET /api/billing/subscribe/callback — OAuth completes, create checkout, redirect to Stripe
+billing.get("/subscribe/callback", async (c) => {
+  const state = c.req.query("state");
+  const accessToken = c.req.query("access_token");
+
+  if (!state || !accessToken) {
+    return c.json({ error: "Invalid callback — missing state or token" }, 400);
+  }
+
+  const interval = await c.env.RATE_LIMIT.get(`subscribe:${state}`);
+  if (!interval) {
+    return c.json({ error: "Expired or invalid state" }, 400);
+  }
+  await c.env.RATE_LIMIT.delete(`subscribe:${state}`);
+
+  // Validate token, get user
+  const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_KEY);
+  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+  if (error || !user) {
+    return c.json({ error: "Authentication failed" }, 401);
+  }
+
+  const userId = user.id;
+  const db = getDb(c.env.DATABASE_URL);
+  const existingSub = await subscriptionQueries.getByUserId(db, userId);
 
   const stripe = createStripe(c.env.STRIPE_SECRET_KEY);
+  const priceId = interval === "yearly" ? c.env.STRIPE_PRICE_YEARLY : c.env.STRIPE_PRICE_MONTHLY;
+  const returnUrl = c.env.WEBSITE_URL || c.env.APP_URL;
 
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
+      customer: existingSub?.stripeCustomerId ?? undefined,
+      customer_email: existingSub?.stripeCustomerId ? undefined : (user.email ?? undefined),
+      client_reference_id: userId,
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
-      subscription_data: { metadata: { source: "website" } },
+      subscription_data: { metadata: { userId } },
       success_url: `${returnUrl}/docs?success=true`,
       cancel_url: `${returnUrl}/#pricing`,
-      metadata: { source: "website" },
+      metadata: { userId },
     });
 
     if (!session.url) return c.json({ error: "No checkout URL" }, 500);
     return c.redirect(session.url);
   } catch (e: any) {
-    console.error("[billing/subscribe]", e?.message);
+    console.error("[billing/subscribe/callback]", e?.message);
     return c.json({ error: e?.message ?? "Checkout failed" }, 500);
   }
 });
@@ -128,24 +169,14 @@ billing.post("/webhooks/stripe", async (c) => {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object;
-      let userId = session.metadata?.userId ?? session.client_reference_id;
-
-      // Website purchases have no userId — resolve by customer email
-      if (!userId && session.customer_details?.email) {
-        const email = session.customer_details.email;
-        const [row] = await db.execute<{ id: string }>(
-          sql`SELECT id FROM auth.users WHERE email = ${email} LIMIT 1`,
-        );
-        if (row?.id) userId = row.id;
-        else console.error(`[webhook] checkout: no user for email ${email}`);
-      }
+      const userId = session.metadata?.userId ?? session.client_reference_id;
       if (!userId) break;
 
       const subscription = await stripe.subscriptions.retrieve(
         session.subscription as string,
       );
 
-      // Attach userId to Stripe subscription metadata for future webhooks
+      // Ensure subscription metadata has userId for future webhook events
       if (!subscription.metadata?.userId) {
         await stripe.subscriptions.update(subscription.id, {
           metadata: { userId },

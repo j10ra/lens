@@ -194,10 +194,10 @@ function TermsPage() {
           <p>
             For questions about these Terms, contact us at{" "}
             <a
-              href="mailto:legal@lens.dev"
+              href="mailto:hi@lens-engine.dev"
               className="text-primary hover:text-primary/80"
             >
-              legal@lens.dev
+              hi@lens-engine.dev
             </a>
             .
           </p>

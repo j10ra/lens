@@ -16,13 +16,14 @@ export function Hero() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
       <div className="relative mx-auto max-w-4xl px-6 text-center">
         <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
-          Index your codebase.
+          Your AI agent reads
           <br />
-          <span className="text-primary">Query with intent.</span>
+          <span className="text-primary">the wrong files.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-          LENS indexes your repos locally and serves context packs to AI agents.
-          Zero LLM calls on the query path.
+          LLMs waste most of their context window on irrelevant code.
+          LENS fixes that — it indexes your repo and serves exactly the right
+          files in under a second. Better context, better output.
         </p>
 
         {/* terminal box */}
