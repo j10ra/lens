@@ -75,6 +75,7 @@ interface QuotaSnapshot {
   plan: string;
   usage: Record<string, number>;
   quota: Record<string, number>;
+  subscription: Record<string, unknown> | null;
   fetchedAt: number;
 }
 
@@ -99,7 +100,7 @@ export function createApp(
 
   // Seed quota cache from startup plan check — eliminates race on first dashboard load
   if (initialPlanData) {
-    quotaCache = { ...initialPlanData, fetchedAt: Date.now() };
+    quotaCache = { ...initialPlanData, subscription: null, fetchedAt: Date.now() };
   }
   const app = new Hono() as Hono & { stopTelemetrySync?: () => void };
 
@@ -629,11 +630,12 @@ export function createApp(
     cloudProxy("GET", "/api/usage/current"),
   );
 
-  // Subscription
+  // Subscription (served from cache, refreshed every 5 min)
   trackRoute("GET", "/api/cloud/subscription");
-  app.get("/api/cloud/subscription", async () =>
-    cloudProxy("GET", "/api/subscription"),
-  );
+  app.get("/api/cloud/subscription", (c) => {
+    const sub = quotaCache?.subscription ?? { plan: "free", status: "active" };
+    return c.json({ subscription: sub });
+  });
 
   // Billing
   trackRoute("POST", "/api/cloud/billing/checkout");
@@ -942,13 +944,18 @@ export function createApp(
 
   async function refreshQuotaCache() {
     try {
-      const res = await cloudProxy("GET", "/api/usage/current");
+      const [res, subRes] = await Promise.all([
+        cloudProxy("GET", "/api/usage/current"),
+        cloudProxy("GET", "/api/subscription"),
+      ]);
       if (res.ok) {
         const data = await res.json() as any;
+        const subData = subRes.ok ? ((await subRes.json()) as any).subscription ?? null : null;
         quotaCache = {
           plan: data.plan ?? "free",
           usage: data.usage ?? {},
           quota: data.quota ?? {},
+          subscription: subData,
           fetchedAt: Date.now(),
         };
         // Clear capabilities on downgrade
@@ -976,11 +983,11 @@ export function createApp(
           console.error("[LENS] API key re-provisioned after 401");
           return refreshQuotaCache(); // Retry with new key
         }
-        quotaCache = { plan: "free", usage: {}, quota: {}, fetchedAt: Date.now() };
+        quotaCache = { plan: "free", usage: {}, quota: {}, subscription: null, fetchedAt: Date.now() };
         caps = undefined;
       } else {
         // Other failure (5xx, etc.) — reset to free so stale Pro doesn't persist
-        quotaCache = { plan: "free", usage: {}, quota: {}, fetchedAt: Date.now() };
+        quotaCache = { plan: "free", usage: {}, quota: {}, subscription: null, fetchedAt: Date.now() };
         caps = undefined;
       }
     } catch {
