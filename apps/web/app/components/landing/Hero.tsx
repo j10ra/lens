@@ -22,8 +22,9 @@ export function Hero() {
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
           Give your AI agent the context it actually needs.
-          LENS indexes your repos locally and delivers the right files
-          in one call — fewer tokens wasted, smarter output.
+          LENS understands your repo's structure — imports, dependencies,
+          git history — and delivers the right files in one call.
+          Fewer tokens wasted, smarter output.
         </p>
 
         {/* terminal box */}
