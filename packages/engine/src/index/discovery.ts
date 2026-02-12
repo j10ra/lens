@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const MAX_FILE_SIZE = 500 * 1024;
+export const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 const BINARY_EXTENSIONS = new Set([
   ".png",

@@ -126,7 +126,13 @@ function RepoCard({ repo, isPro }: { repo: RepoItem; isPro: boolean }) {
 
 	const reindex = useMutation({
 		mutationFn: api.reindex,
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+		onMutate: (id) => {
+			queryClient.setQueryData(["dashboard-repos"], (old: Awaited<ReturnType<typeof api.repos>> | undefined) => {
+				if (!old) return old;
+				return { ...old, repos: old.repos.map((r) => r.id === id ? { ...r, index_status: "indexing" } : r) };
+			});
+		},
+		onSettled: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
 	});
 
 	const startWatch = useMutation({
@@ -206,7 +212,7 @@ function RepoCard({ repo, isPro }: { repo: RepoItem; isPro: boolean }) {
 				<div className="flex items-center gap-1.5">
 					<Sparkles className="h-3 w-3 text-muted-foreground" />
 					<span className="text-[10px] font-medium text-muted-foreground">Enrichment</span>
-					{!repo.has_capabilities && (
+					{!isPro && (
 						<Badge variant="outline" className="text-[9px] px-1 py-0 text-amber-500 border-amber-500/40">Pro</Badge>
 					)}
 				</div>
@@ -218,6 +224,7 @@ function RepoCard({ repo, isPro }: { repo: RepoItem; isPro: boolean }) {
 						pct={embPct}
 						enabled={!!repo.enable_embeddings}
 						onToggle={(v) => updateSettings.mutate({ enable_embeddings: v })}
+						disabled={!isPro}
 					/>
 					<ToggleProgress
 						label="Summaries"
@@ -226,13 +233,21 @@ function RepoCard({ repo, isPro }: { repo: RepoItem; isPro: boolean }) {
 						pct={purPct}
 						enabled={!!repo.enable_summaries}
 						onToggle={(v) => updateSettings.mutate({ enable_summaries: v })}
+						disabled={!isPro}
 					/>
 					<ToggleCount
 						label="Vocab clusters"
 						count={repo.vocab_cluster_count}
 						enabled={!!repo.enable_vocab_clusters}
 						onToggle={(v) => updateSettings.mutate({ enable_vocab_clusters: v })}
+						disabled={!isPro}
 					/>
+					{!isPro && (
+						<Link to="/billing" className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 px-3 py-1.5 text-[11px] font-medium text-amber-500 hover:bg-amber-500/10 mt-1">
+							<Sparkles className="h-3 w-3" />
+							Upgrade to Pro
+						</Link>
+					)}
 				</div>
 			</div>
 		</div>
@@ -246,6 +261,7 @@ function ToggleProgress({
 	pct,
 	enabled,
 	onToggle,
+	disabled,
 }: {
 	label: string;
 	value: number;
@@ -253,12 +269,14 @@ function ToggleProgress({
 	pct: number;
 	enabled: boolean;
 	onToggle: (v: boolean) => void;
+	disabled?: boolean;
 }) {
 	return (
-		<div className={`flex items-center gap-2 ${enabled ? "" : "opacity-50"}`}>
+		<div className={`flex items-center gap-2 ${enabled && !disabled ? "" : "opacity-50"}`}>
 			<Switch
 				checked={enabled}
 				onCheckedChange={onToggle}
+				disabled={disabled}
 				className="scale-75 origin-left shrink-0"
 			/>
 			<div className="flex-1 min-w-0">
@@ -284,17 +302,20 @@ function ToggleCount({
 	count,
 	enabled,
 	onToggle,
+	disabled,
 }: {
 	label: string;
 	count: number;
 	enabled: boolean;
 	onToggle: (v: boolean) => void;
+	disabled?: boolean;
 }) {
 	return (
-		<div className={`flex items-center gap-2 ${enabled ? "" : "opacity-50"}`}>
+		<div className={`flex items-center gap-2 ${enabled && !disabled ? "" : "opacity-50"}`}>
 			<Switch
 				checked={enabled}
 				onCheckedChange={onToggle}
+				disabled={disabled}
 				className="scale-75 origin-left shrink-0"
 			/>
 			<div className="flex items-baseline justify-between flex-1">

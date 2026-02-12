@@ -45,22 +45,22 @@ function TermsPage() {
         <Section title="Service Description">
           <p>
             LENS is a local-first codebase indexing engine. The core CLI and
-            engine run entirely on your machine. The optional cloud tier provides
-            AI proxy services (embedding generation, purpose summaries) and
-            billing management.
+            engine run entirely on your machine. The optional cloud tier
+            provides AI proxy services (embedding generation, purpose summaries)
+            and billing management.
           </p>
           <p>
-            <strong className="text-foreground">Local components</strong> &mdash;
-            The LENS engine, CLI, and daemon operate locally. Your source code
-            never leaves your machine unless you explicitly opt into cloud
-            features.
+            <strong className="text-foreground">Local components</strong>{" "}
+            &mdash; The LENS engine, CLI, and daemon operate locally. Your
+            source code never leaves your machine unless you explicitly opt into
+            cloud features.
           </p>
           <p>
-            <strong className="text-foreground">Cloud components</strong> &mdash;
-            When enabled, the cloud tier proxies requests to third-party AI
-            services (Voyage AI for embeddings, OpenRouter for purpose
-            summaries). Only code snippets and metadata are transmitted, not full
-            files.
+            <strong className="text-foreground">Cloud components</strong>{" "}
+            &mdash; When enabled, the cloud tier proxies requests to third-party
+            AI services (Voyage AI for embeddings, OpenRouter for purpose
+            summaries). Only code snippets and metadata are transmitted, not
+            full files.
           </p>
         </Section>
 

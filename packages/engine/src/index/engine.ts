@@ -69,7 +69,8 @@ export async function runIndex(db: Db, repoId: string, caps?: Capabilities, forc
     let chunksUnchanged = 0;
     let chunksDeleted = 0;
 
-    for (const file of files) {
+    for (let fi = 0; fi < files.length; fi++) {
+      const file = files[fi];
       if (file.status === "deleted") {
         chunksDeleted += chunkQueries.deleteByRepoPath(db, repoId, file.path);
         continue;
@@ -140,7 +141,6 @@ export async function runIndex(db: Db, repoId: string, caps?: Capabilities, forc
     trace?.end("chunking", `+${chunksCreated} -${chunksDeleted}`);
     onProgress?.();
 
-    // Structural analysis
     trace?.step("extractMetadata");
     extractAndPersistMetadata(db, repoId);
     // Prune orphan metadata (paths with no chunks — e.g. stale dist/node_modules entries)

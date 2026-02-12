@@ -65,14 +65,10 @@ export function RootLayout() {
   useEffect(() => {
     const es = new EventSource("/api/auth/events");
     es.onmessage = () => {
+      // Daemon refreshes quota cache before emitting SSE, so data is fresh
       qc.invalidateQueries({ queryKey: ["auth-status"] });
-      // Auth changed (login/logout) — refresh daemon's plan cache then re-fetch usage
-      api.refreshPlan()
-        .then(() => {
-          qc.invalidateQueries({ queryKey: ["dashboard-usage"] });
-          qc.invalidateQueries({ queryKey: ["cloud-subscription"] });
-        })
-        .catch(() => {});
+      qc.invalidateQueries({ queryKey: ["dashboard-usage"] });
+      qc.invalidateQueries({ queryKey: ["cloud-subscription"] });
     };
     return () => es.close();
   }, [qc]);

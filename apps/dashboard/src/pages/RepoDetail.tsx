@@ -16,7 +16,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import {
   ArrowDownLeft,
   ArrowLeft,
@@ -122,7 +122,21 @@ export function RepoDetail() {
 
   const reindex = useMutation({
     mutationFn: api.reindex,
-    onSuccess: () =>
+    onMutate: (id) => {
+      queryClient.setQueryData(
+        ["dashboard-repos"],
+        (old: Awaited<ReturnType<typeof api.repos>> | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            repos: old.repos.map((r) =>
+              r.id === id ? { ...r, index_status: "indexing" } : r,
+            ),
+          };
+        },
+      );
+    },
+    onSettled: () =>
       queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
   });
 
@@ -176,9 +190,6 @@ export function RepoDetail() {
           <ArrowLeft className="h-3.5 w-3.5" /> Back
         </Button>
         <span className="text-sm font-medium">{repo.name}</span>
-        <span className="text-xs text-muted-foreground truncate hidden md:inline">
-          {repo.root_path}
-        </span>
         <div className="ml-auto flex gap-2">
           <ActionBtn
             onClick={() => reindex.mutate(repo.id)}
@@ -335,7 +346,7 @@ export function RepoDetail() {
         open={!!selectedFilePath}
         onOpenChange={(open) => !open && setSelectedFilePath(null)}
       >
-        <SheetContent side="right" className="overflow-y-auto sm:max-w-lg">
+        <SheetContent side="right" className="overflow-y-auto sm:max-w-xl">
           {fileDetail ? (
             <FileDetailSheet
               detail={fileDetail}
@@ -362,7 +373,7 @@ export function RepoDetail() {
           {chunkDetail ? (
             <>
               <SheetHeader>
-                <SheetTitle className="font-mono text-sm break-all">
+                <SheetTitle className="font-mono text-sm break-all select-all pr-6">
                   <FileCode className="inline h-3.5 w-3.5 mr-1.5 align-text-bottom" />
                   {chunkDetail.path}
                 </SheetTitle>
@@ -433,7 +444,7 @@ function FileDetailSheet({
   return (
     <>
       <SheetHeader>
-        <SheetTitle className="font-mono text-sm break-all">
+        <SheetTitle className="font-mono text-sm break-all select-all pr-6">
           {detail.path}
         </SheetTitle>
         <SheetDescription>
@@ -680,12 +691,24 @@ type RepoSummary = NonNullable<
   Awaited<ReturnType<typeof api.repos>>["repos"]
 >[number];
 
-function OverviewTab({ repo, isPro, repoId }: { repo: RepoSummary; isPro: boolean; repoId: string }) {
+function OverviewTab({
+  repo,
+  isPro,
+  repoId,
+}: {
+  repo: RepoSummary;
+  isPro: boolean;
+  repoId: string;
+}) {
   const queryClient = useQueryClient();
   const updateSettings = useMutation({
-    mutationFn: (settings: { enable_embeddings?: boolean; enable_summaries?: boolean; enable_vocab_clusters?: boolean }) =>
-      api.updateRepoSettings(repoId, settings),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+    mutationFn: (settings: {
+      enable_embeddings?: boolean;
+      enable_summaries?: boolean;
+      enable_vocab_clusters?: boolean;
+    }) => api.updateRepoSettings(repoId, settings),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
   });
   const embPct =
     repo.embeddable_count > 0
@@ -725,17 +748,25 @@ function OverviewTab({ repo, isPro, repoId }: { repo: RepoSummary; isPro: boolea
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs font-medium">Enrichment</span>
-            {!repo.has_capabilities && (
-              <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/40">
+            {!isPro && (
+              <Badge
+                variant="outline"
+                className="text-[10px] text-amber-500 border-amber-500/40"
+              >
                 Pro
               </Badge>
             )}
           </div>
           <div className="space-y-2 text-xs">
-            <div className="flex items-center gap-2">
+            <div
+              className={`flex items-center gap-2 ${!isPro || !repo.enable_embeddings ? "opacity-50" : ""}`}
+            >
               <Switch
                 checked={!!repo.enable_embeddings}
-                onCheckedChange={(v) => updateSettings.mutate({ enable_embeddings: v })}
+                onCheckedChange={(v) =>
+                  updateSettings.mutate({ enable_embeddings: v })
+                }
+                disabled={!isPro}
                 className="scale-75 origin-left shrink-0"
               />
               <div className="flex-1 min-w-0">
@@ -744,14 +775,19 @@ function OverviewTab({ repo, isPro, repoId }: { repo: RepoSummary; isPro: boolea
                   value={repo.embedded_count}
                   max={repo.embeddable_count}
                   pct={embPct}
-                  disabled={!repo.enable_embeddings}
+                  disabled={!isPro || !repo.enable_embeddings}
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div
+              className={`flex items-center gap-2 ${!isPro || !repo.enable_summaries ? "opacity-50" : ""}`}
+            >
               <Switch
                 checked={!!repo.enable_summaries}
-                onCheckedChange={(v) => updateSettings.mutate({ enable_summaries: v })}
+                onCheckedChange={(v) =>
+                  updateSettings.mutate({ enable_summaries: v })
+                }
+                disabled={!isPro}
                 className="scale-75 origin-left shrink-0"
               />
               <div className="flex-1 min-w-0">
@@ -760,21 +796,39 @@ function OverviewTab({ repo, isPro, repoId }: { repo: RepoSummary; isPro: boolea
                   value={repo.purpose_count}
                   max={repo.purpose_total}
                   pct={purPct}
-                  disabled={!repo.enable_summaries}
+                  disabled={!isPro || !repo.enable_summaries}
                 />
               </div>
             </div>
-            <div className={`flex items-center gap-2 ${repo.enable_vocab_clusters ? "" : "opacity-50"}`}>
+            <div
+              className={`flex items-center gap-2 ${!isPro || !repo.enable_vocab_clusters ? "opacity-50" : ""}`}
+            >
               <Switch
                 checked={!!repo.enable_vocab_clusters}
-                onCheckedChange={(v) => updateSettings.mutate({ enable_vocab_clusters: v })}
+                onCheckedChange={(v) =>
+                  updateSettings.mutate({ enable_vocab_clusters: v })
+                }
+                disabled={!isPro}
                 className="scale-75 origin-left shrink-0"
               />
               <div className="flex items-baseline justify-between flex-1">
-                <span className="text-[10px] text-muted-foreground">Vocab clusters</span>
-                <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{repo.vocab_cluster_count}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  Vocab clusters
+                </span>
+                <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                  {repo.vocab_cluster_count}
+                </span>
               </div>
             </div>
+            {!isPro && (
+              <Link
+                to="/billing"
+                className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 px-3 py-1.5 text-[11px] font-medium text-amber-500 hover:bg-amber-500/10 mt-1"
+              >
+                <Sparkles className="h-3 w-3" />
+                Upgrade to Pro
+              </Link>
+            )}
           </div>
         </div>
 
@@ -783,21 +837,13 @@ function OverviewTab({ repo, isPro, repoId }: { repo: RepoSummary; isPro: boolea
           <div className="flex items-center gap-2 mb-2">
             <Eye className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs font-medium">Watcher</span>
-            <StatusBadge
-              status={repo.watcher.active ? "active" : "inactive"}
-            />
+            <StatusBadge status={repo.watcher.active ? "active" : "inactive"} />
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
             {repo.watcher.active ? (
               <>
-                <Kv
-                  label="Changed files"
-                  value={repo.watcher.changed_files}
-                />
-                <Kv
-                  label="Started"
-                  value={timeAgo(repo.watcher.started_at)}
-                />
+                <Kv label="Changed files" value={repo.watcher.changed_files} />
+                <Kv label="Started" value={timeAgo(repo.watcher.started_at)} />
               </>
             ) : (
               <p className="text-[10px] text-muted-foreground col-span-2">
@@ -834,7 +880,9 @@ function Kv({
   return (
     <div className="flex items-baseline justify-between">
       <span className="text-[10px] text-muted-foreground">{label}</span>
-      <span className={`text-xs font-medium tabular-nums ${mono ? "font-mono" : ""}`}>
+      <span
+        className={`text-xs font-medium tabular-nums ${mono ? "font-mono" : ""}`}
+      >
         {value}
       </span>
     </div>
@@ -965,7 +1013,7 @@ function FilesTab({
                     <button
                       type="button"
                       onClick={() => onSelectFile(f.path)}
-                      className="text-primary hover:underline font-mono text-left truncate block max-w-sm"
+                      className="text-primary hover:underline font-mono text-left"
                     >
                       {f.path}
                     </button>
@@ -1145,7 +1193,7 @@ function ChunksTab({
                     <button
                       type="button"
                       onClick={() => onSelectChunk(ch.id)}
-                      className="text-primary hover:underline font-mono text-left truncate block max-w-sm"
+                      className="text-primary hover:underline font-mono text-left"
                     >
                       {ch.path}
                     </button>
@@ -1220,7 +1268,7 @@ function VocabTab({
 
   if (clusters.length === 0) {
     return (
-      <div className="rounded-lg border bg-card py-10 text-center text-sm text-muted-foreground">
+      <div className="rounded-lg border bg-card py-10 m-2 text-center text-sm text-muted-foreground">
         No vocab clusters. Pro plan required for semantic term clustering.
       </div>
     );

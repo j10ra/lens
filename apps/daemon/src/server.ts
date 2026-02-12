@@ -147,7 +147,7 @@ export function createApp(
     const start = performance.now();
     const path = new URL(c.req.url).pathname;
 
-    if (path.startsWith("/dashboard/") || path.startsWith("/api/dashboard/") || path === "/health") {
+    if (path.startsWith("/dashboard/") || path.startsWith("/api/dashboard/") || path === "/health" || path.endsWith("/events")) {
       return next();
     }
 
@@ -625,7 +625,7 @@ export function createApp(
   app.get("/api/repo/events", (c) => {
     const stream = new ReadableStream({
       start(ctrl) { repoClients.add(ctrl); },
-      cancel(ctrl) { repoClients.delete(ctrl as ReadableStreamDefaultController); },
+      cancel() { /* cleaned up on next failed enqueue */ },
     });
     return new Response(stream, {
       headers: {
@@ -639,15 +639,22 @@ export function createApp(
   // SSE: watch ~/.lens/auth.json and push changes to connected clients
   const authClients = new Set<ReadableStreamDefaultController>();
   const authDir = join(homedir(), ".lens");
+
+  function emitAuthEvent() {
+    for (const ctrl of authClients) {
+      try { ctrl.enqueue(encoder.encode("data: auth-changed\n\n")); }
+      catch { authClients.delete(ctrl); }
+    }
+  }
+
   try {
     watch(authDir, (_, filename) => {
-      if (filename !== "auth.json") return;
-      for (const ctrl of authClients) {
-        try { ctrl.enqueue(new TextEncoder().encode("data: auth-changed\n\n")); }
-        catch { authClients.delete(ctrl); }
-      }
-      // Auto-refresh plan status when auth changes (login/logout/key provision)
-      refreshQuotaCache().catch(() => {});
+      // filename can be null on macOS — emit if null or auth.json
+      if (filename && filename !== "auth.json") return;
+      // Refresh quota THEN emit SSE — dashboard gets fresh plan data
+      refreshQuotaCache()
+        .then(() => emitAuthEvent())
+        .catch(() => emitAuthEvent());
     });
   } catch {}
 
@@ -655,7 +662,7 @@ export function createApp(
   app.get("/api/auth/events", (c) => {
     const stream = new ReadableStream({
       start(ctrl) { authClients.add(ctrl); },
-      cancel(ctrl) { authClients.delete(ctrl as ReadableStreamDefaultController); },
+      cancel() { /* cleaned up on next failed enqueue */ },
     });
     return new Response(stream, {
       headers: {
@@ -664,6 +671,13 @@ export function createApp(
         Connection: "keep-alive",
       },
     });
+  });
+
+  trackRoute("POST", "/api/auth/notify");
+  app.post("/api/auth/notify", async (c) => {
+    await refreshQuotaCache();
+    emitAuthEvent();
+    return c.json({ ok: true });
   });
 
   trackRoute("GET", "/api/auth/status");
@@ -1236,14 +1250,21 @@ export function createApp(
       if (existsSync(fullPath) && statSync(fullPath).isFile()) {
         const content = readFileSync(fullPath);
         const mime = MIME_TYPES[extname(fullPath)] ?? "application/octet-stream";
-        return new Response(content, { headers: { "Content-Type": mime, "Cache-Control": "public, max-age=3600" } });
+        const isHtml = mime === "text/html";
+        return new Response(content, {
+          headers: {
+            "Content-Type": mime,
+            "Cache-Control": isHtml ? "no-cache" : "public, max-age=86400",
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
       }
 
       // SPA fallback
       const indexPath = join(dashboardDist, "index.html");
       if (existsSync(indexPath)) {
         return new Response(readFileSync(indexPath), {
-          headers: { "Content-Type": "text/html" },
+          headers: { "Content-Type": "text/html", "Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*" },
         });
       }
 
@@ -1264,21 +1285,22 @@ export function createApp(
       ]);
       if (res.ok) {
         const data = await res.json() as any;
+        const plan = (data.plan ?? "free").trim();
         const subData = subRes.ok ? ((await subRes.json()) as any).subscription ?? null : null;
         quotaCache = {
-          plan: data.plan ?? "free",
+          plan,
           usage: data.usage ?? {},
           quota: data.quota ?? {},
           subscription: subData,
           fetchedAt: Date.now(),
         };
         // Clear capabilities on downgrade
-        if (caps && data.plan !== "pro") {
+        if (caps && plan !== "pro") {
           caps = undefined;
           console.error("[LENS] Cloud capabilities disabled (plan changed to free)");
         }
         // Lazy capability recovery — if caps failed at startup but plan is Pro now
-        if (!caps && data.plan === "pro") {
+        if (!caps && plan === "pro") {
           const apiKey = await readApiKey();
           if (apiKey) {
             const { createCloudCapabilities } = await import("./cloud-capabilities");

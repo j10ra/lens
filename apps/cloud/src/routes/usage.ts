@@ -41,7 +41,7 @@ usage.get("/current", async (c) => {
   const userId = c.get("userId");
   const db = getDb(c.env.DATABASE_URL);
   const sub = await subscriptionQueries.getByUserId(db, userId);
-  const plan = sub?.plan ?? "free";
+  const plan = (sub?.plan ?? "free").trim();
   const periodStart =
     sub?.currentPeriodStart?.toISOString().slice(0, 10) ??
     new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);

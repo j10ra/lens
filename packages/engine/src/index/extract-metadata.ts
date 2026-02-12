@@ -9,8 +9,10 @@ const PY_EXPORT_RE = /^(?:def|class)\s+(\w+)/gm;
 const GO_EXPORT_RE = /^func\s+([A-Z]\w*)/gm;
 const RUST_EXPORT_RE = /^pub\s+(?:fn|struct|enum|trait|type|mod)\s+(\w+)/gm;
 const CSHARP_EXPORT_RE =
-  /^(?:public|internal)\s+(?:static\s+)?(?:abstract\s+|sealed\s+|partial\s+)?(?:class|interface|enum|struct|record|delegate)\s+(\w+)/gm;
-const JAVA_EXPORT_RE = /^(?:public)\s+(?:static\s+)?(?:abstract\s+|final\s+)?(?:class|interface|enum|record)\s+(\w+)/gm;
+  /^\s*(?:public|internal)\s+(?:static\s+)?(?:abstract\s+|sealed\s+|partial\s+)?(?:class|interface|enum|struct|record|delegate)\s+(\w+)/gm;
+const CSHARP_EXPORT_METHOD_RE =
+  /^\s*public\s+(?:static\s+)?(?:async\s+)?(?:override\s+)?(?:virtual\s+)?[\w<>\[\]?.]+\s+(\w+)\s*\(/gm;
+const JAVA_EXPORT_RE = /^\s*(?:public)\s+(?:static\s+)?(?:abstract\s+|final\s+)?(?:class|interface|enum|record)\s+(\w+)/gm;
 
 const JSDOC_RE = /^\/\*\*\s*([\s\S]*?)\*\//m;
 const PY_DOCSTRING_RE = /^(?:["']{3})([\s\S]*?)(?:["']{3})/m;
@@ -38,9 +40,15 @@ function extractExports(content: string, language: string): string[] {
     case "rust":
       re = new RegExp(RUST_EXPORT_RE.source, "gm");
       break;
-    case "csharp":
-      re = new RegExp(CSHARP_EXPORT_RE.source, "gm");
-      break;
+    case "csharp": {
+      const exports: string[] = [];
+      for (const pattern of [CSHARP_EXPORT_RE, CSHARP_EXPORT_METHOD_RE]) {
+        for (const m of content.matchAll(new RegExp(pattern.source, "gm"))) {
+          if (m[1] && !exports.includes(m[1])) exports.push(m[1]);
+        }
+      }
+      return exports.slice(0, 30);
+    }
     case "java":
     case "kotlin":
       re = new RegExp(JAVA_EXPORT_RE.source, "gm");
@@ -153,8 +161,12 @@ const RUST_INTERNAL_RES = [
 ];
 
 const CSHARP_INTERNAL_RES = [
+  // Types with explicit access modifier
   /^\s*(?:private|protected|internal)\s+(?:static\s+)?(?:abstract\s+|sealed\s+|partial\s+)?(?:class|interface|enum|struct|record)\s+(\w+)/gm,
-  /^\s*(?:private|protected|internal)\s+(?:static\s+)?(?:async\s+)?[\w<>\[\].]+\s+(\w+)\s*\(/gm,
+  // Methods with explicit access modifier
+  /^\s*(?:private|protected|internal)\s+(?:static\s+)?(?:async\s+)?[\w<>\[\]?.]+\s+(\w+)\s*\(/gm,
+  // Methods with no access modifier (implicitly private in C#): returnType Name(
+  /^\s+(?:static\s+)?(?:async\s+)?(?:override\s+)?(?:virtual\s+)?[\w<>\[\]?.]+\s+(\w+)\s*\(/gm,
 ];
 
 const JAVA_INTERNAL_RES = [
@@ -236,7 +248,13 @@ function extractInternals(content: string, language: string, exports: string[]):
       );
 
     case "csharp":
-      return collectMatches(content, CSHARP_INTERNAL_RES, exportSet);
+      return collectMatches(
+        content,
+        CSHARP_INTERNAL_RES,
+        exportSet,
+        (line) => /^\s*public\s/.test(line),
+        (name) => /^(?:if|for|foreach|while|switch|using|catch|lock|return|throw|yield|try|do|else|new|await|base|this)$/.test(name),
+      );
 
     case "java":
       return collectMatches(content, JAVA_INTERNAL_RES, exportSet);
