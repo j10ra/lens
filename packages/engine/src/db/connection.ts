@@ -32,6 +32,13 @@ export function openDb(customPath?: string): Db {
   // Create tables (idempotent)
   sqlite.exec(createTablesSql());
 
+  // Migrate: add sections + internals columns to file_metadata
+  const cols = new Set(
+    (sqlite.pragma("table_info(file_metadata)") as { name: string }[]).map((c) => c.name),
+  );
+  if (!cols.has("sections")) sqlite.exec("ALTER TABLE file_metadata ADD COLUMN sections TEXT DEFAULT '[]'");
+  if (!cols.has("internals")) sqlite.exec("ALTER TABLE file_metadata ADD COLUMN internals TEXT DEFAULT '[]'");
+
   _db = db;
   _raw = sqlite;
   return db;
@@ -100,6 +107,8 @@ function createTablesSql(): string {
       exports TEXT DEFAULT '[]',
       imports TEXT DEFAULT '[]',
       docstring TEXT DEFAULT '',
+      sections TEXT DEFAULT '[]',
+      internals TEXT DEFAULT '[]',
       purpose TEXT DEFAULT '',
       purpose_hash TEXT DEFAULT '',
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),

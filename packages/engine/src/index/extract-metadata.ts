@@ -93,15 +93,77 @@ export interface FileMetadataExtracted {
   exports: string[];
   imports: string[];
   docstring: string;
+  sections: string[];
+  internals: string[];
+}
+
+const SECTION_SINGLE_RE = /^(?:\/\/|#)\s*[-=]{3,}\s*(.+?)\s*[-=]{3,}\s*$/gm;
+const SECTION_BLOCK_RE = /^\/\*\s*[-=]{3,}\s*(.+?)\s*[-=]{3,}\s*\*\/$/gm;
+
+function extractSections(content: string): string[] {
+  const seen = new Set<string>();
+  const sections: string[] = [];
+
+  for (const re of [SECTION_SINGLE_RE, SECTION_BLOCK_RE]) {
+    const pattern = new RegExp(re.source, re.flags);
+    for (const m of content.matchAll(pattern)) {
+      const label = m[1]?.trim();
+      if (label && !seen.has(label)) {
+        seen.add(label);
+        sections.push(label);
+      }
+    }
+  }
+
+  return sections.slice(0, 15);
+}
+
+const TS_INTERNAL_FN_RE = /^(?:async\s+)?function\s+(\w+)/gm;
+const TS_INTERNAL_CONST_RE = /^(?:const|let)\s+(\w+)\s*=/gm;
+
+function extractInternals(content: string, language: string, exports: string[]): string[] {
+  switch (language) {
+    case "typescript":
+    case "javascript":
+    case "tsx":
+    case "jsx":
+      break;
+    default:
+      return [];
+  }
+
+  const exportSet = new Set(exports);
+  const seen = new Set<string>();
+  const internals: string[] = [];
+
+  for (const line of content.split("\n")) {
+    if (line.trimStart().startsWith("export")) continue;
+
+    for (const re of [TS_INTERNAL_FN_RE, TS_INTERNAL_CONST_RE]) {
+      const pattern = new RegExp(re.source, re.flags);
+      for (const m of line.matchAll(pattern)) {
+        const name = m[1];
+        if (name && name.length >= 6 && !exportSet.has(name) && !seen.has(name)) {
+          seen.add(name);
+          internals.push(name);
+        }
+      }
+    }
+  }
+
+  return internals.slice(0, 20);
 }
 
 export function extractFileMetadata(path: string, content: string, language: string): FileMetadataExtracted {
+  const exports = extractExports(content, language);
   return {
     path,
     language,
-    exports: extractExports(content, language),
+    exports,
     imports: extractImportSpecifiers(content, language),
     docstring: extractDocstring(content, language),
+    sections: extractSections(content),
+    internals: extractInternals(content, language, exports),
   };
 }
 
@@ -124,7 +186,7 @@ export function extractAndPersistMetadata(db: Db, repoId: string): number {
   let count = 0;
   for (const [path, { content, language }] of files) {
     const meta = extractFileMetadata(path, content, language);
-    metadataQueries.upsert(db, repoId, path, language, meta.exports, meta.imports, meta.docstring);
+    metadataQueries.upsert(db, repoId, path, language, meta.exports, meta.imports, meta.docstring, meta.sections, meta.internals);
     count++;
   }
 

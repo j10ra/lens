@@ -67,6 +67,8 @@ export const fileMetadata = sqliteTable(
     exports: text("exports").default("[]"),
     imports: text("imports").default("[]"),
     docstring: text("docstring").default(""),
+    sections: text("sections").default("[]"),
+    internals: text("internals").default("[]"),
     purpose: text("purpose").default(""),
     purpose_hash: text("purpose_hash").default(""),
     updated_at: updatedAt(),

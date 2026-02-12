@@ -326,6 +326,8 @@ export const metadataQueries = {
     exports: string[],
     imports: string[],
     docstring: string,
+    sections: string[],
+    internals: string[],
   ): void {
     db.insert(fileMetadata)
       .values({
@@ -336,6 +338,8 @@ export const metadataQueries = {
         exports: JSON.stringify(exports),
         imports: JSON.stringify(imports),
         docstring,
+        sections: JSON.stringify(sections),
+        internals: JSON.stringify(internals),
       })
       .onConflictDoUpdate({
         target: [fileMetadata.repo_id, fileMetadata.path],
@@ -344,6 +348,8 @@ export const metadataQueries = {
           exports: JSON.stringify(exports),
           imports: JSON.stringify(imports),
           docstring,
+          sections: JSON.stringify(sections),
+          internals: JSON.stringify(internals),
           updated_at: sql`datetime('now')`,
         },
       })
@@ -357,6 +363,8 @@ export const metadataQueries = {
         language: fileMetadata.language,
         exports: fileMetadata.exports,
         docstring: fileMetadata.docstring,
+        sections: fileMetadata.sections,
+        internals: fileMetadata.internals,
         purpose: fileMetadata.purpose,
       })
       .from(fileMetadata)
@@ -367,6 +375,8 @@ export const metadataQueries = {
         ...r,
         exports: jsonParse(r.exports, [] as string[]),
         docstring: r.docstring ?? "",
+        sections: jsonParse(r.sections, [] as string[]),
+        internals: jsonParse(r.internals, [] as string[]),
         purpose: r.purpose ?? "",
       }));
   },

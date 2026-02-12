@@ -244,7 +244,7 @@ function buildTermWeights(words: string[], metadata: FileMetadataRow[]): Map<str
   for (const w of words) {
     let df = 0;
     for (const f of metadata) {
-      const haystack = `${f.path} ${(f.exports ?? []).join(" ")} ${f.docstring ?? ""} ${f.purpose ?? ""}`.toLowerCase();
+      const haystack = `${f.path} ${(f.exports ?? []).join(" ")} ${f.docstring ?? ""} ${f.purpose ?? ""} ${(f.sections ?? []).join(" ")} ${(f.internals ?? []).join(" ")}`.toLowerCase();
       if (haystack.includes(w)) df++;
     }
     const idf = df > 0 ? Math.min(10, Math.max(1, Math.log(N / df))) : 10;
@@ -278,6 +278,8 @@ export function interpretQuery(
     const exportsLower = (f.exports ?? []).join(" ").toLowerCase();
     const docLower = (f.docstring ?? "").toLowerCase();
     const purposeLower = (f.purpose ?? "").toLowerCase();
+    const sectionsLower = (f.sections ?? []).join(" ").toLowerCase();
+    const internalsLower = (f.internals ?? []).join(" ").toLowerCase();
 
     const pathSegments = pathLower.split("/");
     const fileName = pathSegments[pathSegments.length - 1].replace(/\.[^.]+$/, "");
@@ -300,6 +302,8 @@ export function interpretQuery(
       else if (pathTokenSet.has(w)) termScore += 2 * weight;
       if (exportsLower.includes(w)) termScore += 2 * weight;
       if (docLower.includes(w) || purposeLower.includes(w)) termScore += 1 * weight;
+      if (sectionsLower.includes(w)) termScore += 1 * weight;
+      if (internalsLower.includes(w)) termScore += 1.5 * weight;
       if (termScore > 0) matchedTerms++;
       score += termScore;
     }
@@ -309,6 +313,8 @@ export function interpretQuery(
       let termScore = 0;
       if (exportsLower.includes(w)) termScore += 2 * weight;
       if (docLower.includes(w) || purposeLower.includes(w)) termScore += 1 * weight;
+      if (sectionsLower.includes(w)) termScore += 1 * weight;
+      if (internalsLower.includes(w)) termScore += 1.5 * weight;
       if (termScore > 0) matchedTerms++;
       score += termScore;
     }

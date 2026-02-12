@@ -38,6 +38,8 @@ export interface FileMetadata {
   exports: string[];
   imports: string[];
   docstring: string;
+  sections: string[];
+  internals: string[];
   purpose: string;
   purpose_hash: string;
   updated_at: string;
@@ -95,6 +97,8 @@ export interface FileMetadataRow {
   language: string | null;
   exports: string[];
   docstring: string;
+  sections: string[];
+  internals: string[];
   purpose: string;
 }
 
