@@ -1,7 +1,15 @@
 import type { Capabilities, Db } from "@lens/engine";
-import { buildContext, getRepoStatus, listRepos, logQueries, registerRepo, repoQueries, RequestTrace, runIndex, settingsQueries } from "@lens/engine";
+import { buildContext, getRawDb, getRepoStatus, listRepos, registerRepo, repoQueries, RequestTrace, runIndex, settingsQueries } from "@lens/engine";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
+
+const LOG_SQL = `INSERT INTO request_logs (id, method, path, status, duration_ms, source, request_body, response_size, response_body, trace, created_at)
+  VALUES (?, ?, ?, ?, ?, 'mcp', ?, ?, ?, ?, datetime('now'))`;
+
+function logMcp(method: string, path: string, status: number, duration: number, reqBody?: string, resSize?: number, resBody?: string, trace?: string) {
+  getRawDb().prepare(LOG_SQL).run(randomUUID(), method, path, status, duration, reqBody ?? null, resSize ?? null, resBody ?? null, trace ?? null);
+}
 
 function text(s: string) {
   return { content: [{ type: "text" as const, text: s }] };
@@ -39,11 +47,11 @@ export function createMcpServer(db: Db, caps?: Capabilities): McpServer {
         const result = await buildContext(db, repoId, goal, caps, trace, { useEmbeddings });
         const duration = Math.round(performance.now() - start);
         const reqBody = JSON.stringify({ repo_path, goal });
-        logQueries.insert(db, "MCP", "/tool/get_context", 200, duration, "mcp", reqBody, result.context_pack.length, result.context_pack, trace.serialize());
+        logMcp("MCP", "/tool/get_context", 200, duration, reqBody, result.context_pack.length, result.context_pack, trace.serialize());
         return text(result.context_pack);
       } catch (e: any) {
         const duration = Math.round(performance.now() - start);
-        logQueries.insert(db, "MCP", "/tool/get_context", 500, duration, "mcp", JSON.stringify({ repo_path, goal }), undefined, e.message, trace.serialize());
+        logMcp("MCP", "/tool/get_context", 500, duration, JSON.stringify({ repo_path, goal }), undefined, e.message, trace.serialize());
         return error(e.message);
       }
     },
@@ -61,11 +69,11 @@ export function createMcpServer(db: Db, caps?: Capabilities): McpServer {
         const repos = listRepos(db);
         const body = JSON.stringify(repos, null, 2);
         const duration = Math.round(performance.now() - start);
-        logQueries.insert(db, "MCP", "/tool/list_repos", 200, duration, "mcp", undefined, body.length, body);
+        logMcp("MCP", "/tool/list_repos", 200, duration, undefined, body.length, body);
         return text(body);
       } catch (e: any) {
         const duration = Math.round(performance.now() - start);
-        logQueries.insert(db, "MCP", "/tool/list_repos", 500, duration, "mcp", undefined, undefined, e.message);
+        logMcp("MCP", "/tool/list_repos", 500, duration, undefined, undefined, e.message);
         return error(e.message);
       }
     },
@@ -82,17 +90,17 @@ export function createMcpServer(db: Db, caps?: Capabilities): McpServer {
       try {
         const repo = repoQueries.getByPath(db, repo_path);
         if (!repo) {
-          logQueries.insert(db, "MCP", "/tool/get_status", 404, Math.round(performance.now() - start), "mcp", JSON.stringify({ repo_path }));
+          logMcp("MCP", "/tool/get_status", 404, Math.round(performance.now() - start), JSON.stringify({ repo_path }));
           return error("repo not found at " + repo_path);
         }
         const status = await getRepoStatus(db, repo.id);
         const body = JSON.stringify(status, null, 2);
         const duration = Math.round(performance.now() - start);
-        logQueries.insert(db, "MCP", "/tool/get_status", 200, duration, "mcp", JSON.stringify({ repo_path }), body.length, body);
+        logMcp("MCP", "/tool/get_status", 200, duration, JSON.stringify({ repo_path }), body.length, body);
         return text(body);
       } catch (e: any) {
         const duration = Math.round(performance.now() - start);
-        logQueries.insert(db, "MCP", "/tool/get_status", 500, duration, "mcp", JSON.stringify({ repo_path }), undefined, e.message);
+        logMcp("MCP", "/tool/get_status", 500, duration, JSON.stringify({ repo_path }), undefined, e.message);
         return error(e.message);
       }
     },
@@ -114,11 +122,11 @@ export function createMcpServer(db: Db, caps?: Capabilities): McpServer {
         const result = await runIndex(db, repoId, caps, force ?? false, undefined, trace);
         const body = JSON.stringify(result, null, 2);
         const duration = Math.round(performance.now() - start);
-        logQueries.insert(db, "MCP", "/tool/index_repo", 200, duration, "mcp", JSON.stringify({ repo_path, force }), body.length, body, trace.serialize());
+        logMcp("MCP", "/tool/index_repo", 200, duration, JSON.stringify({ repo_path, force }), body.length, body, trace.serialize());
         return text(body);
       } catch (e: any) {
         const duration = Math.round(performance.now() - start);
-        logQueries.insert(db, "MCP", "/tool/index_repo", 500, duration, "mcp", JSON.stringify({ repo_path, force }), undefined, e.message, trace.serialize());
+        logMcp("MCP", "/tool/index_repo", 500, duration, JSON.stringify({ repo_path, force }), undefined, e.message, trace.serialize());
         return error(e.message);
       }
     },

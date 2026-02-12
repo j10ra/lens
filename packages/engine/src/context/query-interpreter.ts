@@ -271,6 +271,18 @@ export function interpretQuery(
   const allTerms = [...exact, ...stemmed];
   const termWeights = buildTermWeights(allTerms, metadata);
 
+  // Pre-compute decomposed export tokens per file (camelCase/PascalCase → individual words)
+  const exportTokensMap = new Map<string, Set<string>>();
+  for (const f of metadata) {
+    const tokens = new Set<string>();
+    for (const exp of f.exports ?? []) {
+      for (const part of exp.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(/[\s_-]+/)) {
+        if (part.length >= 3 && !STOPWORDS.has(part)) tokens.add(part);
+      }
+    }
+    exportTokensMap.set(f.path, tokens);
+  }
+
   const scored = metadata.map((f) => {
     let score = 0;
     let matchedTerms = 0;
@@ -294,13 +306,15 @@ export function interpretQuery(
       .flatMap((s) => s.replace(/\./g, " ").split(/\s+/))
       .filter((t) => t.length >= 2);
     const pathTokenSet = new Set([...fileTokens, ...dirTokens]);
+    const expTokens = exportTokensMap.get(f.path);
 
     for (const w of exact) {
       const weight = termWeights.get(w) ?? 1;
       let termScore = 0;
       if (fileTokens.some((t) => t === w || t.includes(w))) termScore += 4 * weight;
       else if (pathTokenSet.has(w)) termScore += 2 * weight;
-      if (exportsLower.includes(w)) termScore += 2 * weight;
+      if (expTokens?.has(w)) termScore += 2.5 * weight;
+      else if (exportsLower.includes(w)) termScore += 2 * weight;
       if (docLower.includes(w) || purposeLower.includes(w)) termScore += 1 * weight;
       if (sectionsLower.includes(w)) termScore += 1 * weight;
       if (internalsLower.includes(w)) termScore += 1.5 * weight;
@@ -326,6 +340,12 @@ export function interpretQuery(
 
     if (score > 0 && isNoisePath(f.path)) {
       score *= 0.3;
+    }
+
+    // Hub dampening: penalize files with excessive exports (data-layer hubs)
+    const exportCount = (f.exports ?? []).length;
+    if (exportCount > 5 && score > 0) {
+      score *= 1 / (1 + Math.log2(exportCount / 5) * 0.3);
     }
 
     const stats = fileStats?.get(f.path);
