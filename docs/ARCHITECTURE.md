@@ -3,33 +3,39 @@
 LENS is a local-first repo context engine that indexes codebases and serves context packs to AI agents. Three layers: engine (SQLite), daemon (HTTP + MCP), cloud (API + admin).
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  AI Agent (Claude Code, Cursor, etc.)               │
-│  ← MCP stdio or HTTP GET /context                   │
-└─────────────────┬───────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  AI Agent (Claude Code, Cursor, etc.)                    │
+│  ← MCP stdio or HTTP POST /context                      │
+└─────────────────┬────────────────────────────────────────┘
                   │
-┌─────────────────▼───────────────────────────────────┐
-│  Layer 2: Daemon  (Hono, :4111)                     │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │ REST API │ │ MCP svr  │ │Dashboard │            │
-│  └────┬─────┘ └────┬─────┘ └──────────┘            │
-│       │             │                                │
-│  ┌────▼─────────────▼──────┐  ┌────────────────┐   │
-│  │  Layer 1: Engine        │  │ Cloud Proxy    │   │
-│  │  SQLite (better-sqlite3)│  │ (authenticated)│   │
-│  └─────────────────────────┘  └───────┬────────┘   │
-└───────────────────────────────────────┼─────────────┘
+┌─────────────────┼────────────────────────────────────────┐
+│                 │    CLI (`lens` command)                 │
+│                 │    login, context, repo, index, status  │
+│                 │    ← HTTP to daemon :4111               │
+└─────────────────┼────────────────────────────────────────┘
+                  │
+┌─────────────────▼────────────────────────────────────────┐
+│  Layer 2: Daemon  (Hono, :4111)                          │
+│  ┌──────────┐ ┌──────────┐ ┌───────────┐                │
+│  │ REST API │ │ MCP svr  │ │ Dashboard │                │
+│  └────┬─────┘ └────┬─────┘ └───────────┘                │
+│       │             │                                     │
+│  ┌────▼─────────────▼──────┐  ┌────────────────┐        │
+│  │  Layer 1: Engine        │  │ Cloud Proxy    │        │
+│  │  SQLite (better-sqlite3)│  │ (authenticated)│        │
+│  └─────────────────────────┘  └───────┬────────┘        │
+└───────────────────────────────────────┼──────────────────┘
                                         │
-┌───────────────────────────────────────▼─────────────┐
-│  Layer 3: Cloud  (Hono API + TanStack Start SSR)    │
-│  ┌──────┐ ┌──────┐ ┌───────┐ ┌────────┐ ┌──────┐  │
-│  │ Auth │ │ Keys │ │ Usage │ │ Proxy  │ │Stripe│  │
-│  └──────┘ └──────┘ └───────┘ └───┬────┘ └──────┘  │
-│                                   │                  │
-│                          ┌────────▼────────┐        │
-│                          │ Voyage  OpenRtr  │        │
-│                          └─────────────────┘        │
-└───────────────────────────────┬─────────────────────┘
+┌───────────────────────────────────────▼──────────────────┐
+│  Layer 3: Cloud  (Hono API + TanStack Start SSR)         │
+│  ┌──────┐ ┌──────┐ ┌───────┐ ┌────────┐ ┌──────┐       │
+│  │ Auth │ │ Keys │ │ Usage │ │ Proxy  │ │Stripe│       │
+│  └──────┘ └──────┘ └───────┘ └───┬────┘ └──────┘       │
+│                                   │                       │
+│                          ┌────────▼────────┐             │
+│                          │ Voyage  OpenRtr  │             │
+│                          └─────────────────┘             │
+└───────────────────────────────┬──────────────────────────┘
                                 │
                     ┌───────────▼───────────┐
                     │  Supabase (Postgres)  │
@@ -49,12 +55,13 @@ Core indexing and retrieval. Pure TypeScript, SQLite via better-sqlite3 + Drizzl
 |-------|---------|
 | `repos` | Registered repositories (path, name, index state, vocab clusters) |
 | `chunks` | Code chunks with content hash, language, embedding vector |
-| `file_metadata` | Exports, imports, docstrings per file |
+| `file_metadata` | Exports, imports, docstrings, sections, internals, purpose per file |
 | `file_imports` | Directed import graph edges |
 | `file_stats` | Per-file git statistics |
 | `file_cochanges` | Co-change pairs (files modified together in commits) |
 | `usage_counters` | Local daily counters (context queries, repos indexed) |
-| `request_logs` | HTTP request log (method, path, status, duration, source) |
+| `request_logs` | HTTP/MCP request log (method, path, status, duration, source, request/response body, trace) |
+| `settings` | Generic key-value store (unused by engine, retained for future UI prefs) |
 | `telemetry_events` | Buffered telemetry events (synced to cloud periodically) |
 
 ### Indexing Pipeline
@@ -130,6 +137,48 @@ Response: ~10ms cached, ~0.5-7s cold (depending on repo size and Pro features).
 
 Post-scoring: sibling dedup (max 2/group) → dynamic cap (8-15 based on import depth) → co-change promotion (up to 3) → semantic merge (up to 5 replacements).
 
+### Request Tracing
+
+`packages/engine/src/trace.ts` — lightweight step timer attached to context and index pipelines.
+
+```
+trace.step("interpretQuery")
+  ... work ...
+trace.end("interpretQuery", "12 files")
+```
+
+Serialized as JSON into `request_logs.trace` column. Dashboard Requests page renders waterfall timings per request.
+
+---
+
+## CLI (`packages/cli`)
+
+`lens` command — the user-facing CLI. Communicates with daemon over HTTP `:4111`.
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `lens login` | OAuth login (starts local server, opens browser) |
+| `lens logout` | Revokes API key, deletes auth.json |
+| `lens repo register [path]` | Register repo for indexing |
+| `lens repo list` | List registered repos |
+| `lens index [--force]` | Trigger re-index |
+| `lens context "goal"` | Query context pack |
+| `lens status` | Repo indexing status |
+| `lens daemon start/stop` | Manage daemon process |
+| `lens dashboard` | Open dashboard in browser |
+| `lens init` | Write `.mcp.json` for MCP auto-discovery |
+| `lens config set/get` | Manage `~/.lens/config.json` |
+
+### Key Files
+
+- `packages/cli/src/index.ts` — Commander program, command registration
+- `packages/cli/src/commands/login.ts` — Local HTTP server for OAuth callback
+- `packages/cli/src/util/client.ts` — HTTP client for daemon API
+- `packages/cli/src/util/auth.ts` — Read/write `~/.lens/auth.json`
+- `packages/cli/src/util/config.ts` — Read/write `~/.lens/config.json`
+
 ---
 
 ## Layer 2: Daemon (`apps/daemon`)
@@ -162,15 +211,23 @@ Hono HTTP server on `:4111`. Dual transport: HTTP for CLI/dashboard, stdio for M
 
 ### Request Logging
 
-Every request (except dashboard static files and `/health`) is logged to SQLite:
+Every request (except dashboard static files and `/health`) is logged to SQLite `request_logs`:
 
-```
-logQueries.insert(db, method, path, status, duration_ms, source)
-```
+| Column | Description |
+|--------|-------------|
+| `method` | HTTP method or "MCP" |
+| `path` | URL path or MCP tool name |
+| `status` | Response status code |
+| `duration_ms` | Response time |
+| `source` | "cli", "mcp", "dashboard", "api", "cloud" |
+| `request_body` | Raw request body (optional) |
+| `response_size` | Response body length |
+| `response_body` | Raw response (optional, for cloud proxy calls) |
+| `trace` | Serialized RequestTrace JSON (step timings) |
 
 Source derived from: path prefix (`/api/dashboard/` → "dashboard"), User-Agent (`lens-cli` → "cli", `mcp` → "mcp"), default → "api".
 
-Logs pruned hourly (7-day retention).
+Logs pruned hourly (7-day retention). Dashboard Requests page shows filterable table with trace waterfall.
 
 ### File Watchers
 
@@ -200,18 +257,21 @@ Dashboard subscribes to both for real-time updates.
 
 ```
 1. User: lens login
-2. CLI opens browser → https://cloud.lens-engine.com/auth/login?device_code=<uuid>
-3. User authenticates via Supabase (GitHub OAuth, Google, or magic link)
-4. Cloud callback: /auth/callback
-   a. Upserts Supabase user
-   b. Creates default API key (lk_live_ prefix, SHA-256 hashed)
-   c. Redirects with tokens
-5. CLI writes ~/.lens/auth.json:
-   {
-     access_token, refresh_token, user_email,
-     user_id, expires_at, api_key: "lk_live_..."
-   }
-6. Daemon detects auth.json change → SSE push to dashboard
+2. CLI starts local HTTP server on random port
+3. Opens browser → localhost:{port}/ (provider chooser page)
+4. User clicks GitHub or Google → redirects to Supabase OAuth
+   └→ redirect_to=http://localhost:{port}/callback
+5. Supabase redirects back with tokens in URL hash fragment
+6. Callback page JS extracts access_token from hash
+   a. Fetches user email via Supabase /auth/v1/user
+   b. POSTs tokens to localhost:{port}/token
+7. CLI /token handler:
+   a. Provisions cloud API key: GET {cloudUrl}/auth/key
+   b. Writes ~/.lens/auth.json:
+      { access_token, refresh_token, user_email, expires_at, api_key }
+   c. Notifies daemon: POST /api/auth/notify
+8. Browser redirects to http://127.0.0.1:4111/dashboard/
+9. Daemon detects auth.json change → SSE push to dashboard
 ```
 
 ### API Key Provisioning
