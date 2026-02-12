@@ -1,6 +1,6 @@
 {
 	"name": "lens-engine",
-	"version": "0.1.18",
+	"version": "0.1.19",
 	"description": "LENS — Local-first repo context engine for AI agents",
 	"type": "module",
 	"bin": {
