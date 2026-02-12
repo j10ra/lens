@@ -140,44 +140,32 @@ function extractSections(content: string): string[] {
   return sections.slice(0, 15);
 }
 
-const TS_INTERNAL_FN_RE = /^(?:async\s+)?function\s+(\w+)/gm;
-const TS_INTERNAL_CONST_RE = /^(?:const|let)\s+(\w+)\s*=/gm;
-
-const GO_INTERNAL_RES = [
-  /^func\s+([a-z]\w*)/gm,
-  /^var\s+([a-z]\w*)/gm,
-  /^const\s+([a-z]\w*)/gm,
+const UNIVERSAL_DECL_RES: RegExp[] = [
+  /^\s*(?:async\s+|suspend\s+)?(?:function|def|fn|func|fun)\s+(?:\([^)]+\)\s+)?(\w+)/gm,
+  /^\s*(?:const|let|var|val)\s+(\w+)\s*[=:]/gm,
+  /^\s*(?:abstract\s+|sealed\s+|partial\s+|data\s+)?(?:class|struct|enum|trait|interface|record|object|mod)\s+(\w+)/gm,
+  /^\s*type\s+(\w+)\s*[=<{]/gm,
+  /^\s*(?:private|protected|internal)\s+(?:static\s+)?(?:async\s+)?(?:suspend\s+)?(?:override\s+)?[\w<>\[\]?.]+\s+(\w+)\s*\(/gm,
 ];
 
-const PY_INTERNAL_RES = [/^def\s+(\w+)/gm, /^class\s+(\w+)/gm];
+const EXPORT_LINE_RE = /^(?:export|pub\s|public\s)/;
 
-const RUST_INTERNAL_RES = [
-  /^(?:async\s+)?fn\s+(\w+)/gm,
-  /^struct\s+(\w+)/gm,
-  /^enum\s+(\w+)/gm,
-  /^trait\s+(\w+)/gm,
-  /^type\s+(\w+)/gm,
-  /^const\s+(\w+)/gm,
-];
+function universalSkipLine(line: string): boolean {
+  const trimmed = line.trimStart();
+  if (trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) return true;
+  if (trimmed.startsWith("#") && !trimmed.startsWith("#!")) return true;
+  return EXPORT_LINE_RE.test(trimmed);
+}
 
-const CSHARP_INTERNAL_RES = [
-  // Types with explicit access modifier
-  /^\s*(?:private|protected|internal)\s+(?:static\s+)?(?:abstract\s+|sealed\s+|partial\s+)?(?:class|interface|enum|struct|record)\s+(\w+)/gm,
-  // Methods with explicit access modifier
-  /^\s*(?:private|protected|internal)\s+(?:static\s+)?(?:async\s+)?[\w<>\[\]?.]+\s+(\w+)\s*\(/gm,
-  // Methods with no access modifier (implicitly private in C#): returnType Name(
-  /^\s+(?:static\s+)?(?:async\s+)?(?:override\s+)?(?:virtual\s+)?[\w<>\[\]?.]+\s+(\w+)\s*\(/gm,
-];
+const SKIP_NAMES = new Set([
+  "if","for","foreach","while","switch","using","catch","lock",
+  "return","throw","yield","try","do","else","new","await",
+  "base","this","super","self","import","require","from","package",
+]);
 
-const JAVA_INTERNAL_RES = [
-  /^\s*(?:private|protected)\s+(?:static\s+)?(?:final\s+|abstract\s+)?(?:class|interface|enum|record)\s+(\w+)/gm,
-  /^\s*(?:private|protected)\s+(?:static\s+)?(?:final\s+|abstract\s+)?[\w<>\[\].]+\s+(\w+)\s*\(/gm,
-];
-
-const KOTLIN_INTERNAL_RES = [
-  /^\s*private\s+(?:suspend\s+)?fun\s+(\w+)/gm,
-  /^\s*private\s+(?:data\s+)?(?:class|interface|object|enum)\s+(\w+)/gm,
-];
+function universalSkipName(name: string): boolean {
+  return SKIP_NAMES.has(name) || name.startsWith("_");
+}
 
 function collectMatches(
   content: string,
@@ -212,59 +200,8 @@ function collectMatches(
   return results.slice(0, 20);
 }
 
-function extractInternals(content: string, language: string, exports: string[]): string[] {
-  const exportSet = new Set(exports);
-
-  switch (language) {
-    case "typescript":
-    case "javascript":
-    case "tsx":
-    case "jsx":
-      return collectMatches(
-        content,
-        [TS_INTERNAL_FN_RE, TS_INTERNAL_CONST_RE],
-        exportSet,
-        (line) => line.trimStart().startsWith("export"),
-      );
-
-    case "go":
-      return collectMatches(content, GO_INTERNAL_RES, exportSet);
-
-    case "python":
-      return collectMatches(
-        content,
-        PY_INTERNAL_RES,
-        exportSet,
-        undefined,
-        (name) => name.startsWith("_"),
-      );
-
-    case "rust":
-      return collectMatches(
-        content,
-        RUST_INTERNAL_RES,
-        exportSet,
-        (line) => /^\s*pub\s/.test(line),
-      );
-
-    case "csharp":
-      return collectMatches(
-        content,
-        CSHARP_INTERNAL_RES,
-        exportSet,
-        (line) => /^\s*public\s/.test(line),
-        (name) => /^(?:if|for|foreach|while|switch|using|catch|lock|return|throw|yield|try|do|else|new|await|base|this)$/.test(name),
-      );
-
-    case "java":
-      return collectMatches(content, JAVA_INTERNAL_RES, exportSet);
-
-    case "kotlin":
-      return collectMatches(content, KOTLIN_INTERNAL_RES, exportSet);
-
-    default:
-      return [];
-  }
+function extractInternals(content: string, _language: string, exports: string[]): string[] {
+  return collectMatches(content, UNIVERSAL_DECL_RES, new Set(exports), universalSkipLine, universalSkipName);
 }
 
 export function extractFileMetadata(path: string, content: string, language: string): FileMetadataExtracted {

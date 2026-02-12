@@ -1,42 +1,17 @@
-import { useQuery, useMutation, keepPreviousData, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { Send } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PageHeader, Button, Switch } from "@lens/ui";
+import { PageHeader, Button } from "@lens/ui";
 import { api } from "@/lib/api";
 
 export function Context() {
   const [repoId, setRepoId] = useState("");
   const [goal, setGoal] = useState("");
-  const queryClient = useQueryClient();
 
   const { data: repoData } = useQuery({
     queryKey: ["dashboard-repos"],
     queryFn: api.repos,
     placeholderData: keepPreviousData,
-  });
-
-  const selectedRepo = (repoData?.repos ?? []).find((r) => r.id === repoId);
-  const useEmbeddings = selectedRepo?.enable_embeddings === 1;
-
-  const toggleEmbeddings = useMutation({
-    mutationFn: (checked: boolean) =>
-      api.updateRepoSettings(repoId, { enable_embeddings: checked }),
-    onMutate: async (checked) => {
-      await queryClient.cancelQueries({ queryKey: ["dashboard-repos"] });
-      const prev = queryClient.getQueryData<{ repos: any[] }>(["dashboard-repos"]);
-      if (prev) {
-        queryClient.setQueryData(["dashboard-repos"], {
-          repos: prev.repos.map((r) =>
-            r.id === repoId ? { ...r, enable_embeddings: checked ? 1 : 0 } : r,
-          ),
-        });
-      }
-      return { prev };
-    },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(["dashboard-repos"], ctx.prev);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
   });
 
   const mutation = useMutation({
@@ -61,16 +36,6 @@ export function Context() {
     <>
       <PageHeader>
         <span className="text-sm font-medium">Context</span>
-        <div className="ml-auto flex items-center gap-1.5">
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <span className="text-xs text-muted-foreground">Embeddings</span>
-            <Switch
-              checked={useEmbeddings}
-              onCheckedChange={(checked) => toggleEmbeddings.mutate(!!checked)}
-              disabled={!repoId || toggleEmbeddings.isPending}
-            />
-          </label>
-        </div>
       </PageHeader>
 
       <div className="flex flex-1 min-h-0 flex-col gap-3 py-3">
