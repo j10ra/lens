@@ -22,6 +22,10 @@ export const repos = sqliteTable(
     last_git_analysis_commit: text("last_git_analysis_commit"),
     max_import_depth: integer("max_import_depth").default(0),
     vocab_clusters: text("vocab_clusters"),
+    last_vocab_cluster_commit: text("last_vocab_cluster_commit"),
+    enable_embeddings: integer("enable_embeddings").notNull().default(1),
+    enable_summaries: integer("enable_summaries").notNull().default(1),
+    enable_vocab_clusters: integer("enable_vocab_clusters").notNull().default(1),
     created_at: now(),
     updated_at: updatedAt(),
   },
@@ -152,10 +156,18 @@ export const requestLogs = sqliteTable(
     source: text("source").notNull().default("api"),
     request_body: text("request_body"),
     response_size: integer("response_size"),
+    response_body: text("response_body"),
+    trace: text("trace"),
     created_at: now(),
   },
   (t) => [index("idx_request_logs_created").on(t.created_at), index("idx_request_logs_source").on(t.source)],
 );
+
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updated_at: updatedAt(),
+});
 
 export const telemetryEvents = sqliteTable(
   "telemetry_events",

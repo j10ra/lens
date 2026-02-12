@@ -228,9 +228,17 @@ export function agglomerativeCluster(terms: string[], embeddings: number[][]): n
   return [...clusterMap.values()].filter((c) => c.length >= 2);
 }
 
-export async function buildVocabClusters(db: Db, repoId: string, caps?: Capabilities): Promise<void> {
+export async function buildVocabClusters(db: Db, repoId: string, caps?: Capabilities, force = false): Promise<void> {
   if (!caps?.embedTexts) {
     console.error("[LENS] Vocab clusters: skipped (no embedTexts capability)");
+    return;
+  }
+
+  const repo = repoQueries.getById(db, repoId);
+  if (!repo) return;
+
+  if (!force && repo.last_vocab_cluster_commit && repo.last_vocab_cluster_commit === repo.last_indexed_commit) {
+    console.error("[LENS] Vocab clusters: skipped (unchanged since last build)");
     return;
   }
 
@@ -283,5 +291,5 @@ export async function buildVocabClusters(db: Db, repoId: string, caps?: Capabili
     .sort((a, b) => b.files.length - a.files.length)
     .slice(0, MAX_CLUSTERS);
 
-  repoQueries.updateVocabClusters(db, repoId, clusters);
+  repoQueries.updateVocabClusters(db, repoId, clusters, repo.last_indexed_commit ?? undefined);
 }

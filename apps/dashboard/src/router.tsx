@@ -2,11 +2,10 @@ import { createRouter, createRootRoute, createRoute } from "@tanstack/react-rout
 import { RootLayout } from "./layouts/RootLayout";
 import { Overview } from "./pages/Overview";
 import { Repos } from "./pages/Repos";
+import { RepoDetail } from "./pages/RepoDetail";
 import { Requests } from "./pages/Requests";
 import { Data } from "./pages/Data";
-import { Jobs } from "./pages/Jobs";
 import { Context } from "./pages/Context";
-
 import { Usage } from "./pages/Usage";
 import { Billing } from "./pages/Billing";
 
@@ -26,6 +25,12 @@ const reposRoute = createRoute({
   component: Repos,
 });
 
+const repoDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/repos/$repoId",
+  component: RepoDetail,
+});
+
 const requestsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/requests",
@@ -36,12 +41,6 @@ const dataRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/data",
   component: Data,
-});
-
-const jobsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/jobs",
-  component: Jobs,
 });
 
 const contextRoute = createRoute({
@@ -65,9 +64,9 @@ const billingRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   reposRoute,
+  repoDetailRoute,
   requestsRoute,
   dataRoute,
-  jobsRoute,
   contextRoute,
   usageRoute,
   billingRoute,

@@ -2,12 +2,12 @@ import { readFile } from "node:fs/promises";
 import type { Db } from "../db/connection";
 import type { Capabilities } from "../capabilities";
 import type { IndexResult } from "../types";
-import { repoQueries, chunkQueries, importQueries } from "../db/queries";
+import type { RequestTrace } from "../trace";
+import { repoQueries, chunkQueries, metadataQueries, importQueries } from "../db/queries";
 import { fullScan, diffScan, getHeadCommit, type DiscoveredFile } from "./discovery";
 import { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./chunker";
 import { extractAndPersistMetadata } from "./extract-metadata";
 import { buildAndPersistImportGraph } from "./import-graph";
-import { buildVocabClusters } from "./vocab-clusters";
 import { analyzeGitHistory } from "./git-analysis";
 import { track } from "../telemetry";
 
@@ -33,7 +33,7 @@ async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function runIndex(db: Db, repoId: string, caps?: Capabilities, force = false, onProgress?: () => void): Promise<IndexResult> {
+export async function runIndex(db: Db, repoId: string, caps?: Capabilities, force = false, onProgress?: () => void, trace?: RequestTrace): Promise<IndexResult> {
   return withLock(repoId, async () => {
     const start = Date.now();
 
@@ -54,13 +54,16 @@ export async function runIndex(db: Db, repoId: string, caps?: Capabilities, forc
 
     repoQueries.setIndexing(db, repoId);
 
+    trace?.step("discovery");
     let files: DiscoveredFile[];
     if (!force && repo.last_indexed_commit) {
       files = await diffScan(repo.root_path, repo.last_indexed_commit, headCommit);
     } else {
       files = await fullScan(repo.root_path);
     }
+    trace?.end("discovery", `${files.length} files`);
 
+    trace?.step("chunking");
     let currentChunks = chunkQueries.countByRepo(db, repoId);
     let chunksCreated = 0;
     let chunksUnchanged = 0;
@@ -122,16 +125,46 @@ export async function runIndex(db: Db, repoId: string, caps?: Capabilities, forc
       }
     }
 
+    // On full scan, prune chunks for paths no longer in git
+    const isFullScan = force || !repo.last_indexed_commit;
+    if (isFullScan) {
+      const scannedPaths = new Set(files.map((f) => f.path));
+      const allChunkPaths = new Set(chunkQueries.getAllByRepo(db, repoId).map((c) => c.path));
+      for (const path of allChunkPaths) {
+        if (!scannedPaths.has(path)) {
+          chunksDeleted += chunkQueries.deleteByRepoPath(db, repoId, path);
+        }
+      }
+    }
+
+    trace?.end("chunking", `+${chunksCreated} -${chunksDeleted}`);
     onProgress?.();
 
     // Structural analysis
+    trace?.step("extractMetadata");
     extractAndPersistMetadata(db, repoId);
+    // Prune orphan metadata (paths with no chunks — e.g. stale dist/node_modules entries)
+    if (isFullScan) {
+      const scannedPaths = new Set(files.map((f) => f.path));
+      const allMeta = metadataQueries.getByRepo(db, repoId);
+      for (const m of allMeta) {
+        if (!scannedPaths.has(m.path)) {
+          metadataQueries.deleteByPath(db, repoId, m.path);
+        }
+      }
+    }
+    trace?.end("extractMetadata");
     onProgress?.();
-    await buildVocabClusters(db, repoId, caps);
+
+    trace?.step("importGraph");
     buildAndPersistImportGraph(db, repoId);
     computeMaxImportDepth(db, repoId);
+    trace?.end("importGraph");
     onProgress?.();
+
+    trace?.step("gitAnalysis");
     await analyzeGitHistory(db, repoId, repo.root_path, repo.last_git_analysis_commit);
+    trace?.end("gitAnalysis");
     onProgress?.();
 
     repoQueries.updateIndexState(db, repoId, headCommit, "ready");

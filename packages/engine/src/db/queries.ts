@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import type { Db } from "./connection";
-import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos, requestLogs, telemetryEvents, usageCounters } from "./schema";
+import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos, requestLogs, settings, telemetryEvents, usageCounters } from "./schema";
 
 // --- Helpers ---
 
@@ -105,9 +105,11 @@ export const repoQueries = {
     db.update(repos).set({ max_import_depth: depth }).where(eq(repos.id, id)).run();
   },
 
-  updateVocabClusters(db: Db, id: string, clusters: unknown): void {
+  updateVocabClusters(db: Db, id: string, clusters: unknown, commit?: string): void {
+    const set: Record<string, unknown> = { vocab_clusters: JSON.stringify(clusters) };
+    if (commit) set.last_vocab_cluster_commit = commit;
     db.update(repos)
-      .set({ vocab_clusters: JSON.stringify(clusters) })
+      .set(set)
       .where(eq(repos.id, id))
       .run();
   },
@@ -118,6 +120,14 @@ export const repoQueries = {
 
   setIndexing(db: Db, id: string): void {
     db.update(repos).set({ index_status: "indexing" }).where(eq(repos.id, id)).run();
+  },
+
+  updateProFeatures(db: Db, id: string, flags: { enable_embeddings?: number; enable_summaries?: number; enable_vocab_clusters?: number }): void {
+    const set: Record<string, unknown> = { updated_at: sql`datetime('now')` };
+    if (flags.enable_embeddings !== undefined) set.enable_embeddings = flags.enable_embeddings;
+    if (flags.enable_summaries !== undefined) set.enable_summaries = flags.enable_summaries;
+    if (flags.enable_vocab_clusters !== undefined) set.enable_vocab_clusters = flags.enable_vocab_clusters;
+    db.update(repos).set(set).where(eq(repos.id, id)).run();
   },
 
   remove(db: Db, id: string): boolean {
@@ -460,6 +470,12 @@ export const metadataQueries = {
       purpose_total,
     };
   },
+
+  deleteByPath(db: Db, repoId: string, path: string): void {
+    db.delete(fileMetadata)
+      .where(and(eq(fileMetadata.repo_id, repoId), eq(fileMetadata.path, path)))
+      .run();
+  },
 };
 
 // --- Import Queries ---
@@ -660,6 +676,8 @@ export const logQueries = {
     source: string,
     requestBody?: string,
     responseSize?: number,
+    responseBody?: string,
+    trace?: string,
   ): void {
     db.insert(requestLogs)
       .values({
@@ -671,6 +689,8 @@ export const logQueries = {
         source,
         request_body: requestBody ?? null,
         response_size: responseSize ?? null,
+        response_body: responseBody ?? null,
+        trace: trace ?? null,
       })
       .run();
   },
@@ -834,6 +854,34 @@ export const telemetryQueries = {
       .where(sql`synced_at IS NOT NULL AND created_at < ${cutoff}`)
       .run();
     return result.changes;
+  },
+};
+
+// --- Settings Queries ---
+
+export const settingsQueries = {
+  get(db: Db, key: string): string | null {
+    const row = db.select({ value: settings.value }).from(settings).where(eq(settings.key, key)).get();
+    return row?.value ?? null;
+  },
+
+  set(db: Db, key: string, value: string): void {
+    db.insert(settings)
+      .values({ key, value })
+      .onConflictDoUpdate({
+        target: settings.key,
+        set: { value, updated_at: sql`datetime('now')` },
+      })
+      .run();
+  },
+
+  getAll(db: Db): Record<string, string> {
+    const rows = db.select().from(settings).all();
+    return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  },
+
+  delete(db: Db, key: string): void {
+    db.delete(settings).where(eq(settings.key, key)).run();
   },
 };
 

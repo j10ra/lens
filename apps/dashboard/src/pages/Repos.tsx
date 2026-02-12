@@ -1,50 +1,31 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { api } from "@/lib/api";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ProgressBar } from "@/components/ProgressBar";
 import { timeAgo } from "@/lib/utils";
-import { RefreshCw, Eye, EyeOff, ArrowLeft, Plus, Trash2, FolderPlus } from "lucide-react";
-import { Button, Card, CardContent, CardHeader, CardTitle, PageHeader } from "@lens/ui";
+import { Plus, FolderPlus, RefreshCw, Eye, EyeOff, Sparkles } from "lucide-react";
+import { Badge, Button, PageHeader, Switch } from "@lens/ui";
+
+type RepoItem = Awaited<ReturnType<typeof api.repos>>["repos"][number];
 
 export function Repos() {
-	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [showRegister, setShowRegister] = useState(false);
 	const [registerPath, setRegisterPath] = useState("");
-	const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 	const queryClient = useQueryClient();
 
-	const auth = useQuery({ queryKey: ["auth-status"], queryFn: api.authStatus });
-	const { data: cloud } = useQuery({
-		queryKey: ["cloud-usage-current"],
-		queryFn: api.cloudUsageCurrent,
-		enabled: !!auth.data?.authenticated,
+	const { data: usage } = useQuery({
+		queryKey: ["dashboard-usage"],
+		queryFn: api.localUsage,
+		refetchInterval: 30_000,
 	});
-	const isPro = (cloud?.plan ?? "free") === "pro";
+	const isPro = (usage?.plan ?? "free") === "pro";
 
-	const { data, isLoading } = useQuery({
+	const { data } = useQuery({
 		queryKey: ["dashboard-repos"],
 		queryFn: api.repos,
 		refetchInterval: 30_000,
 		placeholderData: keepPreviousData,
-	});
-
-	const reindex = useMutation({
-		mutationFn: api.reindex,
-		onSuccess: () =>
-			queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
-	});
-
-	const startWatch = useMutation({
-		mutationFn: api.startWatcher,
-		onSuccess: () =>
-			queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
-	});
-
-	const stopWatch = useMutation({
-		mutationFn: api.stopWatcher,
-		onSuccess: () =>
-			queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
 	});
 
 	const register = useMutation({
@@ -56,165 +37,7 @@ export function Repos() {
 		},
 	});
 
-	const remove = useMutation({
-		mutationFn: api.removeRepo,
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] });
-			setConfirmRemove(null);
-			setSelectedId(null);
-		},
-	});
-
 	const repos = data?.repos ?? [];
-	const selected = selectedId
-		? repos.find((r) => r.id === selectedId)
-		: null;
-
-	if (selected) {
-		return (
-			<>
-				<PageHeader>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => setSelectedId(null)}
-						className="gap-1 -ml-2"
-					>
-						<ArrowLeft className="h-3.5 w-3.5" /> Back
-					</Button>
-					<span className="text-sm font-medium">{selected.name}</span>
-					<span className="text-xs text-muted-foreground truncate hidden md:inline">{selected.root_path}</span>
-					<div className="ml-auto flex gap-2">
-						<ActionBtn
-							onClick={() => reindex.mutate(selected.id)}
-							icon={RefreshCw}
-							label="Re-index"
-							loading={reindex.isPending}
-						/>
-						{selected.watcher.active ? (
-							<ActionBtn
-								onClick={() => stopWatch.mutate(selected.id)}
-								icon={EyeOff}
-								label="Stop watcher"
-							/>
-						) : (
-							<ActionBtn
-								onClick={() => startWatch.mutate(selected.id)}
-								icon={Eye}
-								label="Start watcher"
-							/>
-						)}
-						{confirmRemove === selected.id ? (
-							<>
-								<Button
-									variant="destructive"
-									size="sm"
-									onClick={() => remove.mutate(selected.id)}
-									disabled={remove.isPending}
-								>
-									{remove.isPending ? "Removing..." : "Confirm"}
-								</Button>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => setConfirmRemove(null)}
-								>
-									Cancel
-								</Button>
-							</>
-						) : (
-							<ActionBtn
-								onClick={() => setConfirmRemove(selected.id)}
-								icon={Trash2}
-								label="Remove"
-							/>
-						)}
-					</div>
-				</PageHeader>
-
-				<div className="flex-1 min-h-0 overflow-auto grid gap-4 p-4 lg:p-6 @xl/main:grid-cols-2 content-start">
-					<Card>
-						<CardHeader className="pb-2">
-							<CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-								Index
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="grid grid-cols-2 gap-3 text-sm">
-							<Stat
-								label="Status"
-								value={<StatusBadge status={selected.index_status} />}
-							/>
-							<Stat
-								label="Last commit"
-								value={selected.last_indexed_commit?.slice(0, 8) ?? "\u2014"}
-								mono
-							/>
-							<Stat label="Files" value={selected.files_indexed} />
-							<Stat label="Chunks" value={selected.chunk_count} />
-							<Stat label="Import depth" value={selected.max_import_depth} />
-							<Stat label="Indexed" value={timeAgo(selected.last_indexed_at)} />
-						</div>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardHeader className="pb-2">
-							<CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-								Enrichment
-							</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-3">
-							{selected.has_capabilities ? (
-								<>
-									<ProgressBar
-										label="Embeddings"
-										value={selected.embedded_count}
-										max={selected.embeddable_count}
-									/>
-									<ProgressBar
-										label="Vocab clusters"
-										value={selected.vocab_cluster_count}
-										max={selected.vocab_cluster_count || 1}
-									/>
-									<ProgressBar
-										label="Purpose"
-										value={selected.purpose_count}
-										max={selected.purpose_total}
-									/>
-								</>
-							) : (
-								<div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2">
-									<p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-										⚡ Pro — Embeddings · Vocab clusters · Summaries
-									</p>
-									<p className="text-xs text-muted-foreground mt-0.5">
-										<code className="text-[10px]">lens login</code> → upgrade to enable
-									</p>
-								</div>
-							)}
-							<div className="pt-1">
-								<Stat
-									label="Watcher"
-									value={
-										<StatusBadge
-											status={selected.watcher.active ? "active" : "inactive"}
-										/>
-									}
-								/>
-								{selected.watcher.active &&
-									selected.watcher.changed_files > 0 && (
-										<p className="text-xs text-muted-foreground mt-1">
-											{selected.watcher.changed_files} changed files pending
-										</p>
-									)}
-							</div>
-						</CardContent>
-					</Card>
-				</div>
-			</>
-		);
-	}
 
 	return (
 		<>
@@ -281,101 +104,212 @@ export function Repos() {
 				)}
 			</PageHeader>
 
-			{/* Grid */}
 			<div className="flex-1 min-h-0 overflow-auto">
-				<table className="w-full border-collapse text-xs">
-					<thead className="sticky top-0 z-10">
-						<tr className="bg-muted/60 text-left">
-							<th className="w-12 border-b border-r border-border bg-muted/60 px-2 py-2 text-center font-medium text-muted-foreground">#</th>
-							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Name</th>
-							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Status</th>
-							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground text-right">Files</th>
-							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground text-right">Chunks</th>
-							<th className="border-b border-r border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground text-right">Embed%</th>
-							<th className="border-b border-border bg-muted/60 px-3 py-2 font-medium text-muted-foreground">Indexed</th>
-						</tr>
-					</thead>
-					<tbody>
-						{repos.length === 0 ? (
-							<tr>
-								<td colSpan={7} className="py-12 text-center text-muted-foreground">
-									No repos registered. Run: lens repo register
-								</td>
-							</tr>
-						) : (
-							repos.map((r, i) => (
-								<tr key={r.id} className="group hover:bg-accent/30">
-									<td className="border-b border-r border-border bg-muted/20 px-2 py-1.5 text-center font-mono text-[10px] text-muted-foreground tabular-nums">{i + 1}</td>
-									<td className="border-b border-r border-border px-3 py-1.5">
-										<button
-											type="button"
-											onClick={() => setSelectedId(r.id)}
-											className="text-primary hover:underline font-medium"
-										>
-											{r.name}
-										</button>
-									</td>
-									<td className="border-b border-r border-border px-3 py-1.5">
-										<StatusBadge status={r.index_status} />
-									</td>
-									<td className="border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums">{r.files_indexed}</td>
-									<td className="border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums">{r.chunk_count}</td>
-									<td className={`border-b border-r border-border px-3 py-1.5 font-mono text-right tabular-nums ${isPro ? "" : "opacity-40"}`}>{isPro ? `${r.embedded_pct}%` : "—"}</td>
-									<td className="border-b border-border px-3 py-1.5 text-muted-foreground">{timeAgo(r.last_indexed_at)}</td>
-								</tr>
-							))
-						)}
-					</tbody>
-				</table>
+				{repos.length === 0 ? (
+					<p className="text-sm text-muted-foreground py-12 text-center">
+						No repos registered. Run: <code className="text-xs">lens repo register</code>
+					</p>
+				) : (
+					<div className="grid gap-3 p-3 @xl/main:grid-cols-2">
+						{repos.map((r) => (
+							<RepoCard key={r.id} repo={r} isPro={isPro} />
+						))}
+					</div>
+				)}
 			</div>
 		</>
 	);
 }
 
-function Stat({
-	label,
-	value,
-	mono,
-}: { label: string; value: React.ReactNode; mono?: boolean }) {
+function RepoCard({ repo, isPro }: { repo: RepoItem; isPro: boolean }) {
+	const queryClient = useQueryClient();
+
+	const reindex = useMutation({
+		mutationFn: api.reindex,
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+	});
+
+	const startWatch = useMutation({
+		mutationFn: api.startWatcher,
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+	});
+
+	const stopWatch = useMutation({
+		mutationFn: api.stopWatcher,
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+	});
+
+	const updateSettings = useMutation({
+		mutationFn: (settings: { enable_embeddings?: boolean; enable_summaries?: boolean; enable_vocab_clusters?: boolean }) =>
+			api.updateRepoSettings(repo.id, settings),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+	});
+
+	const embPct = repo.embeddable_count > 0
+		? Math.round((repo.embedded_count / repo.embeddable_count) * 100) : 0;
+	const purPct = repo.purpose_total > 0
+		? Math.round((repo.purpose_count / repo.purpose_total) * 100) : 0;
+
 	return (
-		<div>
-			<p className="text-xs text-muted-foreground">{label}</p>
-			<div className={`text-sm font-medium ${mono ? "font-mono" : ""}`}>
-				{value}
+		<div className="rounded-lg border bg-card">
+			{/* Header */}
+			<div className="flex items-start justify-between gap-2 p-3 pb-2">
+				<div className="min-w-0">
+					<div className="flex items-center gap-2">
+						<Link
+							to="/repos/$repoId"
+							params={{ repoId: repo.id }}
+							className="text-sm font-medium text-primary hover:underline truncate"
+						>
+							{repo.name}
+						</Link>
+						<StatusBadge status={repo.index_status} />
+					</div>
+					<p className="text-[10px] text-muted-foreground truncate mt-0.5">{repo.root_path}</p>
+				</div>
+				<div className="flex items-center gap-1 shrink-0">
+					<Button
+						variant="ghost"
+						size="sm"
+						className="h-6 w-6 p-0"
+						onClick={() => reindex.mutate(repo.id)}
+						disabled={reindex.isPending}
+						title="Re-index"
+					>
+						<RefreshCw className={`h-3.5 w-3.5 ${reindex.isPending ? "animate-spin" : ""}`} />
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						className="h-6 w-6 p-0"
+						onClick={() => (repo.watcher.active ? stopWatch : startWatch).mutate(repo.id)}
+						title={repo.watcher.active ? "Stop watcher" : "Start watcher"}
+					>
+						{repo.watcher.active
+							? <EyeOff className="h-3.5 w-3.5" />
+							: <Eye className="h-3.5 w-3.5" />
+						}
+					</Button>
+				</div>
+			</div>
+
+			{/* Stats */}
+			<div className="grid grid-cols-4 gap-2 px-3 pb-2 text-xs">
+				<Kv label="Files" value={repo.files_indexed} />
+				<Kv label="Chunks" value={repo.chunk_count.toLocaleString()} />
+				<Kv label="Commit" value={repo.last_indexed_commit?.slice(0, 7) ?? "\u2014"} mono />
+				<Kv label="Indexed" value={timeAgo(repo.last_indexed_at)} />
+			</div>
+
+			{/* Enrichment */}
+			<div className="border-t px-3 py-2 space-y-2">
+				<div className="flex items-center gap-1.5">
+					<Sparkles className="h-3 w-3 text-muted-foreground" />
+					<span className="text-[10px] font-medium text-muted-foreground">Enrichment</span>
+					{!repo.has_capabilities && (
+						<Badge variant="outline" className="text-[9px] px-1 py-0 text-amber-500 border-amber-500/40">Pro</Badge>
+					)}
+				</div>
+				<div className="space-y-1.5">
+					<ToggleProgress
+						label="Embeddings"
+						value={repo.embedded_count}
+						max={repo.embeddable_count}
+						pct={embPct}
+						enabled={!!repo.enable_embeddings}
+						onToggle={(v) => updateSettings.mutate({ enable_embeddings: v })}
+					/>
+					<ToggleProgress
+						label="Summaries"
+						value={repo.purpose_count}
+						max={repo.purpose_total}
+						pct={purPct}
+						enabled={!!repo.enable_summaries}
+						onToggle={(v) => updateSettings.mutate({ enable_summaries: v })}
+					/>
+					<ToggleCount
+						label="Vocab clusters"
+						count={repo.vocab_cluster_count}
+						enabled={!!repo.enable_vocab_clusters}
+						onToggle={(v) => updateSettings.mutate({ enable_vocab_clusters: v })}
+					/>
+				</div>
 			</div>
 		</div>
 	);
 }
 
-function ActionBtn({
-	onClick,
-	icon: Icon,
+function ToggleProgress({
 	label,
-	loading,
+	value,
+	max,
+	pct,
+	enabled,
+	onToggle,
 }: {
-	onClick: () => void;
-	icon: React.ComponentType<{ className?: string }>;
 	label: string;
-	loading?: boolean;
+	value: number;
+	max: number;
+	pct: number;
+	enabled: boolean;
+	onToggle: (v: boolean) => void;
 }) {
 	return (
-		<Button
-			variant="outline"
-			size="sm"
-			onClick={onClick}
-			disabled={loading}
-			className="gap-1.5"
-		>
-			<Icon className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-			{label}
-		</Button>
+		<div className={`flex items-center gap-2 ${enabled ? "" : "opacity-50"}`}>
+			<Switch
+				checked={enabled}
+				onCheckedChange={onToggle}
+				className="scale-75 origin-left shrink-0"
+			/>
+			<div className="flex-1 min-w-0">
+				<div className="flex items-baseline justify-between mb-0.5">
+					<span className="text-[10px] text-muted-foreground">{label}</span>
+					<span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+						{value}/{max}
+					</span>
+				</div>
+				<div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+					<div
+						className="h-full rounded-full bg-primary transition-all"
+						style={{ width: `${pct}%` }}
+					/>
+				</div>
+			</div>
+		</div>
 	);
 }
 
-function Spinner() {
+function ToggleCount({
+	label,
+	count,
+	enabled,
+	onToggle,
+}: {
+	label: string;
+	count: number;
+	enabled: boolean;
+	onToggle: (v: boolean) => void;
+}) {
 	return (
-		<div className="flex items-center justify-center py-20">
-			<div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+		<div className={`flex items-center gap-2 ${enabled ? "" : "opacity-50"}`}>
+			<Switch
+				checked={enabled}
+				onCheckedChange={onToggle}
+				className="scale-75 origin-left shrink-0"
+			/>
+			<div className="flex items-baseline justify-between flex-1">
+				<span className="text-[10px] text-muted-foreground">{label}</span>
+				<span className="font-mono text-[10px] tabular-nums text-muted-foreground">{count}</span>
+			</div>
+		</div>
+	);
+}
+
+function Kv({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+	return (
+		<div>
+			<span className="text-[10px] text-muted-foreground block">{label}</span>
+			<span className={`text-xs font-medium tabular-nums ${mono ? "font-mono" : ""}`}>{value}</span>
 		</div>
 	);
 }

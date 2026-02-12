@@ -19,15 +19,27 @@ import {
   repoQueries,
   chunkQueries,
   metadataQueries,
+  importQueries,
+  statsQueries,
+  cochangeQueries,
   logQueries,
   ensureEmbedded,
   enrichPurpose,
+  buildVocabClusters,
   getRawDb,
   usageQueries,
+  settingsQueries,
   telemetryQueries,
   track,
   setTelemetryEnabled,
+  RequestTrace,
 } from "@lens/engine";
+
+declare module "hono" {
+  interface ContextVariableMap {
+    trace: RequestTrace;
+  }
+}
 
 const TEMPLATE = `<!-- LENS — Repo Context Daemon -->
 ## LENS Context
@@ -133,16 +145,39 @@ export function createApp(
   let lastPrune = 0;
   app.use("*", async (c, next) => {
     const start = performance.now();
-    await next();
-    const duration = Math.round(performance.now() - start);
     const path = new URL(c.req.url).pathname;
-    const source = deriveSource(c.req.raw, path);
 
-    if (path.startsWith("/dashboard/") && !path.startsWith("/api/")) return;
-    if (path === "/health") return;
+    if (path.startsWith("/dashboard/") || path.startsWith("/api/dashboard/") || path === "/health") {
+      return next();
+    }
+
+    const trace = new RequestTrace();
+    c.set("trace", trace);
+
+    // Capture request body for non-GET methods
+    let reqBody: string | undefined;
+    if (c.req.method !== "GET") {
+      try {
+        reqBody = await c.req.raw.clone().text();
+      } catch {}
+    }
+
+    await next();
+
+    const duration = Math.round(performance.now() - start);
+    const source = deriveSource(c.req.raw, path);
+    const traceData = trace.toJSON().length > 0 ? trace.serialize() : undefined;
+
+    // Capture response body + size
+    let resBody: string | undefined;
+    let resSize: number | undefined;
+    try {
+      resBody = await c.res.clone().text();
+      resSize = resBody.length;
+    } catch {}
 
     try {
-      logQueries.insert(db, c.req.method, path, c.res.status, duration, source);
+      logQueries.insert(db, c.req.method, path, c.res.status, duration, source, reqBody, resSize, resBody, traceData);
       // Prune at most once per hour
       const now = Date.now();
       if (now - lastPrune > 3_600_000) {
@@ -155,7 +190,7 @@ export function createApp(
   // --- Health ---
 
   trackRoute("GET", "/health");
-  app.get("/health", (c) => c.json({ status: "ok", version: "0.1.0" }));
+  app.get("/health", (c) => c.json({ status: "ok", version: "0.1.0", cloud_url: CLOUD_API_URL }));
 
   // --- Telemetry Track (for CLI) ---
 
@@ -163,9 +198,12 @@ export function createApp(
   app.post("/telemetry/track", async (c) => {
     try {
       if (!isTelemetryEnabled()) return c.json({ ok: true, skipped: true });
+      const trace = c.get("trace");
       const { event_type, event_data } = await c.req.json();
       if (!event_type || typeof event_type !== "string") return c.json({ error: "event_type required" }, 400);
+      trace.step("track");
       track(db, event_type, event_data);
+      trace.end("track", event_type);
       return c.json({ ok: true });
     } catch {
       return c.json({ ok: true });
@@ -177,12 +215,15 @@ export function createApp(
   trackRoute("POST", "/repo/register");
   app.post("/repo/register", async (c) => {
     try {
+      const trace = c.get("trace");
       const { root_path, name, remote_url } = await c.req.json();
       if (!root_path) return c.json({ error: "root_path required" }, 400);
 
       // Registration limit check
+      trace.step("quotaCheck");
       const currentRepos = listRepos(db).length;
       const maxRepos = quotaCache?.quota?.maxRepos ?? 50;
+      trace.end("quotaCheck", `${currentRepos}/${maxRepos}`);
       if (currentRepos >= maxRepos) {
         return c.json({
           error: "Repo limit reached",
@@ -192,29 +233,52 @@ export function createApp(
         }, 429);
       }
 
+      trace.step("registerRepo");
       const result = registerRepo(db, root_path, name, remote_url);
+      trace.end("registerRepo", result.created ? "created" : "existing");
 
       if (result.created) {
         runIndex(db, result.repo_id, caps, false, emitRepoEvent)
-          .then((r) => {
+          .then(async (r) => {
+            const bg = new RequestTrace();
+            const bgStart = performance.now();
+            const results: Record<string, unknown> = { index: r };
+            bg.add("index", r.duration_ms, `${r.files_scanned} files, +${r.chunks_created} chunks`);
             if (r.files_scanned > 0) usageQueries.increment(db, "repos_indexed");
+            const repo = repoQueries.getById(db, result.repo_id);
+            const reqBody = JSON.stringify({ repo_id: result.repo_id, repo_name: repo?.name });
             const tasks: Promise<any>[] = [];
-            if (quotaRemaining("embeddingChunks") > 0) {
-              tasks.push(ensureEmbedded(db, result.repo_id, caps));
+            if (repo?.enable_vocab_clusters && quotaRemaining("embeddingChunks") > 0) {
+              bg.step("vocabClusters");
+              tasks.push(buildVocabClusters(db, result.repo_id, caps).then(() => { bg.end("vocabClusters"); results.vocabClusters = "done"; }));
             } else {
-              console.log("[LENS] Skipping embeddings: quota exceeded");
+              bg.add("vocabClusters", 0, !repo?.enable_vocab_clusters ? "disabled" : "quota exceeded");
             }
-            if (quotaRemaining("purposeRequests") > 0) {
-              tasks.push(enrichPurpose(db, result.repo_id, caps));
+            if (repo?.enable_embeddings && quotaRemaining("embeddingChunks") > 0) {
+              bg.step("embeddings");
+              tasks.push(ensureEmbedded(db, result.repo_id, caps).then((er) => { bg.end("embeddings", `${er.embedded_count} embedded`); results.embeddings = er; }));
             } else {
-              console.log("[LENS] Skipping purpose enrichment: quota exceeded");
+              bg.add("embeddings", 0, !repo?.enable_embeddings ? "disabled" : "quota exceeded");
             }
-            return Promise.all(tasks);
+            if (repo?.enable_summaries && quotaRemaining("purposeRequests") > 0) {
+              bg.step("purpose");
+              tasks.push(enrichPurpose(db, result.repo_id, caps).then((pr) => { bg.end("purpose", `${pr.enriched} enriched`); results.purpose = pr; }));
+            } else {
+              bg.add("purpose", 0, !repo?.enable_summaries ? "disabled" : "quota exceeded");
+            }
+            await Promise.all(tasks);
+            const resBody = JSON.stringify(results);
+            const bgDuration = Math.round(performance.now() - bgStart);
+            logQueries.insert(db, "BG", `/enrichment/${result.repo_id}`, 200, bgDuration, "system", reqBody, resBody.length, resBody, bg.serialize());
           })
-          .catch((e) => console.error("[LENS] post-register index failed:", e));
+          .catch((e) => {
+            logQueries.insert(db, "BG", `/enrichment/${result.repo_id}`, 500, 0, "system", JSON.stringify({ repo_id: result.repo_id }), undefined, String(e));
+          });
       }
 
+      trace.step("startWatcher");
       startWatcher(db, result.repo_id, root_path);
+      trace.end("startWatcher");
       emitRepoEvent();
       return c.json(result);
     } catch (e: any) {
@@ -225,7 +289,11 @@ export function createApp(
   trackRoute("GET", "/repo/list");
   app.get("/repo/list", (c) => {
     try {
-      return c.json({ repos: listRepos(db) });
+      const trace = c.get("trace");
+      trace.step("listRepos");
+      const repos = listRepos(db);
+      trace.end("listRepos", `${repos.length} repos`);
+      return c.json({ repos });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
     }
@@ -234,7 +302,11 @@ export function createApp(
   trackRoute("GET", "/repo/list/detailed");
   app.get("/repo/list/detailed", (c) => {
     try {
+      const trace = c.get("trace");
+      trace.step("listRepos");
       const repos = listRepos(db);
+      trace.end("listRepos", `${repos.length} repos`);
+      trace.step("loadStats");
       const detailed = repos.map((r) => {
         const stats = chunkQueries.getStats(db, r.id);
         return {
@@ -249,6 +321,7 @@ export function createApp(
           last_indexed_at: r.last_indexed_at,
         };
       });
+      trace.end("loadStats");
       return c.json({ repos: detailed });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -261,7 +334,10 @@ export function createApp(
   trackRoute("GET", "/repo/:id");
   app.get("/repo/:id", (c) => {
     try {
+      const trace = c.get("trace");
+      trace.step("getRepo");
       const repo = getRepo(db, c.req.param("id"));
+      trace.end("getRepo");
       return c.json(repo);
     } catch (e: any) {
       if (e.message === "repo not found") return c.json({ error: "repo not found" }, 404);
@@ -272,9 +348,14 @@ export function createApp(
   trackRoute("DELETE", "/repo/:id");
   app.delete("/repo/:id", async (c) => {
     try {
+      const trace = c.get("trace");
       const id = c.req.param("id");
+      trace.step("stopWatcher");
       await stopWatcher(id).catch(() => {});
+      trace.end("stopWatcher");
+      trace.step("removeRepo");
       const result = removeRepo(db, id);
+      trace.end("removeRepo");
       emitRepoEvent();
       return c.json(result);
     } catch (e: any) {
@@ -286,7 +367,10 @@ export function createApp(
   trackRoute("GET", "/repo/:id/status");
   app.get("/repo/:id/status", async (c) => {
     try {
+      const trace = c.get("trace");
+      trace.step("getRepoStatus");
       const status = await getRepoStatus(db, c.req.param("id"));
+      trace.end("getRepoStatus");
       return c.json({
         ...status,
         has_capabilities: !!caps,
@@ -306,7 +390,8 @@ export function createApp(
     try {
       const { repo_id, goal } = await c.req.json();
       if (!repo_id || !goal) return c.json({ error: "repo_id and goal required" }, 400);
-      const result = await buildContext(db, repo_id, goal, caps);
+      const useEmbeddings = settingsQueries.get(db, "use_embeddings") !== "false";
+      const result = await buildContext(db, repo_id, goal, caps, c.get("trace"), { useEmbeddings });
       usageQueries.increment(db, "context_queries");
       return c.json(result);
     } catch (e: any) {
@@ -321,21 +406,42 @@ export function createApp(
     try {
       const { repo_id, force } = await c.req.json();
       if (!repo_id) return c.json({ error: "repo_id required" }, 400);
-      const result = await runIndex(db, repo_id, caps, force ?? false, emitRepoEvent);
+      const result = await runIndex(db, repo_id, caps, force ?? false, emitRepoEvent, c.get("trace"));
       if (result.files_scanned > 0) usageQueries.increment(db, "repos_indexed");
 
+      const repo = repoQueries.getById(db, repo_id);
+      const bg = new RequestTrace();
+      const bgStart = performance.now();
+      const results: Record<string, unknown> = { index: result };
+      const reqBody = JSON.stringify({ repo_id, repo_name: repo?.name, force });
       const tasks: Promise<any>[] = [];
-      if (quotaRemaining("embeddingChunks") > 0) {
-        tasks.push(ensureEmbedded(db, repo_id, caps));
+      if (repo?.enable_vocab_clusters && quotaRemaining("embeddingChunks") > 0) {
+        bg.step("vocabClusters");
+        tasks.push(buildVocabClusters(db, repo_id, caps).then(() => { bg.end("vocabClusters"); results.vocabClusters = "done"; }));
       } else {
-        console.log("[LENS] Skipping embeddings: quota exceeded");
+        bg.add("vocabClusters", 0, !repo?.enable_vocab_clusters ? "disabled" : "quota exceeded");
       }
-      if (quotaRemaining("purposeRequests") > 0) {
-        tasks.push(enrichPurpose(db, repo_id, caps));
+      if (repo?.enable_embeddings && quotaRemaining("embeddingChunks") > 0) {
+        bg.step("embeddings");
+        tasks.push(ensureEmbedded(db, repo_id, caps).then((er) => { bg.end("embeddings", `${er.embedded_count} embedded`); results.embeddings = er; }));
       } else {
-        console.log("[LENS] Skipping purpose enrichment: quota exceeded");
+        bg.add("embeddings", 0, !repo?.enable_embeddings ? "disabled" : "quota exceeded");
       }
-      Promise.all(tasks).catch((e) => console.error("[LENS] post-index embed/enrich failed:", e));
+      if (repo?.enable_summaries && quotaRemaining("purposeRequests") > 0) {
+        bg.step("purpose");
+        tasks.push(enrichPurpose(db, repo_id, caps).then((pr) => { bg.end("purpose", `${pr.enriched} enriched`); results.purpose = pr; }));
+      } else {
+        bg.add("purpose", 0, !repo?.enable_summaries ? "disabled" : "quota exceeded");
+      }
+      Promise.all(tasks)
+        .then(() => {
+          const resBody = JSON.stringify(results);
+          const bgDuration = Math.round(performance.now() - bgStart);
+          logQueries.insert(db, "BG", `/enrichment/${repo_id}`, 200, bgDuration, "system", reqBody, resBody.length, resBody, bg.serialize());
+        })
+        .catch((e) => {
+          logQueries.insert(db, "BG", `/enrichment/${repo_id}`, 500, 0, "system", reqBody, undefined, String(e));
+        });
 
       return c.json(result);
     } catch (e: any) {
@@ -346,17 +452,24 @@ export function createApp(
   trackRoute("GET", "/index/status/:repo_id");
   app.get("/index/status/:repo_id", async (c) => {
     try {
+      const trace = c.get("trace");
       const repoId = c.req.param("repo_id");
+      trace.step("getRepo");
       const repo = repoQueries.getById(db, repoId);
+      trace.end("getRepo");
       if (!repo) return c.json({ error: "repo not found" }, 404);
 
+      trace.step("getHeadCommit");
       let currentHead: string | null = null;
       try {
         currentHead = await getHeadCommit(repo.root_path);
       } catch {}
+      trace.end("getHeadCommit");
 
       const isStale = !!(currentHead && repo.last_indexed_commit !== currentHead);
+      trace.step("getStats");
       const stats = chunkQueries.getStats(db, repoId);
+      trace.end("getStats");
 
       return c.json({
         index_status: repo.index_status,
@@ -377,10 +490,15 @@ export function createApp(
   trackRoute("POST", "/index/watch");
   app.post("/index/watch", async (c) => {
     try {
+      const trace = c.get("trace");
       const { repo_id } = await c.req.json();
       if (!repo_id) return c.json({ error: "repo_id required" }, 400);
+      trace.step("getRepo");
       const repo = getRepo(db, repo_id);
+      trace.end("getRepo");
+      trace.step("startWatcher");
       const result = startWatcher(db, repo_id, repo.root_path);
+      trace.end("startWatcher");
       emitRepoEvent();
       return c.json(result);
     } catch (e: any) {
@@ -392,9 +510,12 @@ export function createApp(
   trackRoute("POST", "/index/unwatch");
   app.post("/index/unwatch", async (c) => {
     try {
+      const trace = c.get("trace");
       const { repo_id } = await c.req.json();
       if (!repo_id) return c.json({ error: "repo_id required" }, 400);
+      trace.step("stopWatcher");
       const result = await stopWatcher(repo_id);
+      trace.end("stopWatcher");
       emitRepoEvent();
       return c.json(result);
     } catch (e: any) {
@@ -405,7 +526,11 @@ export function createApp(
   trackRoute("GET", "/index/watch-status/:repo_id");
   app.get("/index/watch-status/:repo_id", (c) => {
     try {
-      return c.json(getWatcherStatus(c.req.param("repo_id")));
+      const trace = c.get("trace");
+      trace.step("getWatcherStatus");
+      const status = getWatcherStatus(c.req.param("repo_id"));
+      trace.end("getWatcherStatus");
+      return c.json(status);
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
     }
@@ -416,14 +541,19 @@ export function createApp(
   trackRoute("GET", "/daemon/stats");
   app.get("/daemon/stats", (c) => {
     try {
+      const trace = c.get("trace");
+      trace.step("listRepos");
       const repos = listRepos(db);
+      trace.end("listRepos", `${repos.length} repos`);
       let totalChunks = 0;
       let totalEmbeddings = 0;
+      trace.step("aggregateStats");
       for (const r of repos) {
         const s = chunkQueries.getStats(db, r.id);
         totalChunks += s.chunk_count;
         totalEmbeddings += s.embedded_count;
       }
+      trace.end("aggregateStats");
       return c.json({
         repos_count: repos.length,
         total_chunks: totalChunks,
@@ -620,15 +750,23 @@ export function createApp(
   // Usage
   trackRoute("GET", "/api/cloud/usage");
   app.get("/api/cloud/usage", async (c) => {
+    const trace = c.get("trace");
     const start = c.req.query("start");
     const end = c.req.query("end");
-    return cloudProxy("GET", `/api/usage?start=${start}&end=${end}`);
+    trace.step("cloudProxy");
+    const res = await cloudProxy("GET", `/api/usage?start=${start}&end=${end}`);
+    trace.end("cloudProxy", `${res.status}`);
+    return res;
   });
 
   trackRoute("GET", "/api/cloud/usage/current");
-  app.get("/api/cloud/usage/current", async () =>
-    cloudProxy("GET", "/api/usage/current"),
-  );
+  app.get("/api/cloud/usage/current", async (c) => {
+    const trace = c.get("trace");
+    trace.step("cloudProxy");
+    const res = await cloudProxy("GET", "/api/usage/current");
+    trace.end("cloudProxy", `${res.status}`);
+    return res;
+  });
 
   // Subscription (served from cache, refreshed every 5 min)
   trackRoute("GET", "/api/cloud/subscription");
@@ -640,15 +778,23 @@ export function createApp(
   // Billing
   trackRoute("POST", "/api/cloud/billing/checkout");
   app.post("/api/cloud/billing/checkout", async (c) => {
+    const trace = c.get("trace");
     const body = await c.req.json().catch(() => ({}));
-    return cloudProxy("POST", "/api/billing/checkout", body);
+    trace.step("cloudProxy");
+    const res = await cloudProxy("POST", "/api/billing/checkout", body);
+    trace.end("cloudProxy", `${res.status}`);
+    return res;
   });
 
   trackRoute("GET", "/api/cloud/billing/portal");
   app.get("/api/cloud/billing/portal", async (c) => {
+    const trace = c.get("trace");
     const returnUrl = c.req.query("return_url") || "";
     const qs = returnUrl ? `?return_url=${encodeURIComponent(returnUrl)}` : "";
-    return cloudProxy("GET", `/api/billing/portal${qs}`);
+    trace.step("cloudProxy");
+    const res = await cloudProxy("GET", `/api/billing/portal${qs}`);
+    trace.end("cloudProxy", `${res.status}`);
+    return res;
   });
 
   // --- Dashboard API ---
@@ -708,6 +854,9 @@ export function createApp(
           last_indexed_at: r.last_indexed_at,
           last_indexed_commit: r.last_indexed_commit,
           max_import_depth: r.max_import_depth,
+          enable_embeddings: r.enable_embeddings,
+          enable_summaries: r.enable_summaries,
+          enable_vocab_clusters: r.enable_vocab_clusters,
           has_capabilities: !!caps,
           watcher: {
             active: watcher.watching,
@@ -748,6 +897,184 @@ export function createApp(
           started_at: watcher.started_at ?? null,
         },
       });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  trackRoute("PATCH", "/api/dashboard/repos/:id/settings");
+  app.patch("/api/dashboard/repos/:id/settings", async (c) => {
+    try {
+      const id = c.req.param("id");
+      const repo = repoQueries.getById(db, id);
+      if (!repo) return c.json({ error: "repo not found" }, 404);
+      const body = await c.req.json() as { enable_embeddings?: boolean; enable_summaries?: boolean; enable_vocab_clusters?: boolean };
+      const flags: { enable_embeddings?: number; enable_summaries?: number; enable_vocab_clusters?: number } = {};
+      if (body.enable_embeddings !== undefined) flags.enable_embeddings = body.enable_embeddings ? 1 : 0;
+      if (body.enable_summaries !== undefined) flags.enable_summaries = body.enable_summaries ? 1 : 0;
+      if (body.enable_vocab_clusters !== undefined) flags.enable_vocab_clusters = body.enable_vocab_clusters ? 1 : 0;
+      repoQueries.updateProFeatures(db, id, flags);
+      emitRepoEvent();
+      return c.json({ ok: true });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  trackRoute("GET", "/api/dashboard/repos/:id/files");
+  app.get("/api/dashboard/repos/:id/files", (c) => {
+    try {
+      const id = c.req.param("id");
+      const repo = repoQueries.getById(db, id);
+      if (!repo) return c.json({ error: "repo not found" }, 404);
+      const limit = Number(c.req.query("limit") || 100);
+      const offset = Number(c.req.query("offset") || 0);
+      const search = c.req.query("search") || undefined;
+      const meta = metadataQueries.getByRepo(db, id);
+      const raw = getRawDb();
+      const chunkCounts = raw
+        .prepare("SELECT path, count(*) as chunk_count, SUM(CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END) as embedded_count FROM chunks WHERE repo_id = ? GROUP BY path")
+        .all(id) as Array<{ path: string; chunk_count: number; embedded_count: number }>;
+      const countMap = new Map(chunkCounts.map((r) => [r.path, r]));
+      let all = meta.map((m) => {
+        const counts = countMap.get(m.path);
+        return {
+          path: m.path,
+          language: m.language,
+          exports: m.exports,
+          purpose: m.purpose,
+          chunk_count: counts?.chunk_count ?? 0,
+          has_embedding: (counts?.embedded_count ?? 0) > 0,
+        };
+      });
+      if (search) {
+        const q = search.toLowerCase();
+        all = all.filter((f) => f.path.toLowerCase().includes(q));
+      }
+      const total = all.length;
+      const files = all.slice(offset, offset + limit);
+      return c.json({ files, total });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  trackRoute("GET", "/api/dashboard/repos/:id/files/:path");
+  app.get("/api/dashboard/repos/:id/files/:path", (c) => {
+    try {
+      const id = c.req.param("id");
+      const filePath = decodeURIComponent(c.req.param("path"));
+      const repo = repoQueries.getById(db, id);
+      if (!repo) return c.json({ error: "repo not found" }, 404);
+
+      // Metadata
+      const allMeta = metadataQueries.getByRepo(db, id);
+      const meta = allMeta.find((m) => m.path === filePath);
+      if (!meta) return c.json({ error: "file not found" }, 404);
+
+      // Chunk stats
+      const raw = getRawDb();
+      const chunkRow = raw
+        .prepare("SELECT count(*) as chunk_count, SUM(CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END) as embedded_count FROM chunks WHERE repo_id = ? AND path = ?")
+        .get(id, filePath) as { chunk_count: number; embedded_count: number };
+
+      // Import graph: what this file imports + what imports this file
+      const allImports = importQueries.getBySources(db, id, [filePath]);
+      const allImporters = importQueries.getByTargets(db, id, [filePath]);
+
+      // Git stats
+      const gitStats = statsQueries.getByRepo(db, id);
+      const fileStat = gitStats.get(filePath);
+
+      // Co-changes (top 10 by count)
+      const cochangeRows = raw
+        .prepare("SELECT path_a, path_b, cochange_count FROM file_cochanges WHERE repo_id = ? AND (path_a = ? OR path_b = ?) ORDER BY cochange_count DESC LIMIT 10")
+        .all(id, filePath, filePath) as Array<{ path_a: string; path_b: string; cochange_count: number }>;
+      const cochanges = cochangeRows.map((r) => ({
+        path: r.path_a === filePath ? r.path_b : r.path_a,
+        count: r.cochange_count,
+      }));
+
+      return c.json({
+        path: meta.path,
+        language: meta.language,
+        exports: meta.exports,
+        docstring: meta.docstring,
+        sections: meta.sections,
+        internals: meta.internals,
+        purpose: meta.purpose,
+        chunk_count: chunkRow.chunk_count,
+        embedded_count: chunkRow.embedded_count,
+        imports: allImports.map((i) => i.target_path),
+        imported_by: allImporters.map((i) => i.source_path),
+        git: fileStat ? {
+          commit_count: fileStat.commit_count,
+          recent_count: fileStat.recent_count,
+          last_modified: fileStat.last_modified?.toISOString() ?? null,
+        } : null,
+        cochanges,
+      });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  trackRoute("GET", "/api/dashboard/repos/:id/chunks");
+  app.get("/api/dashboard/repos/:id/chunks", (c) => {
+    try {
+      const id = c.req.param("id");
+      const repo = repoQueries.getById(db, id);
+      if (!repo) return c.json({ error: "repo not found" }, 404);
+      const limit = Number(c.req.query("limit") || 100);
+      const offset = Number(c.req.query("offset") || 0);
+      const pathFilter = c.req.query("path") || undefined;
+      const raw = getRawDb();
+      const where = pathFilter
+        ? "WHERE repo_id = ? AND path = ?"
+        : "WHERE repo_id = ?";
+      const params = pathFilter ? [id, pathFilter] : [id];
+      const rows = raw
+        .prepare(`SELECT id, path, chunk_index, start_line, end_line, language, CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END as has_embedding FROM chunks ${where} ORDER BY path, chunk_index LIMIT ? OFFSET ?`)
+        .all(...params, limit, offset) as Array<{
+          id: string; path: string; chunk_index: number;
+          start_line: number; end_line: number; language: string | null; has_embedding: number;
+        }>;
+      const totalRow = raw
+        .prepare(`SELECT count(*) as count FROM chunks ${where}`)
+        .get(...params) as { count: number };
+      return c.json({
+        chunks: rows.map((r) => ({ ...r, has_embedding: r.has_embedding === 1 })),
+        total: totalRow.count,
+      });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  trackRoute("GET", "/api/dashboard/repos/:id/chunks/:chunkId");
+  app.get("/api/dashboard/repos/:id/chunks/:chunkId", (c) => {
+    try {
+      const id = c.req.param("id");
+      const chunkId = c.req.param("chunkId");
+      const raw = getRawDb();
+      const row = raw
+        .prepare("SELECT id, path, chunk_index, start_line, end_line, content, language, chunk_hash, CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END as has_embedding FROM chunks WHERE id = ? AND repo_id = ?")
+        .get(chunkId, id) as { id: string; path: string; chunk_index: number; start_line: number; end_line: number; content: string; language: string | null; chunk_hash: string; has_embedding: number } | undefined;
+      if (!row) return c.json({ error: "chunk not found" }, 404);
+      return c.json({ ...row, has_embedding: row.has_embedding === 1 });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  trackRoute("GET", "/api/dashboard/repos/:id/vocab-clusters");
+  app.get("/api/dashboard/repos/:id/vocab-clusters", (c) => {
+    try {
+      const id = c.req.param("id");
+      const repo = repoQueries.getById(db, id);
+      if (!repo) return c.json({ error: "repo not found" }, 404);
+      const clusters = repo.vocab_clusters ? JSON.parse(repo.vocab_clusters) : [];
+      return c.json({ clusters: Array.isArray(clusters) ? clusters : [] });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
     }
@@ -824,44 +1151,6 @@ export function createApp(
     }
   });
 
-  trackRoute("GET", "/api/dashboard/jobs");
-  app.get("/api/dashboard/jobs", async (c) => {
-    try {
-      const repos = listRepos(db);
-      const result = await Promise.all(
-        repos.map(async (r) => {
-          const stats = chunkQueries.getStats(db, r.id);
-          const structural = metadataQueries.getStructuralStats(db, r.id);
-          const watcher = getWatcherStatus(r.id);
-          let currentHead: string | null = null;
-          try { currentHead = await getHeadCommit(r.root_path); } catch {}
-          return {
-            id: r.id,
-            name: r.name,
-            index_status: r.index_status,
-            last_indexed_commit: r.last_indexed_commit,
-            last_indexed_at: r.last_indexed_at,
-            is_stale: !!(currentHead && r.last_indexed_commit !== currentHead),
-            current_head: currentHead,
-            chunk_count: stats.chunk_count,
-            embedded_count: stats.embedded_count,
-            embeddable_count: stats.embeddable_count,
-            purpose_count: structural.purpose_count,
-            purpose_total: structural.purpose_total,
-            watcher: {
-              active: watcher.watching,
-              changed_files: watcher.changed_files ?? 0,
-              started_at: watcher.started_at ?? null,
-            },
-          };
-        }),
-      );
-      return c.json({ repos: result });
-    } catch (e: any) {
-      return c.json({ error: e.message }, 500);
-    }
-  });
-
   trackRoute("GET", "/api/dashboard/usage");
   app.get("/api/dashboard/usage", (c) => {
     try {
@@ -902,6 +1191,29 @@ export function createApp(
         has_capabilities: !!caps,
         refreshed_at: quotaCache?.fetchedAt ?? null,
       });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  trackRoute("GET", "/api/dashboard/settings");
+  app.get("/api/dashboard/settings", (c) => {
+    try {
+      const all = settingsQueries.getAll(db);
+      return c.json({ settings: all });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  trackRoute("PUT", "/api/dashboard/settings");
+  app.put("/api/dashboard/settings", async (c) => {
+    try {
+      const body = await c.req.json() as Record<string, string>;
+      for (const [key, value] of Object.entries(body)) {
+        settingsQueries.set(db, key, value);
+      }
+      return c.json({ ok: true, settings: settingsQueries.getAll(db) });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
     }
@@ -973,7 +1285,9 @@ export function createApp(
             caps = createCloudCapabilities(
               apiKey,
               (counter, amount) => { try { usageQueries.increment(db, counter as any, amount); } catch {} },
-              (method, path, status, duration, source) => { try { logQueries.insert(db, method, path, status, duration, source); } catch {} },
+              (method, path, status, duration, source, reqBody, resBody) => {
+                try { logQueries.insert(db, method, path, status, duration, source, reqBody, resBody?.length, resBody); } catch {}
+              },
             );
             console.error("[LENS] Cloud capabilities recovered (Pro plan)");
           }

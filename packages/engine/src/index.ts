@@ -45,7 +45,7 @@ export { buildVocabClusters, extractVocab, cosine, agglomerativeCluster } from "
 export { startWatcher, stopWatcher, getWatcherStatus } from "./index/watcher";
 
 // Context
-export { buildContext } from "./context/context";
+export { buildContext, type ContextOptions } from "./context/context";
 export { interpretQuery, isNoisePath } from "./context/query-interpreter";
 export { formatContextPack } from "./context/formatter";
 export { vectorSearch } from "./context/vector";
@@ -72,8 +72,12 @@ export {
   logQueries,
   usageQueries,
   telemetryQueries,
+  settingsQueries,
   type UsageCounter,
 } from "./db/queries";
+
+// Trace
+export { RequestTrace, type TraceStep } from "./trace";
 
 // Telemetry
 export { track, setTelemetryEnabled } from "./telemetry";

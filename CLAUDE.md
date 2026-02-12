@@ -64,14 +64,44 @@ Always run `tsc --noEmit` after code changes. Biome only catches lint/format iss
 
 ### Indexing Pipeline
 
-`runIndex()` in `packages/engine/src/index/engine.ts`:
+Two stages: **core index** (always runs) and **enrichment** (only on explicit triggers).
 
-1. Diff scan → chunk files
-2. `extractAndPersistMetadata()` — exports, imports, docstrings
-3. `buildVocabClusters()` — Voyage-embed terms, cosine cluster >0.75
+#### Core Index — `runIndex()` in `packages/engine/src/index/engine.ts`
+
+1. Discovery — diff scan (changed files since last commit) or full scan (`--force`)
+2. Chunking — split files into indexed chunks
+3. `extractAndPersistMetadata()` — exports, imports, docstrings, sections, internals
 4. `buildAndPersistImportGraph()` — directed import edges
 5. `computeMaxImportDepth()` — BFS from leaves
 6. `analyzeGitHistory()` — commit counts, co-change pairs
+
+#### Enrichment — post-index tasks in `apps/daemon/src/server.ts`
+
+Runs after core index, guarded by per-repo toggles + capabilities + quota:
+
+1. `buildVocabClusters()` — Voyage-embed terms, cosine cluster >0.75
+2. `ensureEmbedded()` — Voyage vector embeddings for semantic search
+3. `enrichPurpose()` — LLM-generated file purpose summaries
+
+#### Trigger Matrix
+
+| Trigger | Core Index | Enrichment |
+|---|---|---|
+| `lens repo register` / `POST /repo/register` | full scan | yes |
+| `lens index` / `POST /index/run` | diff scan (or full if `--force`) | yes |
+| `lens context` / `POST /context` | diff scan via `ensureIndexed()` | **no** |
+| File watcher (chokidar) | diff scan via `runIndex()` | **no** |
+
+Enrichment = expensive API calls (Voyage, LLM). Only explicit user actions trigger it.
+
+### Per-Repo Feature Toggles
+
+Each repo has three independent flags (default: enabled):
+- `enable_embeddings` — vector embeddings for semantic search
+- `enable_summaries` — LLM purpose summaries
+- `enable_vocab_clusters` — Voyage term clustering
+
+Toggle via dashboard UI or `PATCH /api/dashboard/repos/:id/settings`.
 
 ### File Watchers
 

@@ -117,7 +117,11 @@ export function Overview() {
             </div>
             <div className="grid gap-3 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
               {repoData.repos.map((repo) => (
-                <Card key={repo.id} className="border-border bg-background py-4 shadow-none">
+                <Card
+                  key={repo.id}
+                  className="border-border bg-background py-4 shadow-none cursor-pointer hover:bg-accent/30 transition-colors"
+                  onClick={() => navigate({ to: "/repos/$repoId", params: { repoId: repo.id } })}
+                >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">

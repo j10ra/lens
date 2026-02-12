@@ -3,6 +3,7 @@ import type { Db } from "../db/connection";
 import { repoQueries } from "../db/queries";
 import { ensureIndexed } from "../index/engine";
 import { track } from "../telemetry";
+import type { RequestTrace } from "../trace";
 import type { ContextData, ContextResponse } from "../types";
 import { formatContextPack } from "./formatter";
 import { interpretQuery, isNoisePath } from "./query-interpreter";
@@ -28,8 +29,8 @@ const CACHE_TTL = 120_000;
 const CACHE_MAX = 20;
 const cache = new Map<string, CacheEntry>();
 
-function cacheKey(repoId: string, goal: string, commit: string | null): string {
-  return `${repoId}:${commit ?? ""}:${goal}`;
+function cacheKey(repoId: string, goal: string, commit: string | null, emb = true): string {
+  return `${repoId}:${commit ?? ""}:${emb ? "e" : "n"}:${goal}`;
 }
 function cacheGet(key: string): ContextResponse | null {
   const entry = cache.get(key);
@@ -48,44 +49,59 @@ function cacheSet(key: string, response: ContextResponse): void {
   cache.set(key, { response, expires: Date.now() + CACHE_TTL });
 }
 
+export interface ContextOptions {
+  useEmbeddings?: boolean;
+}
+
 export async function buildContext(
   db: Db,
   repoId: string,
   goal: string,
   caps?: Capabilities,
+  trace?: RequestTrace,
+  options?: ContextOptions,
 ): Promise<ContextResponse> {
   const start = Date.now();
 
   try {
+    trace?.step("ensureIndexed");
     await ensureIndexed(db, repoId, caps);
+    trace?.end("ensureIndexed");
 
     const repo = repoQueries.getById(db, repoId);
     const commit = repo?.last_indexed_commit ?? null;
 
-    const key = cacheKey(repoId, goal, commit);
+    const useEmb = options?.useEmbeddings !== false;
+    const key = cacheKey(repoId, goal, commit, useEmb);
     const cached = cacheGet(key);
     if (cached) {
+      trace?.add("cache", 0, "HIT");
       track(db, "context", { duration_ms: Date.now() - start, result_count: cached.stats.files_in_context, cache_hit: true });
       return { ...cached, stats: { ...cached.stats, cached: true, duration_ms: Date.now() - start } };
     }
+    const embAvailable = useEmb && (await import("../db/queries")).chunkQueries.hasEmbeddings(db, repoId);
 
-    const embAvailable = (await import("../db/queries")).chunkQueries.hasEmbeddings(db, repoId);
-
+    trace?.step("loadStructural");
     const metadata = loadFileMetadata(db, repoId);
     const allStats = getAllFileStats(db, repoId);
     const vocabClusters = loadVocabClusters(db, repoId);
     const indegreeMap = getIndegrees(db, repoId);
     const maxImportDepth = repo?.max_import_depth ?? 0;
+    trace?.end("loadStructural");
 
+    trace?.step("vectorSearch");
     const vecResults = embAvailable ? await vectorSearch(db, repoId, goal, 10, caps, true).catch(() => []) : [];
+    trace?.end("vectorSearch", `${vecResults.length} results`);
 
     const statsForInterpreter = new Map<string, { commit_count: number; recent_count: number }>();
     for (const [path, stat] of allStats) {
       statsForInterpreter.set(path, { commit_count: stat.commit_count, recent_count: stat.recent_count });
     }
+    trace?.step("interpretQuery");
     const interpreted = interpretQuery(goal, metadata, statsForInterpreter, vocabClusters, indegreeMap, maxImportDepth);
+    trace?.end("interpretQuery", `${interpreted.files.length} files`);
 
-    // Co-change promotion
+    trace?.step("cochangePromotion");
     const topForCochange = interpreted.files.slice(0, 5).map((f) => f.path);
     const cochangePartners = getCochangePartners(db, repoId, topForCochange, 3, 20);
     const existingPathSet = new Set(interpreted.files.map((f) => f.path));
@@ -100,6 +116,8 @@ export async function buildContext(
       existingPathSet.add(cp.partner);
       promoted++;
     }
+
+    trace?.end("cochangePromotion", `${promoted} promoted`);
 
     // Semantic merge
     if (vecResults.length > 0) {
@@ -139,7 +157,7 @@ export async function buildContext(
     const hitPaths = interpreted.files.map((f) => f.path);
     const topPaths = hitPaths.slice(0, 3);
 
-    // Structural enrichment
+    trace?.step("structuralEnrichment");
     const reverseImports = getReverseImports(db, repoId, hitPaths);
     const forwardImports = getForwardImports(db, repoId, hitPaths);
     const hop2Deps = get2HopReverseDeps(db, repoId, topPaths);
@@ -178,6 +196,9 @@ export async function buildContext(
       }
     }
 
+    trace?.end("structuralEnrichment");
+
+    trace?.step("formatContextPack");
     const data: ContextData = {
       goal,
       files: interpreted.files,
@@ -189,6 +210,7 @@ export async function buildContext(
       fileStats: allStats,
     };
     const contextPack = formatContextPack(data);
+    trace?.end("formatContextPack");
 
     const response: ContextResponse = {
       context_pack: contextPack,

@@ -1,17 +1,42 @@
-import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Send } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PageHeader, Button } from "@lens/ui";
+import { PageHeader, Button, Switch } from "@lens/ui";
 import { api } from "@/lib/api";
 
 export function Context() {
   const [repoId, setRepoId] = useState("");
   const [goal, setGoal] = useState("");
+  const queryClient = useQueryClient();
 
   const { data: repoData } = useQuery({
     queryKey: ["dashboard-repos"],
     queryFn: api.repos,
     placeholderData: keepPreviousData,
+  });
+
+  const { data: settingsData } = useQuery({
+    queryKey: ["dashboard-settings"],
+    queryFn: api.getSettings,
+  });
+
+  const useEmbeddings = settingsData?.settings?.use_embeddings !== "false";
+
+  const toggleEmbeddings = useMutation({
+    mutationFn: (checked: boolean) =>
+      api.updateSettings({ use_embeddings: checked ? "true" : "false" }),
+    onMutate: async (checked) => {
+      await queryClient.cancelQueries({ queryKey: ["dashboard-settings"] });
+      const prev = queryClient.getQueryData<{ settings: Record<string, string> }>(["dashboard-settings"]);
+      queryClient.setQueryData(["dashboard-settings"], {
+        settings: { ...prev?.settings, use_embeddings: checked ? "true" : "false" },
+      });
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["dashboard-settings"], ctx.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["dashboard-settings"] }),
   });
 
   const mutation = useMutation({
@@ -36,10 +61,19 @@ export function Context() {
     <>
       <PageHeader>
         <span className="text-sm font-medium">Context</span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <span className="text-xs text-muted-foreground">Embeddings</span>
+            <Switch
+              checked={useEmbeddings}
+              onCheckedChange={(checked) => toggleEmbeddings.mutate(!!checked)}
+              disabled={toggleEmbeddings.isPending}
+            />
+          </label>
+        </div>
       </PageHeader>
 
       <div className="flex flex-1 min-h-0 flex-col gap-3 py-3">
-        {/* Query form */}
         <form
           onSubmit={handleSubmit}
           className="shrink-0 flex flex-col gap-2 px-3"
@@ -57,13 +91,15 @@ export function Context() {
                 </option>
               ))}
             </select>
+
             <input
               type="text"
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              placeholder="Describe your goal... e.g. 'add user authentication'"
+              placeholder="Describe your goal..."
               className="h-8 flex-1 rounded-md border border-border bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
+
             <Button
               type="submit"
               size="sm"
@@ -79,7 +115,6 @@ export function Context() {
             </Button>
           </div>
 
-          {/* Stats */}
           {stats && (
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
               <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums">
@@ -100,14 +135,12 @@ export function Context() {
           )}
         </form>
 
-        {/* Error */}
         {mutation.isError && (
           <div className="shrink-0 mx-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {(mutation.error as Error).message}
           </div>
         )}
 
-        {/* Content */}
         {mutation.isPending ? (
           <div className="flex items-center justify-center py-20">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />

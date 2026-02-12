@@ -24,9 +24,11 @@ export async function request<T>(method: string, path: string, body?: unknown, r
   for (let i = 0; i < retries; i++) {
     let res: Response;
     try {
+      const headers: Record<string, string> = { "User-Agent": "lens-cli" };
+      if (body) headers["Content-Type"] = "application/json";
       res = await fetch(url, {
         method,
-        headers: body ? { "Content-Type": "application/json" } : undefined,
+        headers,
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(60000), // 60s timeout
       });

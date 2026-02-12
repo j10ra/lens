@@ -39,6 +39,22 @@ export function openDb(customPath?: string): Db {
   if (!cols.has("sections")) sqlite.exec("ALTER TABLE file_metadata ADD COLUMN sections TEXT DEFAULT '[]'");
   if (!cols.has("internals")) sqlite.exec("ALTER TABLE file_metadata ADD COLUMN internals TEXT DEFAULT '[]'");
 
+  // Migrate: add pro feature toggle columns to repos
+  const repoCols = new Set(
+    (sqlite.pragma("table_info(repos)") as { name: string }[]).map((c) => c.name),
+  );
+  if (!repoCols.has("enable_embeddings")) sqlite.exec("ALTER TABLE repos ADD COLUMN enable_embeddings INTEGER NOT NULL DEFAULT 1");
+  if (!repoCols.has("enable_summaries")) sqlite.exec("ALTER TABLE repos ADD COLUMN enable_summaries INTEGER NOT NULL DEFAULT 1");
+  if (!repoCols.has("enable_vocab_clusters")) sqlite.exec("ALTER TABLE repos ADD COLUMN enable_vocab_clusters INTEGER NOT NULL DEFAULT 1");
+  if (!repoCols.has("last_vocab_cluster_commit")) sqlite.exec("ALTER TABLE repos ADD COLUMN last_vocab_cluster_commit TEXT");
+
+  // Migrate: add response_body column to request_logs
+  const logCols = new Set(
+    (sqlite.pragma("table_info(request_logs)") as { name: string }[]).map((c) => c.name),
+  );
+  if (!logCols.has("response_body")) sqlite.exec("ALTER TABLE request_logs ADD COLUMN response_body TEXT");
+  if (!logCols.has("trace")) sqlite.exec("ALTER TABLE request_logs ADD COLUMN trace TEXT");
+
   _db = db;
   _raw = sqlite;
   return db;
@@ -74,6 +90,10 @@ function createTablesSql(): string {
       last_git_analysis_commit TEXT,
       max_import_depth INTEGER DEFAULT 0,
       vocab_clusters TEXT,
+      last_vocab_cluster_commit TEXT,
+      enable_embeddings INTEGER NOT NULL DEFAULT 1,
+      enable_summaries INTEGER NOT NULL DEFAULT 1,
+      enable_vocab_clusters INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -168,10 +188,18 @@ function createTablesSql(): string {
       source TEXT NOT NULL DEFAULT 'api',
       request_body TEXT,
       response_size INTEGER,
+      response_body TEXT,
+      trace TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_request_logs_created ON request_logs(created_at);
     CREATE INDEX IF NOT EXISTS idx_request_logs_source ON request_logs(source);
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
     CREATE TABLE IF NOT EXISTS telemetry_events (
       id TEXT PRIMARY KEY,

@@ -84,7 +84,9 @@ async function loadCapabilities(db: ReturnType<typeof openDb>): Promise<Capabili
     const caps = createCloudCapabilities(
       apiKey,
       (counter, amount) => { try { usageQueries.increment(db, counter as any, amount); } catch {} },
-      (method, path, status, duration, source) => { try { logQueries.insert(db, method, path, status, duration, source); } catch {} },
+      (method, path, status, duration, source, reqBody, resBody) => {
+        try { logQueries.insert(db, method, path, status, duration, source, reqBody, resBody?.length, resBody); } catch {}
+      },
     );
     console.error("[LENS] Cloud capabilities enabled (Pro plan)");
     return { caps, planData };

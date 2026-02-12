@@ -5,7 +5,6 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
   BarChart3,
-  Cpu,
   CreditCard,
   Database,
   FolderGit2,
@@ -22,13 +21,13 @@ import {
 } from "@lens/ui";
 import { api } from "@/lib/api";
 
+const PRIMARY_ACTION: NavItem = { href: "/context", icon: Send, label: "Context" };
+
 const NAV_ITEMS: NavItem[] = [
   { href: "/", icon: LayoutDashboard, label: "Overview" },
   { href: "/repos", icon: FolderGit2, label: "Repos" },
   { href: "/requests", icon: Activity, label: "Requests" },
   { href: "/data", icon: Database, label: "Data" },
-  { href: "/jobs", icon: Cpu, label: "Jobs" },
-  { href: "/context", icon: Send, label: "Context" },
 ];
 
 const CLOUD_GROUPS: NavGroup[] = [
@@ -53,6 +52,8 @@ export function RootLayout() {
   });
 
   const isHealthy = health.data?.status === "ok";
+  const cloudUrl = health.data?.cloud_url ?? "";
+  const connectionLabel = cloudUrl && !/localhost|127\.0\.0\.1/.test(cloudUrl) ? "Cloud" : "Local";
 
   const qc = useQueryClient();
   const auth = useQuery({
@@ -84,7 +85,6 @@ export function RootLayout() {
       timer = setTimeout(() => {
         qc.invalidateQueries({ queryKey: ["dashboard-repos"] });
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
-        qc.invalidateQueries({ queryKey: ["dashboard-jobs"] });
       }, 300);
     };
     return () => { clearTimeout(timer); es.close(); };
@@ -97,6 +97,7 @@ export function RootLayout() {
   return (
     <SidebarProvider className="bg-muted h-svh">
       <AppSidebar
+        primaryAction={PRIMARY_ACTION}
         navItems={NAV_ITEMS}
         navGroups={CLOUD_GROUPS}
         currentPath={currentPath}
@@ -104,6 +105,7 @@ export function RootLayout() {
           <Link to={href}>{children}</Link>
         )}
         healthy={isHealthy}
+        connectionLabel={connectionLabel}
         footer={<NavUser user={user} />}
       />
       <SidebarInset className="bg-background rounded-xl overflow-hidden md:my-2 md:mr-2 md:border">

@@ -20,6 +20,17 @@ export {
 } from "./components/ui/card";
 export { Checkbox } from "./components/ui/checkbox";
 export { Separator } from "./components/ui/separator";
+export { Switch } from "./components/ui/switch";
+export {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./components/ui/sheet";
 export {
   Sidebar,
   SidebarContent,

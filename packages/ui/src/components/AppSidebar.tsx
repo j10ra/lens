@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
+import { ArrowRight, Cloud, Monitor } from "lucide-react";
 import { Logo } from "./Logo";
 import { ModeToggle } from "./ModeToggle";
+import { Badge } from "./ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +30,7 @@ export interface NavGroup {
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   navItems: NavItem[];
   navGroups?: NavGroup[];
+  primaryAction?: NavItem;
   currentPath: string;
   renderLink: (props: {
     href: string;
@@ -36,16 +39,19 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   }) => React.ReactNode;
   brand?: { title: string; subtitle: string };
   healthy?: boolean;
+  connectionLabel?: string;
   footer?: React.ReactNode;
 }
 
 export function AppSidebar({
   navItems,
   navGroups,
+  primaryAction,
   currentPath,
   renderLink,
   brand = { title: "LENS", subtitle: "Workspace" },
   healthy,
+  connectionLabel,
   footer,
   ...props
 }: AppSidebarProps) {
@@ -65,6 +71,40 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        {primaryAction && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem className="flex flex-row items-center gap-1.5">
+                  <div className="flex-1 min-w-0">
+                    {renderLink({
+                      href: primaryAction.href,
+                      children: (
+                        <SidebarMenuButton
+                          className="border border-border bg-muted/40 hover:bg-muted h-9 font-medium"
+                        >
+                          <primaryAction.icon />
+                          <span>{primaryAction.label}</span>
+                        </SidebarMenuButton>
+                      ),
+                    })}
+                  </div>
+                  <div className="shrink-0 group-data-[collapsible=icon]:hidden">
+                    {renderLink({
+                      href: primaryAction.href,
+                      children: (
+                        <button className="flex size-9 items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors">
+                          <ArrowRight className="size-4 text-muted-foreground" />
+                        </button>
+                      ),
+                    })}
+                  </div>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -117,11 +157,19 @@ export function AppSidebar({
           </SidebarGroup>
         ))}
 
-        <SidebarGroup className="mt-auto">
+        <SidebarGroup className="mt-auto group-data-[collapsible=icon]:hidden">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <ModeToggle variant="sidebar" />
+                <div className="flex items-center justify-between px-2 py-1">
+                  {connectionLabel && (
+                    <Badge variant="outline">
+                      {connectionLabel === "Cloud" ? <Cloud /> : <Monitor />}
+                      {connectionLabel}
+                    </Badge>
+                  )}
+                  <ModeToggle variant="button" />
+                </div>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

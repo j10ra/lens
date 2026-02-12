@@ -7,7 +7,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  health: () => request<{ status: string; version: string }>("/health"),
+  health: () => request<{ status: string; version: string; cloud_url: string }>("/health"),
 
   stats: () =>
     request<{
@@ -38,12 +38,89 @@ export const api = {
         last_indexed_at: string | null;
         last_indexed_commit: string | null;
         max_import_depth: number;
+        enable_embeddings: number;
+        enable_summaries: number;
+        enable_vocab_clusters: number;
         has_capabilities: boolean;
         watcher: { active: boolean; changed_files: number; started_at: string | null };
       }>;
     }>("/api/dashboard/repos"),
 
   repo: (id: string) => request<Record<string, unknown>>(`/api/dashboard/repos/${id}`),
+
+  repoFiles: (id: string, params?: { limit?: number; offset?: number; search?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.limit) sp.set("limit", String(params.limit));
+    if (params?.offset) sp.set("offset", String(params.offset));
+    if (params?.search) sp.set("search", params.search);
+    const qs = sp.toString();
+    return request<{
+      files: Array<{
+        path: string;
+        language: string | null;
+        exports: string[];
+        purpose: string;
+        chunk_count: number;
+        has_embedding: boolean;
+      }>;
+      total: number;
+    }>(`/api/dashboard/repos/${id}/files${qs ? `?${qs}` : ""}`);
+  },
+
+  repoFileDetail: (repoId: string, filePath: string) =>
+    request<{
+      path: string;
+      language: string | null;
+      exports: string[];
+      docstring: string;
+      sections: string[];
+      internals: string[];
+      purpose: string;
+      chunk_count: number;
+      embedded_count: number;
+      imports: string[];
+      imported_by: string[];
+      git: { commit_count: number; recent_count: number; last_modified: string | null } | null;
+      cochanges: Array<{ path: string; count: number }>;
+    }>(`/api/dashboard/repos/${repoId}/files/${encodeURIComponent(filePath)}`),
+
+  repoChunks: (id: string, params?: { limit?: number; offset?: number; path?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.limit) sp.set("limit", String(params.limit));
+    if (params?.offset) sp.set("offset", String(params.offset));
+    if (params?.path) sp.set("path", params.path);
+    const qs = sp.toString();
+    return request<{
+      chunks: Array<{
+        id: string;
+        path: string;
+        chunk_index: number;
+        start_line: number;
+        end_line: number;
+        language: string | null;
+        has_embedding: boolean;
+      }>;
+      total: number;
+    }>(`/api/dashboard/repos/${id}/chunks${qs ? `?${qs}` : ""}`);
+  },
+
+  repoChunkDetail: (repoId: string, chunkId: string) =>
+    request<{
+      id: string;
+      path: string;
+      chunk_index: number;
+      start_line: number;
+      end_line: number;
+      content: string;
+      language: string | null;
+      chunk_hash: string;
+      has_embedding: boolean;
+    }>(`/api/dashboard/repos/${repoId}/chunks/${chunkId}`),
+
+  repoVocabClusters: (id: string) =>
+    request<{
+      clusters: Array<{ terms: string[]; centroid_term?: string }>;
+    }>(`/api/dashboard/repos/${id}/vocab-clusters`),
 
   logs: (params?: { limit?: number; offset?: number; method?: string; path?: string; status?: number; source?: string }) => {
     const sp = new URLSearchParams();
@@ -64,6 +141,8 @@ export const api = {
         source: string;
         request_body: string | null;
         response_size: number | null;
+        response_body: string | null;
+        trace: string | null;
         created_at: string;
       }>;
       total: number;
@@ -79,24 +158,12 @@ export const api = {
       `/api/dashboard/tables/${encodeURIComponent(name)}?limit=${limit}&offset=${offset}`,
     ),
 
-  jobs: () =>
-    request<{
-      repos: Array<{
-        id: string;
-        name: string;
-        index_status: string;
-        last_indexed_commit: string | null;
-        last_indexed_at: string | null;
-        is_stale: boolean;
-        current_head: string | null;
-        chunk_count: number;
-        embedded_count: number;
-        embeddable_count: number;
-        purpose_count: number;
-        purpose_total: number;
-        watcher: { active: boolean; changed_files: number; started_at: string | null };
-      }>;
-    }>("/api/dashboard/jobs"),
+  updateRepoSettings: (id: string, settings: { enable_embeddings?: boolean; enable_summaries?: boolean; enable_vocab_clusters?: boolean }) =>
+    request<{ ok: boolean }>(`/api/dashboard/repos/${id}/settings`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    }),
 
   routes: () =>
     request<{ routes: Array<{ method: string; path: string }> }>("/api/dashboard/routes"),
@@ -105,7 +172,7 @@ export const api = {
     request<unknown>("/index/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ repo_id: repoId, force: false }),
+      body: JSON.stringify({ repo_id: repoId, force: true }),
     }),
 
   startWatcher: (repoId: string) =>
@@ -206,4 +273,14 @@ export const api = {
       "/api/dashboard/refresh-plan",
       { method: "POST" },
     ),
+
+  getSettings: () =>
+    request<{ settings: Record<string, string> }>("/api/dashboard/settings"),
+
+  updateSettings: (settings: Record<string, string>) =>
+    request<{ ok: boolean; settings: Record<string, string> }>("/api/dashboard/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    }),
 };
