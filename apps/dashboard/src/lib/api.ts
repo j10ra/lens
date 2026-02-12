@@ -274,13 +274,4 @@ export const api = {
       { method: "POST" },
     ),
 
-  getSettings: () =>
-    request<{ settings: Record<string, string> }>("/api/dashboard/settings"),
-
-  updateSettings: (settings: Record<string, string>) =>
-    request<{ ok: boolean; settings: Record<string, string> }>("/api/dashboard/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-    }),
 };

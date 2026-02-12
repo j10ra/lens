@@ -15,28 +15,28 @@ export function Context() {
     placeholderData: keepPreviousData,
   });
 
-  const { data: settingsData } = useQuery({
-    queryKey: ["dashboard-settings"],
-    queryFn: api.getSettings,
-  });
-
-  const useEmbeddings = settingsData?.settings?.use_embeddings !== "false";
+  const selectedRepo = (repoData?.repos ?? []).find((r) => r.id === repoId);
+  const useEmbeddings = selectedRepo?.enable_embeddings === 1;
 
   const toggleEmbeddings = useMutation({
     mutationFn: (checked: boolean) =>
-      api.updateSettings({ use_embeddings: checked ? "true" : "false" }),
+      api.updateRepoSettings(repoId, { enable_embeddings: checked }),
     onMutate: async (checked) => {
-      await queryClient.cancelQueries({ queryKey: ["dashboard-settings"] });
-      const prev = queryClient.getQueryData<{ settings: Record<string, string> }>(["dashboard-settings"]);
-      queryClient.setQueryData(["dashboard-settings"], {
-        settings: { ...prev?.settings, use_embeddings: checked ? "true" : "false" },
-      });
+      await queryClient.cancelQueries({ queryKey: ["dashboard-repos"] });
+      const prev = queryClient.getQueryData<{ repos: any[] }>(["dashboard-repos"]);
+      if (prev) {
+        queryClient.setQueryData(["dashboard-repos"], {
+          repos: prev.repos.map((r) =>
+            r.id === repoId ? { ...r, enable_embeddings: checked ? 1 : 0 } : r,
+          ),
+        });
+      }
       return { prev };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(["dashboard-settings"], ctx.prev);
+      if (ctx?.prev) queryClient.setQueryData(["dashboard-repos"], ctx.prev);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["dashboard-settings"] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
   });
 
   const mutation = useMutation({
@@ -67,7 +67,7 @@ export function Context() {
             <Switch
               checked={useEmbeddings}
               onCheckedChange={(checked) => toggleEmbeddings.mutate(!!checked)}
-              disabled={toggleEmbeddings.isPending}
+              disabled={!repoId || toggleEmbeddings.isPending}
             />
           </label>
         </div>

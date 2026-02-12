@@ -1,5 +1,5 @@
 import type { Capabilities, Db } from "@lens/engine";
-import { buildContext, getRawDb, getRepoStatus, listRepos, registerRepo, repoQueries, RequestTrace, runIndex, settingsQueries } from "@lens/engine";
+import { buildContext, getRawDb, getRepoStatus, listRepos, registerRepo, repoQueries, RequestTrace, runIndex } from "@lens/engine";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -43,7 +43,8 @@ export function createMcpServer(db: Db, caps?: Capabilities): McpServer {
         trace.step("findRepo");
         const repoId = findOrRegisterRepo(db, repo_path);
         trace.end("findRepo");
-        const useEmbeddings = settingsQueries.get(db, "use_embeddings") !== "false";
+        const repo = repoQueries.getById(db, repoId);
+        const useEmbeddings = repo?.enable_embeddings === 1;
         const result = await buildContext(db, repoId, goal, caps, trace, { useEmbeddings });
         const duration = Math.round(performance.now() - start);
         const reqBody = JSON.stringify({ repo_path, goal });

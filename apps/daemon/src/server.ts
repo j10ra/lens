@@ -28,7 +28,6 @@ import {
   buildVocabClusters,
   getRawDb,
   usageQueries,
-  settingsQueries,
   telemetryQueries,
   track,
   setTelemetryEnabled,
@@ -390,7 +389,8 @@ export function createApp(
     try {
       const { repo_id, goal } = await c.req.json();
       if (!repo_id || !goal) return c.json({ error: "repo_id and goal required" }, 400);
-      const useEmbeddings = settingsQueries.get(db, "use_embeddings") !== "false";
+      const repo = repoQueries.getById(db, repo_id);
+      const useEmbeddings = repo?.enable_embeddings === 1;
       const result = await buildContext(db, repo_id, goal, caps, c.get("trace"), { useEmbeddings });
       usageQueries.increment(db, "context_queries");
       return c.json(result);
@@ -1205,29 +1205,6 @@ export function createApp(
         has_capabilities: !!caps,
         refreshed_at: quotaCache?.fetchedAt ?? null,
       });
-    } catch (e: any) {
-      return c.json({ error: e.message }, 500);
-    }
-  });
-
-  trackRoute("GET", "/api/dashboard/settings");
-  app.get("/api/dashboard/settings", (c) => {
-    try {
-      const all = settingsQueries.getAll(db);
-      return c.json({ settings: all });
-    } catch (e: any) {
-      return c.json({ error: e.message }, 500);
-    }
-  });
-
-  trackRoute("PUT", "/api/dashboard/settings");
-  app.put("/api/dashboard/settings", async (c) => {
-    try {
-      const body = await c.req.json() as Record<string, string>;
-      for (const [key, value] of Object.entries(body)) {
-        settingsQueries.set(db, key, value);
-      }
-      return c.json({ ok: true, settings: settingsQueries.getAll(db) });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
     }

@@ -116,10 +116,14 @@ Response: ~10ms cached, ~0.5-7s cold (depending on repo size and Pro features).
 |--------|--------|-------------|
 | Filename token | 4x * IDF | camelCase/snake_case split |
 | Directory token | 2x * IDF | Last 3 path segments |
-| Export match | 2x * IDF | Exported symbols |
+| Export token | 2.5x * IDF | Decomposed export symbols |
+| Export string | 2x * IDF | Raw export name contains term |
 | Docstring/purpose | 1x * IDF | OR logic, no double-count |
+| Sections | 1x * IDF | Extracted section comments |
+| Internals | 1.5x * IDF | Internal identifiers |
 | Coverage boost | *(1 + (matched/total)^2) | Multi-term matches favored |
 | Noise penalty | *0.3 | vendor/, .min.js, etc. |
+| Hub dampening | *1/(1 + log2(exports/5) * 0.3) | Penalize 5+ export hubs |
 | Activity boost | +min(recent, 5) * 0.5 | Recent commits (90d) |
 | Cluster boost | *1.3 | Vocab cluster match |
 | Indegree boost | *(1 + log2(deg) * 0.1) | Files imported by 3+ |
@@ -152,7 +156,7 @@ Hono HTTP server on `:4111`. Dual transport: HTTP for CLI/dashboard, stdio for M
 | `/daemon/*` | Stats, version |
 | `/api/auth/*` | Auth status, SSE events |
 | `/api/cloud/*` | Proxy to cloud API |
-| `/api/dashboard/*` | Dashboard-specific endpoints |
+| `/api/dashboard/*` | Dashboard-specific endpoints (repos, routes, request logs) |
 | `/dashboard/*` | Static SPA files |
 | `/telemetry/*` | Telemetry event ingestion |
 
@@ -220,11 +224,12 @@ If `auth.json` has `access_token` but no `api_key`, daemon auto-provisions via `
 
 1. Extract Bearer token from Authorization header
 2. Validate prefix: must start with `lk_`
-3. 12-char prefix → lookup in `api_keys` table
-4. Check: not revoked, not expired
-5. SHA-256 hash → constant-time compare with stored hash
-6. Set `userId` and `apiKeyId` for downstream handlers
-7. Touch `last_used_at` (non-blocking via `waitUntil`)
+3. 12-char prefix → lookup in `api_keys` table (by prefix, no revocation filter)
+4. Check: not revoked → 401 "API key revoked"
+5. Check: not expired → 401 "API key expired"
+6. SHA-256 hash → compare with stored hash
+7. Set `userId` and `apiKeyId` for downstream handlers
+8. Touch `last_used_at` (non-blocking via `waitUntil`)
 
 ### Token Refresh
 
@@ -282,6 +287,18 @@ Single source of truth: `apps/daemon/src/config.ts`.
 | Semantic search boost | No | Yes |
 
 CLI shows Pro features as locked when `has_capabilities === false`.
+
+### Per-Repo Feature Toggles
+
+Each repo has three independent flags (default: enabled). Controlled via dashboard UI or `PATCH /api/dashboard/repos/:id/settings`.
+
+| Flag | Enrichment (data in) | Query (data out) |
+|------|---------------------|------------------|
+| `enable_embeddings` | Generate vector embeddings during indexing | Use vector search in context queries |
+| `enable_summaries` | Generate LLM purpose summaries | Summaries used in scoring |
+| `enable_vocab_clusters` | Build Voyage term clusters | Clusters used for concept expansion |
+
+`enable_embeddings` is the single source of truth for both enrichment and query-time vector search. When off: no Voyage API calls for embedding the query, no vector similarity boost. Existing embeddings in the DB are preserved but unused until re-enabled.
 
 ---
 

@@ -18,9 +18,7 @@ export const keyQueries = {
     return db
       .select()
       .from(apiKeys)
-      .where(
-        and(eq(apiKeys.keyPrefix, prefix), sql`${apiKeys.revokedAt} IS NULL`),
-      )
+      .where(eq(apiKeys.keyPrefix, prefix))
       .limit(1)
       .then((rows) => rows[0] ?? null);
   },
