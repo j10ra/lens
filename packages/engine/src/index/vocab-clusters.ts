@@ -1,7 +1,7 @@
-import type { Db } from "../db/connection";
 import type { Capabilities } from "../capabilities";
+import type { Db } from "../db/connection";
+import { jsonParse, metadataQueries, repoQueries } from "../db/queries";
 import type { VocabCluster } from "../types";
-import { metadataQueries, repoQueries, jsonParse } from "../db/queries";
 
 const TERM_BATCH_SIZE = 32;
 const SIMILARITY_THRESHOLD = 0.75;
@@ -258,7 +258,9 @@ export async function buildVocabClusters(db: Db, repoId: string, caps?: Capabili
     return;
   }
 
-  console.error(`[LENS] Vocab clusters: embedding ${terms.length} terms in ${Math.ceil(terms.length / TERM_BATCH_SIZE)} batches...`);
+  console.error(
+    `[LENS] Vocab clusters: embedding ${terms.length} terms in ${Math.ceil(terms.length / TERM_BATCH_SIZE)} batches...`,
+  );
 
   let embeddings: number[][];
   try {

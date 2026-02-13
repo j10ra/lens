@@ -1,8 +1,8 @@
-import fs from "node:fs/promises";
-import fsSync from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import { randomUUID } from "node:crypto";
+import fsSync from "node:fs";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 const CONFIG_DIR = path.join(os.homedir(), ".lens");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");

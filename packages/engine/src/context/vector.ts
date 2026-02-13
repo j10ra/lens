@@ -1,8 +1,8 @@
-import type { Db } from "../db/connection";
 import type { Capabilities } from "../capabilities";
-import type { VectorResult } from "../types";
+import type { Db } from "../db/connection";
 import { chunkQueries } from "../db/queries";
 import { isDocFile } from "../index/discovery";
+import type { VectorResult } from "../types";
 
 function cosine(a: Float32Array, b: Float32Array): number {
   let dot = 0,

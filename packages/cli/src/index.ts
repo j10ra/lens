@@ -1,22 +1,21 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { registerCommand } from "./commands/register.js";
-import { contextCommand } from "./commands/context.js";
-import { indexCommand } from "./commands/index.js";
-import { statusCommand } from "./commands/status.js";
-import { listCommand } from "./commands/list.js";
-import { removeCommand } from "./commands/remove.js";
-import { daemonStatsCommand } from "./commands/daemon-stats.js";
-import { watchCommand, unwatchCommand, watchStatusCommand } from "./commands/watch.js";
-import { mcpCommand } from "./commands/mcp.js";
 import { configGetCommand, configSetCommand } from "./commands/config.js";
+import { contextCommand } from "./commands/context.js";
 import { startCommand, stopCommand } from "./commands/daemon-ctrl.js";
-
+import { daemonStatsCommand } from "./commands/daemon-stats.js";
 import { dashboardCommand } from "./commands/dashboard.js";
+import { indexCommand } from "./commands/index.js";
+import { listCommand } from "./commands/list.js";
 import { loginCommand } from "./commands/login.js";
 import { logoutCommand } from "./commands/logout.js";
-import { error } from "./util/format.js";
+import { mcpCommand } from "./commands/mcp.js";
+import { registerCommand } from "./commands/register.js";
+import { removeCommand } from "./commands/remove.js";
+import { statusCommand } from "./commands/status.js";
+import { unwatchCommand, watchCommand, watchStatusCommand } from "./commands/watch.js";
 import { isTelemetryEnabled } from "./util/config.js";
+import { error } from "./util/format.js";
 
 const program = new Command().name("lens").description("LENS — Local-first repo context engine").version("0.1.19");
 

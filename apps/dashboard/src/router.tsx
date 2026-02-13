@@ -1,13 +1,13 @@
-import { createRouter, createRootRoute, createRoute } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { RootLayout } from "./layouts/RootLayout";
-import { Overview } from "./pages/Overview";
-import { Repos } from "./pages/Repos";
-import { RepoDetail } from "./pages/RepoDetail";
-import { Requests } from "./pages/Requests";
-import { Data } from "./pages/Data";
-import { Context } from "./pages/Context";
-import { Usage } from "./pages/Usage";
 import { Billing } from "./pages/Billing";
+import { Context } from "./pages/Context";
+import { Data } from "./pages/Data";
+import { Overview } from "./pages/Overview";
+import { RepoDetail } from "./pages/RepoDetail";
+import { Repos } from "./pages/Repos";
+import { Requests } from "./pages/Requests";
+import { Usage } from "./pages/Usage";
 
 const rootRoute = createRootRoute({
   component: RootLayout,

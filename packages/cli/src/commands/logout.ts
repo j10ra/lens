@@ -4,6 +4,8 @@ import { output } from "../util/format.js";
 
 export async function logoutCommand(): Promise<void> {
   await clearAuth();
-  try { await post("/api/auth/notify"); } catch {}
+  try {
+    await post("/api/auth/notify");
+  } catch {}
   output("Logged out of LENS cloud.", false);
 }

@@ -1,7 +1,7 @@
-import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
+import { Button, PageHeader } from "@lens/ui";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { Send } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PageHeader, Button } from "@lens/ui";
 import { api } from "@/lib/api";
 
 export function Context() {
@@ -39,10 +39,7 @@ export function Context() {
       </PageHeader>
 
       <div className="flex flex-1 min-h-0 flex-col gap-3 py-3">
-        <form
-          onSubmit={handleSubmit}
-          className="shrink-0 flex flex-col gap-2 px-3"
-        >
+        <form onSubmit={handleSubmit} className="shrink-0 flex flex-col gap-2 px-3">
           <div className="flex items-center gap-2">
             <select
               value={repoId}
@@ -82,19 +79,11 @@ export function Context() {
 
           {stats && (
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-              <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums">
-                {stats.files_in_context} files
-              </span>
-              <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums">
-                {stats.duration_ms}ms
-              </span>
-              <span className="rounded bg-muted px-1.5 py-0.5">
-                {stats.cached ? "cached" : "fresh"}
-              </span>
+              <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums">{stats.files_in_context} files</span>
+              <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums">{stats.duration_ms}ms</span>
+              <span className="rounded bg-muted px-1.5 py-0.5">{stats.cached ? "cached" : "fresh"}</span>
               {!stats.index_fresh && (
-                <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-destructive">
-                  stale
-                </span>
+                <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-destructive">stale</span>
               )}
             </div>
           )}
@@ -128,7 +117,7 @@ export function Context() {
               </thead>
               <tbody>
                 {mutation.data.context_pack.split("\n").map((line, i) => (
-                  <tr key={i} className="group hover:bg-accent/30">
+                  <tr key={`L${i}-${line.length}`} className="group hover:bg-accent/30">
                     <td className="border-b border-r border-border bg-muted/20 px-2 py-0 text-center font-mono text-[10px] text-muted-foreground/50 tabular-nums select-none align-top leading-5">
                       {i + 1}
                     </td>

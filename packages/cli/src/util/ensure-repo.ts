@@ -1,5 +1,5 @@
-import { detectRepo } from "./repo.js";
 import { post } from "./client.js";
+import { detectRepo } from "./repo.js";
 
 interface RegisterResponse {
   repo_id: string;

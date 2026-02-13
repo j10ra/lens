@@ -1,7 +1,7 @@
-import { and, eq, gte, inArray, lte, sql, sum, desc } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql, sum } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "./schema";
-import { apiKeys, subscriptions, usageDaily, planQuotas } from "./schema";
+import { apiKeys, planQuotas, subscriptions, usageDaily } from "./schema";
 
 type Db = PostgresJsDatabase<typeof schema>;
 
@@ -23,13 +23,7 @@ export const keyQueries = {
       .then((rows) => rows[0] ?? null);
   },
 
-  create(
-    db: Db,
-    userId: string,
-    keyHash: string,
-    keyPrefix: string,
-    name = "default",
-  ) {
+  create(db: Db, userId: string, keyHash: string, keyPrefix: string, name = "default") {
     return db
       .insert(apiKeys)
       .values({ userId, keyHash, keyPrefix, name })
@@ -63,10 +57,7 @@ export const keyQueries = {
   },
 
   touch(db: Db, keyId: string) {
-    return db
-      .update(apiKeys)
-      .set({ lastUsedAt: new Date() })
-      .where(eq(apiKeys.id, keyId));
+    return db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, keyId));
   },
 };
 
@@ -162,13 +153,7 @@ export const usageQueries = {
     return db
       .select()
       .from(usageDaily)
-      .where(
-        and(
-          eq(usageDaily.userId, userId),
-          gte(usageDaily.date, startDate),
-          lte(usageDaily.date, endDate),
-        ),
-      )
+      .where(and(eq(usageDaily.userId, userId), gte(usageDaily.date, startDate), lte(usageDaily.date, endDate)))
       .orderBy(usageDaily.date);
   },
 
@@ -182,12 +167,7 @@ export const usageQueries = {
         reposIndexed: sum(usageDaily.reposIndexed).mapWith(Number),
       })
       .from(usageDaily)
-      .where(
-        and(
-          eq(usageDaily.userId, userId),
-          gte(usageDaily.date, periodStart),
-        ),
-      )
+      .where(and(eq(usageDaily.userId, userId), gte(usageDaily.date, periodStart)))
       .then((rows) => rows[0] ?? null);
   },
 };

@@ -244,7 +244,8 @@ function buildTermWeights(words: string[], metadata: FileMetadataRow[]): Map<str
   for (const w of words) {
     let df = 0;
     for (const f of metadata) {
-      const haystack = `${f.path} ${(f.exports ?? []).join(" ")} ${f.docstring ?? ""} ${f.purpose ?? ""} ${(f.sections ?? []).join(" ")} ${(f.internals ?? []).join(" ")}`.toLowerCase();
+      const haystack =
+        `${f.path} ${(f.exports ?? []).join(" ")} ${f.docstring ?? ""} ${f.purpose ?? ""} ${(f.sections ?? []).join(" ")} ${(f.internals ?? []).join(" ")}`.toLowerCase();
       if (haystack.includes(w)) df++;
     }
     const idf = df > 0 ? Math.min(10, Math.max(1, Math.log(N / df))) : 10;
@@ -276,7 +277,10 @@ export function interpretQuery(
   for (const f of metadata) {
     const tokens = new Set<string>();
     for (const exp of f.exports ?? []) {
-      for (const part of exp.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(/[\s_-]+/)) {
+      for (const part of exp
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .toLowerCase()
+        .split(/[\s_-]+/)) {
         if (part.length >= 3 && !STOPWORDS.has(part)) tokens.add(part);
       }
     }

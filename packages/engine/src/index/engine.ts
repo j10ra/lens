@@ -1,15 +1,15 @@
 import { readFile } from "node:fs/promises";
-import type { Db } from "../db/connection";
 import type { Capabilities } from "../capabilities";
-import type { IndexResult } from "../types";
-import type { RequestTrace } from "../trace";
-import { repoQueries, chunkQueries, metadataQueries, importQueries } from "../db/queries";
-import { fullScan, diffScan, getHeadCommit, type DiscoveredFile } from "./discovery";
-import { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./chunker";
-import { extractAndPersistMetadata } from "./extract-metadata";
-import { buildAndPersistImportGraph } from "./import-graph";
-import { analyzeGitHistory } from "./git-analysis";
+import type { Db } from "../db/connection";
+import { chunkQueries, importQueries, metadataQueries, repoQueries } from "../db/queries";
 import { track } from "../telemetry";
+import type { RequestTrace } from "../trace";
+import type { IndexResult } from "../types";
+import { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./chunker";
+import { type DiscoveredFile, diffScan, fullScan, getHeadCommit } from "./discovery";
+import { extractAndPersistMetadata } from "./extract-metadata";
+import { analyzeGitHistory } from "./git-analysis";
+import { buildAndPersistImportGraph } from "./import-graph";
 
 const MAX_CHUNKS_PER_REPO = 100_000;
 
@@ -33,7 +33,14 @@ async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function runIndex(db: Db, repoId: string, caps?: Capabilities, force = false, onProgress?: () => void, trace?: RequestTrace): Promise<IndexResult> {
+export async function runIndex(
+  db: Db,
+  repoId: string,
+  _caps?: Capabilities,
+  force = false,
+  onProgress?: () => void,
+  trace?: RequestTrace,
+): Promise<IndexResult> {
   return withLock(repoId, async () => {
     const start = Date.now();
 

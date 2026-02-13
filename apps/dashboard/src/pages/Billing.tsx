@@ -7,12 +7,7 @@ import { api } from "@/lib/api";
 
 type Interval = "monthly" | "yearly";
 
-const PRO_FEATURES = [
-  "Everything in Free",
-  "Voyage embeddings",
-  "Purpose summaries",
-  "Vocab clusters",
-];
+const PRO_FEATURES = ["Everything in Free", "Voyage embeddings", "Purpose summaries", "Vocab clusters"];
 
 function BillingContent() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -21,11 +16,18 @@ function BillingContent() {
   // After Stripe redirect (checkout success or portal return), refresh plan cache
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("success") === "true" || document.referrer.includes("stripe.com") || document.referrer.includes("billing.stripe")) {
-      api.refreshPlan().then(() => {
-        queryClient.invalidateQueries({ queryKey: ["cloud-subscription"] });
-        queryClient.invalidateQueries({ queryKey: ["dashboard-usage"] });
-      }).catch(() => {});
+    if (
+      params.get("success") === "true" ||
+      document.referrer.includes("stripe.com") ||
+      document.referrer.includes("billing.stripe")
+    ) {
+      api
+        .refreshPlan()
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["cloud-subscription"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-usage"] });
+        })
+        .catch(() => {});
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [queryClient]);
@@ -55,10 +57,7 @@ function BillingContent() {
           <div className="mb-4 h-4 w-28 rounded bg-muted" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-border bg-card p-6"
-              >
+              <div key={i} className="rounded-xl border border-border bg-card p-6">
                 <div className="h-5 w-20 rounded bg-muted" />
                 <div className="mt-3 h-8 w-16 rounded bg-muted" />
                 <div className="mt-4 space-y-2">
@@ -129,9 +128,7 @@ function BillingContent() {
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Billing</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage your subscription and payment method.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Manage your subscription and payment method.</p>
       </div>
 
       <div className="rounded-xl border bg-card p-6">
@@ -141,31 +138,24 @@ function BillingContent() {
             <p className="mt-1 text-xl font-bold capitalize">
               {currentPlan}{" "}
               {isPro && !isCanceling && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  &mdash; $9/mo
-                </span>
+                <span className="text-sm font-normal text-muted-foreground">&mdash; $9/mo</span>
               )}
             </p>
           </div>
-          <div
-            className={`inline-flex items-center rounded-full border px-3 py-1 ${statusColor}`}
-          >
-            <span className={`text-xs font-medium ${statusText}`}>
-              {statusLabel}
-            </span>
+          <div className={`inline-flex items-center rounded-full border px-3 py-1 ${statusColor}`}>
+            <span className={`text-xs font-medium ${statusText}`}>{statusLabel}</span>
           </div>
         </div>
         {isCanceling && nextBilling && (
           <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
-            <p className="text-sm font-medium text-foreground">
-              Your Pro access ends {nextBilling}
-            </p>
+            <p className="text-sm font-medium text-foreground">Your Pro access ends {nextBilling}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              You'll lose Voyage embeddings, purpose summaries, and vocab clusters.
-              Resubscribe anytime to keep your Pro features.
+              You'll lose Voyage embeddings, purpose summaries, and vocab clusters. Resubscribe anytime to keep your Pro
+              features.
             </p>
             <div className="mt-3 flex gap-3">
               <button
+                type="button"
                 onClick={handleManage}
                 disabled={actionLoading !== null}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
@@ -178,21 +168,19 @@ function BillingContent() {
         {!isCanceling && nextBilling && (
           <div className="mt-4 flex items-center gap-4 border-t pt-4">
             <p className="text-sm text-muted-foreground">
-              Next billing date:{" "}
-              <span className="text-foreground">{nextBilling}</span>
+              Next billing date: <span className="text-foreground">{nextBilling}</span>
             </p>
           </div>
         )}
         {isPro && !isCanceling && sub?.stripeCustomerId && (
           <div className="mt-4 flex gap-3">
             <button
+              type="button"
               onClick={handleManage}
               disabled={actionLoading !== null}
               className="rounded-lg bg-secondary px-4 py-2 text-sm hover:bg-accent disabled:opacity-50"
             >
-              {actionLoading === "portal"
-                ? "Loading..."
-                : "Manage Subscription"}
+              {actionLoading === "portal" ? "Loading..." : "Manage Subscription"}
             </button>
           </div>
         )}
@@ -218,28 +206,20 @@ function BillingContent() {
               <span className="text-sm text-muted-foreground">forever</span>
             </div>
             <ul className="mt-4 space-y-2">
-              {[
-                "Unlimited local context queries",
-                "TF-IDF + Import graph",
-                "MCP integration",
-              ].map((f) => (
-                <li
-                  key={f}
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
-                >
+              {["Unlimited local context queries", "TF-IDF + Import graph", "MCP integration"].map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="size-4 text-success" /> {f}
                 </li>
               ))}
             </ul>
             {isPro && (
               <button
+                type="button"
                 onClick={handleManage}
                 disabled={actionLoading !== null}
                 className="mt-6 w-full rounded-lg bg-secondary py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-50"
               >
-                {actionLoading === "portal"
-                  ? "Loading..."
-                  : "Downgrade to Free"}
+                {actionLoading === "portal" ? "Loading..." : "Downgrade to Free"}
               </button>
             )}
           </div>
@@ -262,16 +242,14 @@ function BillingContent() {
             </div>
             <ul className="mt-4 space-y-2">
               {PRO_FEATURES.map((f) => (
-                <li
-                  key={f}
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
-                >
+                <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="size-4 text-success" /> {f}
                 </li>
               ))}
             </ul>
             {(isFree || isCanceling) && (
               <button
+                type="button"
                 onClick={() => handleUpgrade("monthly")}
                 disabled={actionLoading !== null}
                 className="mt-6 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
@@ -295,16 +273,14 @@ function BillingContent() {
             </div>
             <ul className="mt-4 space-y-2">
               {PRO_FEATURES.map((f) => (
-                <li
-                  key={f}
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
-                >
+                <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="size-4 text-success" /> {f}
                 </li>
               ))}
             </ul>
             {(isFree || isCanceling) && (
               <button
+                type="button"
                 onClick={() => handleUpgrade("yearly")}
                 disabled={actionLoading !== null}
                 className="mt-6 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
@@ -323,9 +299,7 @@ function BillingContent() {
       >
         <div>
           <p className="text-sm font-semibold">Enterprise</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Dedicated support, custom integrations, SLA guarantee
-          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Dedicated support, custom integrations, SLA guarantee</p>
         </div>
         <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Mail className="size-4" /> Contact Sales

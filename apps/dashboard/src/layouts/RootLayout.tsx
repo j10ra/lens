@@ -1,24 +1,8 @@
+import { AppSidebar, type NavGroup, type NavItem, NavUser, SidebarInset, SidebarProvider } from "@lens/ui";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Activity, BarChart3, CreditCard, Database, FolderGit2, LayoutDashboard, Send } from "lucide-react";
 import { useEffect } from "react";
-import { Outlet } from "@tanstack/react-router";
-import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  Activity,
-  BarChart3,
-  CreditCard,
-  Database,
-  FolderGit2,
-  LayoutDashboard,
-  Send,
-} from "lucide-react";
-import {
-  AppSidebar,
-  NavUser,
-  SidebarInset,
-  SidebarProvider,
-  type NavItem,
-  type NavGroup,
-} from "@lens/ui";
 import { api } from "@/lib/api";
 
 const PRIMARY_ACTION: NavItem = { href: "/context", icon: Send, label: "Context" };
@@ -83,7 +67,10 @@ export function RootLayout() {
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
       }, 300);
     };
-    return () => { clearTimeout(timer); es.close(); };
+    return () => {
+      clearTimeout(timer);
+      es.close();
+    };
   }, [qc]);
 
   const user = auth.data?.authenticated
@@ -97,9 +84,7 @@ export function RootLayout() {
         navItems={NAV_ITEMS}
         navGroups={CLOUD_GROUPS}
         currentPath={currentPath}
-        renderLink={({ href, children }) => (
-          <Link to={href}>{children}</Link>
-        )}
+        renderLink={({ href, children }) => <Link to={href}>{children}</Link>}
         healthy={isHealthy}
         connectionLabel={connectionLabel}
         footer={<NavUser user={user} />}

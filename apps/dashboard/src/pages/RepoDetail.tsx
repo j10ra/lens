@@ -10,12 +10,7 @@ import {
   SheetTitle,
   Switch,
 } from "@lens/ui";
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import {
   ArrowDownLeft,
@@ -123,33 +118,25 @@ export function RepoDetail() {
   const reindex = useMutation({
     mutationFn: api.reindex,
     onMutate: (id) => {
-      queryClient.setQueryData(
-        ["dashboard-repos"],
-        (old: Awaited<ReturnType<typeof api.repos>> | undefined) => {
-          if (!old) return old;
-          return {
-            ...old,
-            repos: old.repos.map((r) =>
-              r.id === id ? { ...r, index_status: "indexing" } : r,
-            ),
-          };
-        },
-      );
+      queryClient.setQueryData(["dashboard-repos"], (old: Awaited<ReturnType<typeof api.repos>> | undefined) => {
+        if (!old) return old;
+        return {
+          ...old,
+          repos: old.repos.map((r) => (r.id === id ? { ...r, index_status: "indexing" } : r)),
+        };
+      });
     },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
   });
 
   const startWatch = useMutation({
     mutationFn: api.startWatcher,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
   });
 
   const stopWatch = useMutation({
     mutationFn: api.stopWatcher,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
   });
 
   const remove = useMutation({
@@ -162,31 +149,19 @@ export function RepoDetail() {
 
   if (!repo) {
     return (
-      <>
-        <PageHeader>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ to: "/repos" })}
-            className="gap-1 -ml-2"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
-          </Button>
-          <span className="text-sm text-muted-foreground">Repo not found</span>
-        </PageHeader>
-      </>
+      <PageHeader>
+        <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/repos" })} className="gap-1 -ml-2">
+          <ArrowLeft className="h-3.5 w-3.5" /> Back
+        </Button>
+        <span className="text-sm text-muted-foreground">Repo not found</span>
+      </PageHeader>
     );
   }
 
   return (
     <>
       <PageHeader>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate({ to: "/repos" })}
-          className="gap-1 -ml-2"
-        >
+        <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/repos" })} className="gap-1 -ml-2">
           <ArrowLeft className="h-3.5 w-3.5" /> Back
         </Button>
         <span className="text-sm font-medium">{repo.name}</span>
@@ -198,17 +173,9 @@ export function RepoDetail() {
             loading={reindex.isPending}
           />
           {repo.watcher.active ? (
-            <ActionBtn
-              onClick={() => stopWatch.mutate(repo.id)}
-              icon={EyeOff}
-              label="Stop watcher"
-            />
+            <ActionBtn onClick={() => stopWatch.mutate(repo.id)} icon={EyeOff} label="Stop watcher" />
           ) : (
-            <ActionBtn
-              onClick={() => startWatch.mutate(repo.id)}
-              icon={Eye}
-              label="Start watcher"
-            />
+            <ActionBtn onClick={() => startWatch.mutate(repo.id)} icon={Eye} label="Start watcher" />
           )}
           {confirmRemove ? (
             <>
@@ -220,20 +187,12 @@ export function RepoDetail() {
               >
                 {remove.isPending ? "Removing..." : "Confirm"}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setConfirmRemove(false)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setConfirmRemove(false)}>
                 Cancel
               </Button>
             </>
           ) : (
-            <ActionBtn
-              onClick={() => setConfirmRemove(true)}
-              icon={Trash2}
-              label="Remove"
-            />
+            <ActionBtn onClick={() => setConfirmRemove(true)} icon={Trash2} label="Remove" />
           )}
         </div>
       </PageHeader>
@@ -342,10 +301,7 @@ export function RepoDetail() {
       </div>
 
       {/* File Detail Sheet */}
-      <Sheet
-        open={!!selectedFilePath}
-        onOpenChange={(open) => !open && setSelectedFilePath(null)}
-      >
+      <Sheet open={!!selectedFilePath} onOpenChange={(open) => !open && setSelectedFilePath(null)}>
         <SheetContent side="right" className="overflow-y-auto sm:max-w-xl">
           {fileDetail ? (
             <FileDetailSheet
@@ -365,10 +321,7 @@ export function RepoDetail() {
       </Sheet>
 
       {/* Chunk Detail Sheet */}
-      <Sheet
-        open={!!selectedChunkId}
-        onOpenChange={(open) => !open && setSelectedChunkId(null)}
-      >
+      <Sheet open={!!selectedChunkId} onOpenChange={(open) => !open && setSelectedChunkId(null)}>
         <SheetContent side="right" className="overflow-y-auto sm:max-w-2xl">
           {chunkDetail ? (
             <>
@@ -388,9 +341,7 @@ export function RepoDetail() {
               <div className="flex flex-col gap-4 px-4 pb-4">
                 <Separator />
                 <section>
-                  <h4 className="mb-2 text-xs font-medium text-muted-foreground">
-                    Content
-                  </h4>
+                  <h4 className="mb-2 text-xs font-medium text-muted-foreground">Content</h4>
                   <div className="max-h-[70vh] overflow-auto rounded-md border bg-muted/30 p-3">
                     <pre className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
                       {chunkDetail.content}
@@ -401,15 +352,11 @@ export function RepoDetail() {
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <span className="text-muted-foreground">Hash</span>
-                    <p className="font-mono text-[10px] mt-0.5 break-all">
-                      {chunkDetail.chunk_hash}
-                    </p>
+                    <p className="font-mono text-[10px] mt-0.5 break-all">{chunkDetail.chunk_hash}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Embedding</span>
-                    <p className="mt-0.5">
-                      {chunkDetail.has_embedding ? "Yes" : "No"}
-                    </p>
+                    <p className="mt-0.5">{chunkDetail.has_embedding ? "Yes" : "No"}</p>
                   </div>
                 </div>
               </div>
@@ -444,9 +391,7 @@ function FileDetailSheet({
   return (
     <>
       <SheetHeader>
-        <SheetTitle className="font-mono text-sm break-all select-all pr-6">
-          {detail.path}
-        </SheetTitle>
+        <SheetTitle className="font-mono text-sm break-all select-all pr-6">{detail.path}</SheetTitle>
         <SheetDescription>
           {detail.language ?? "unknown"}
           {" · "}
@@ -470,9 +415,7 @@ function FileDetailSheet({
           <>
             <Separator />
             <DetailSection title="Docstring">
-              <p className="text-xs text-muted-foreground italic">
-                {detail.docstring}
-              </p>
+              <p className="text-xs text-muted-foreground italic">{detail.docstring}</p>
             </DetailSection>
           </>
         )}
@@ -484,11 +427,7 @@ function FileDetailSheet({
             <DetailSection title={`Exports (${detail.exports.length})`}>
               <div className="flex flex-wrap gap-1">
                 {detail.exports.map((exp) => (
-                  <Badge
-                    key={exp}
-                    variant="secondary"
-                    className="font-mono text-[10px]"
-                  >
+                  <Badge key={exp} variant="secondary" className="font-mono text-[10px]">
                     {exp}
                   </Badge>
                 ))}
@@ -517,16 +456,10 @@ function FileDetailSheet({
         {detail.internals.length > 0 && (
           <>
             <Separator />
-            <DetailSection
-              title={`Internal identifiers (${detail.internals.length})`}
-            >
+            <DetailSection title={`Internal identifiers (${detail.internals.length})`}>
               <div className="flex flex-wrap gap-1">
                 {detail.internals.map((i) => (
-                  <Badge
-                    key={i}
-                    variant="secondary"
-                    className="font-mono text-[10px] bg-muted/50"
-                  >
+                  <Badge key={i} variant="secondary" className="font-mono text-[10px] bg-muted/50">
                     {i}
                   </Badge>
                 ))}
@@ -539,10 +472,7 @@ function FileDetailSheet({
         {detail.imports.length > 0 && (
           <>
             <Separator />
-            <DetailSection
-              title={`Imports (${detail.imports.length})`}
-              icon={<ArrowUpRight className="h-3 w-3" />}
-            >
+            <DetailSection title={`Imports (${detail.imports.length})`} icon={<ArrowUpRight className="h-3 w-3" />}>
               <div className="space-y-0.5">
                 {detail.imports.map((p) => (
                   <button
@@ -587,29 +517,20 @@ function FileDetailSheet({
         {detail.git && (
           <>
             <Separator />
-            <DetailSection
-              title="Git activity"
-              icon={<GitCommit className="h-3 w-3" />}
-            >
+            <DetailSection title="Git activity" icon={<GitCommit className="h-3 w-3" />}>
               <div className="grid grid-cols-3 gap-3 text-xs">
                 <div>
                   <span className="text-muted-foreground">Commits</span>
-                  <p className="font-mono font-medium tabular-nums">
-                    {detail.git.commit_count}
-                  </p>
+                  <p className="font-mono font-medium tabular-nums">{detail.git.commit_count}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Recent (90d)</span>
-                  <p className="font-mono font-medium tabular-nums">
-                    {detail.git.recent_count}
-                  </p>
+                  <p className="font-mono font-medium tabular-nums">{detail.git.recent_count}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Last modified</span>
                   <p className="font-mono tabular-nums">
-                    {detail.git.last_modified
-                      ? timeAgo(detail.git.last_modified)
-                      : "—"}
+                    {detail.git.last_modified ? timeAgo(detail.git.last_modified) : "—"}
                   </p>
                 </div>
               </div>
@@ -621,16 +542,10 @@ function FileDetailSheet({
         {detail.cochanges.length > 0 && (
           <>
             <Separator />
-            <DetailSection
-              title={`Co-changes (${detail.cochanges.length})`}
-              icon={<Hash className="h-3 w-3" />}
-            >
+            <DetailSection title={`Co-changes (${detail.cochanges.length})`} icon={<Hash className="h-3 w-3" />}>
               <div className="space-y-1">
                 {detail.cochanges.map((co) => (
-                  <div
-                    key={co.path}
-                    className="flex items-center justify-between gap-2 text-xs"
-                  >
+                  <div key={co.path} className="flex items-center justify-between gap-2 text-xs">
                     <button
                       type="button"
                       onClick={() => onNavigateFile(co.path)}
@@ -638,9 +553,7 @@ function FileDetailSheet({
                     >
                       {co.path}
                     </button>
-                    <span className="font-mono tabular-nums text-muted-foreground shrink-0">
-                      {co.count}x
-                    </span>
+                    <span className="font-mono tabular-nums text-muted-foreground shrink-0">{co.count}x</span>
                   </div>
                 ))}
               </div>
@@ -650,12 +563,7 @@ function FileDetailSheet({
 
         <Separator />
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={onViewChunks}
-          >
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={onViewChunks}>
             <Filter className="h-3 w-3" />
             View chunks
           </Button>
@@ -687,19 +595,9 @@ function DetailSection({
 
 // --- Overview Tab ---
 
-type RepoSummary = NonNullable<
-  Awaited<ReturnType<typeof api.repos>>["repos"]
->[number];
+type RepoSummary = NonNullable<Awaited<ReturnType<typeof api.repos>>["repos"]>[number];
 
-function OverviewTab({
-  repo,
-  isPro,
-  repoId,
-}: {
-  repo: RepoSummary;
-  isPro: boolean;
-  repoId: string;
-}) {
+function OverviewTab({ repo, isPro, repoId }: { repo: RepoSummary; isPro: boolean; repoId: string }) {
   const queryClient = useQueryClient();
   const updateSettings = useMutation({
     mutationFn: (settings: {
@@ -707,17 +605,10 @@ function OverviewTab({
       enable_summaries?: boolean;
       enable_vocab_clusters?: boolean;
     }) => api.updateRepoSettings(repoId, settings),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
   });
-  const embPct =
-    repo.embeddable_count > 0
-      ? Math.round((repo.embedded_count / repo.embeddable_count) * 100)
-      : 0;
-  const purPct =
-    repo.purpose_total > 0
-      ? Math.round((repo.purpose_count / repo.purpose_total) * 100)
-      : 0;
+  const embPct = repo.embeddable_count > 0 ? Math.round((repo.embedded_count / repo.embeddable_count) * 100) : 0;
+  const purPct = repo.purpose_total > 0 ? Math.round((repo.purpose_count / repo.purpose_total) * 100) : 0;
 
   return (
     <div className="space-y-2 p-2">
@@ -735,11 +626,7 @@ function OverviewTab({
             <Kv label="Chunks" value={repo.chunk_count.toLocaleString()} />
             <Kv label="Import depth" value={repo.max_import_depth} />
             <Kv label="Indexed" value={timeAgo(repo.last_indexed_at)} />
-            <Kv
-              label="Commit"
-              value={repo.last_indexed_commit?.slice(0, 8) ?? "\u2014"}
-              mono
-            />
+            <Kv label="Commit" value={repo.last_indexed_commit?.slice(0, 8) ?? "\u2014"} mono />
           </div>
         </div>
 
@@ -749,23 +636,16 @@ function OverviewTab({
             <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs font-medium">Enrichment</span>
             {!isPro && (
-              <Badge
-                variant="outline"
-                className="text-[10px] text-amber-500 border-amber-500/40"
-              >
+              <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/40">
                 Pro
               </Badge>
             )}
           </div>
           <div className="space-y-2 text-xs">
-            <div
-              className={`flex items-center gap-2 ${!isPro || !repo.enable_embeddings ? "opacity-50" : ""}`}
-            >
+            <div className={`flex items-center gap-2 ${!isPro || !repo.enable_embeddings ? "opacity-50" : ""}`}>
               <Switch
                 checked={!!repo.enable_embeddings}
-                onCheckedChange={(v) =>
-                  updateSettings.mutate({ enable_embeddings: v })
-                }
+                onCheckedChange={(v) => updateSettings.mutate({ enable_embeddings: v })}
                 disabled={!isPro}
                 className="scale-75 origin-left shrink-0"
               />
@@ -779,14 +659,10 @@ function OverviewTab({
                 />
               </div>
             </div>
-            <div
-              className={`flex items-center gap-2 ${!isPro || !repo.enable_summaries ? "opacity-50" : ""}`}
-            >
+            <div className={`flex items-center gap-2 ${!isPro || !repo.enable_summaries ? "opacity-50" : ""}`}>
               <Switch
                 checked={!!repo.enable_summaries}
-                onCheckedChange={(v) =>
-                  updateSettings.mutate({ enable_summaries: v })
-                }
+                onCheckedChange={(v) => updateSettings.mutate({ enable_summaries: v })}
                 disabled={!isPro}
                 className="scale-75 origin-left shrink-0"
               />
@@ -800,21 +676,15 @@ function OverviewTab({
                 />
               </div>
             </div>
-            <div
-              className={`flex items-center gap-2 ${!isPro || !repo.enable_vocab_clusters ? "opacity-50" : ""}`}
-            >
+            <div className={`flex items-center gap-2 ${!isPro || !repo.enable_vocab_clusters ? "opacity-50" : ""}`}>
               <Switch
                 checked={!!repo.enable_vocab_clusters}
-                onCheckedChange={(v) =>
-                  updateSettings.mutate({ enable_vocab_clusters: v })
-                }
+                onCheckedChange={(v) => updateSettings.mutate({ enable_vocab_clusters: v })}
                 disabled={!isPro}
                 className="scale-75 origin-left shrink-0"
               />
               <div className="flex items-baseline justify-between flex-1">
-                <span className="text-[10px] text-muted-foreground">
-                  Vocab clusters
-                </span>
+                <span className="text-[10px] text-muted-foreground">Vocab clusters</span>
                 <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
                   {repo.vocab_cluster_count}
                 </span>
@@ -859,32 +729,18 @@ function OverviewTab({
             <FolderGit2 className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs font-medium">Repository</span>
           </div>
-          <p className="font-mono text-xs break-all text-muted-foreground">
-            {repo.root_path}
-          </p>
+          <p className="font-mono text-xs break-all text-muted-foreground">{repo.root_path}</p>
         </div>
       </div>
     </div>
   );
 }
 
-function Kv({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
+function Kv({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="flex items-baseline justify-between">
       <span className="text-[10px] text-muted-foreground">{label}</span>
-      <span
-        className={`text-xs font-medium tabular-nums ${mono ? "font-mono" : ""}`}
-      >
-        {value}
-      </span>
+      <span className={`text-xs font-medium tabular-nums ${mono ? "font-mono" : ""}`}>{value}</span>
     </div>
   );
 }
@@ -911,10 +767,7 @@ function MiniProgress({
         </span>
       </div>
       <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
-        <div
-          className="h-full rounded-full bg-primary transition-all"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -960,9 +813,7 @@ function FilesTab({
             className="h-7 w-52 rounded-md border border-border bg-background pl-7 pr-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
-        <span className="text-[10px] text-muted-foreground tabular-nums">
-          {total} files
-        </span>
+        <span className="text-[10px] text-muted-foreground tabular-nums">{total} files</span>
       </div>
 
       {/* Table */}
@@ -996,10 +847,7 @@ function FilesTab({
           <tbody>
             {files.length === 0 ? (
               <tr>
-                <td
-                  colSpan={7}
-                  className="py-12 text-center text-muted-foreground"
-                >
+                <td colSpan={7} className="py-12 text-center text-muted-foreground">
                   {search ? "No matching files" : "No files indexed yet"}
                 </td>
               </tr>
@@ -1018,18 +866,13 @@ function FilesTab({
                       {f.path}
                     </button>
                   </td>
-                  <td className="border-b border-r border-border px-3 py-1.5 font-mono">
-                    {f.language ?? "—"}
-                  </td>
+                  <td className="border-b border-r border-border px-3 py-1.5 font-mono">{f.language ?? "—"}</td>
                   <td className="border-b border-r border-border px-3 py-1.5 text-right font-mono tabular-nums">
                     {f.exports.length}
                   </td>
                   <td className="border-b border-r border-border px-3 py-1.5 max-w-[200px]">
                     {f.purpose ? (
-                      <span
-                        className="truncate block max-w-[200px]"
-                        title={f.purpose}
-                      >
+                      <span className="truncate block max-w-[200px]" title={f.purpose}>
                         {f.purpose}
                       </span>
                     ) : (
@@ -1070,8 +913,7 @@ function FilesTab({
       {total > pageSize && (
         <div className="flex items-center justify-between border-t bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground">
           <span className="tabular-nums">
-            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of{" "}
-            {total.toLocaleString()}
+            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of {total.toLocaleString()}
           </span>
           <div className="flex items-center gap-1">
             <Button
@@ -1136,12 +978,7 @@ function ChunksTab({
             <Badge variant="secondary" className="font-mono text-[10px]">
               {pathFilter}
             </Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 text-[10px] px-1.5"
-              onClick={onClearFilter}
-            >
+            <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={onClearFilter}>
               Clear
             </Button>
           </div>
@@ -1176,10 +1013,7 @@ function ChunksTab({
           <tbody>
             {chunks.length === 0 ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="py-12 text-center text-muted-foreground"
-                >
+                <td colSpan={6} className="py-12 text-center text-muted-foreground">
                   No chunks found
                 </td>
               </tr>
@@ -1204,9 +1038,7 @@ function ChunksTab({
                   <td className="border-b border-r border-border px-3 py-1.5 font-mono tabular-nums">
                     {ch.start_line}–{ch.end_line}
                   </td>
-                  <td className="border-b border-r border-border px-3 py-1.5 font-mono">
-                    {ch.language ?? "—"}
-                  </td>
+                  <td className="border-b border-r border-border px-3 py-1.5 font-mono">{ch.language ?? "—"}</td>
                   <td className="border-b border-border px-3 py-1.5 text-center">
                     {ch.has_embedding ? (
                       <Check className="h-3.5 w-3.5 text-green-500 mx-auto" />
@@ -1225,8 +1057,7 @@ function ChunksTab({
       {total > pageSize && (
         <div className="flex items-center justify-between border-t bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground">
           <span className="tabular-nums">
-            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of{" "}
-            {total.toLocaleString()}
+            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of {total.toLocaleString()}
           </span>
           <div className="flex items-center gap-1">
             <Button
@@ -1259,11 +1090,7 @@ function ChunksTab({
 
 // --- Vocab Tab ---
 
-function VocabTab({
-  clusters,
-}: {
-  clusters: Array<{ terms: string[]; centroid_term?: string }>;
-}) {
+function VocabTab({ clusters }: { clusters: Array<{ terms: string[]; centroid_term?: string }> }) {
   const [expanded, setExpanded] = useState<number | null>(null);
 
   if (clusters.length === 0) {
@@ -1276,12 +1103,11 @@ function VocabTab({
 
   return (
     <div className="space-y-2 p-2">
-      <p className="text-xs text-muted-foreground">
-        {clusters.length} clusters
-      </p>
+      <p className="text-xs text-muted-foreground">{clusters.length} clusters</p>
       <div className="grid gap-2 @xl/main:grid-cols-2 @3xl/main:grid-cols-3">
         {clusters.map((cluster, i) => (
           <button
+            // biome-ignore lint/suspicious/noArrayIndexKey: clusters have no stable id
             key={i}
             type="button"
             onClick={() => setExpanded(expanded === i ? null : i)}
@@ -1290,26 +1116,16 @@ function VocabTab({
             <div className="flex items-center gap-2 mb-2">
               <Network className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-xs font-medium">Cluster {i + 1}</span>
-              <span className="text-[10px] text-muted-foreground">
-                {cluster.terms.length} terms
-              </span>
+              <span className="text-[10px] text-muted-foreground">{cluster.terms.length} terms</span>
             </div>
             <div className="flex flex-wrap gap-1">
-              {(expanded === i ? cluster.terms : cluster.terms.slice(0, 8)).map(
-                (term) => (
-                  <Badge
-                    key={term}
-                    variant="secondary"
-                    className="text-[10px] font-mono"
-                  >
-                    {term}
-                  </Badge>
-                ),
-              )}
+              {(expanded === i ? cluster.terms : cluster.terms.slice(0, 8)).map((term) => (
+                <Badge key={term} variant="secondary" className="text-[10px] font-mono">
+                  {term}
+                </Badge>
+              ))}
               {expanded !== i && cluster.terms.length > 8 && (
-                <span className="text-[10px] text-muted-foreground self-center">
-                  +{cluster.terms.length - 8}
-                </span>
+                <span className="text-[10px] text-muted-foreground self-center">+{cluster.terms.length - 8}</span>
               )}
             </div>
           </button>
@@ -1333,13 +1149,7 @@ function ActionBtn({
   loading?: boolean;
 }) {
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={onClick}
-      disabled={loading}
-      className="gap-1.5"
-    >
+    <Button variant="outline" size="sm" onClick={onClick} disabled={loading} className="gap-1.5">
       <Icon className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
       {label}
     </Button>

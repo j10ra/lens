@@ -1,7 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import type { Db } from "./connection";
-import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos, requestLogs, settings, telemetryEvents, usageCounters } from "./schema";
+import {
+  chunks,
+  fileCochanges,
+  fileImports,
+  fileMetadata,
+  fileStats,
+  repos,
+  requestLogs,
+  settings,
+  telemetryEvents,
+  usageCounters,
+} from "./schema";
 
 // --- Helpers ---
 
@@ -108,10 +119,7 @@ export const repoQueries = {
   updateVocabClusters(db: Db, id: string, clusters: unknown, commit?: string): void {
     const set: Record<string, unknown> = { vocab_clusters: JSON.stringify(clusters) };
     if (commit) set.last_vocab_cluster_commit = commit;
-    db.update(repos)
-      .set(set)
-      .where(eq(repos.id, id))
-      .run();
+    db.update(repos).set(set).where(eq(repos.id, id)).run();
   },
 
   updateGitAnalysisCommit(db: Db, id: string, commit: string): void {
@@ -122,7 +130,11 @@ export const repoQueries = {
     db.update(repos).set({ index_status: "indexing" }).where(eq(repos.id, id)).run();
   },
 
-  updateProFeatures(db: Db, id: string, flags: { enable_embeddings?: number; enable_summaries?: number; enable_vocab_clusters?: number }): void {
+  updateProFeatures(
+    db: Db,
+    id: string,
+    flags: { enable_embeddings?: number; enable_summaries?: number; enable_vocab_clusters?: number },
+  ): void {
     const set: Record<string, unknown> = { updated_at: sql`datetime('now')` };
     if (flags.enable_embeddings !== undefined) set.enable_embeddings = flags.enable_embeddings;
     if (flags.enable_summaries !== undefined) set.enable_summaries = flags.enable_summaries;
@@ -702,7 +714,7 @@ export const logQueries = {
     const { limit = 50, offset = 0, method, path, status, source } = opts;
     const conditions = [];
     if (method) conditions.push(eq(requestLogs.method, method));
-    if (path) conditions.push(sql`${requestLogs.path} LIKE ${"%" + path + "%"}`);
+    if (path) conditions.push(sql`${requestLogs.path} LIKE ${`%${path}%`}`);
     if (status) conditions.push(eq(requestLogs.status, status));
     if (source) conditions.push(eq(requestLogs.source, source));
 
@@ -716,33 +728,22 @@ export const logQueries = {
       .offset(offset)
       .all();
 
-    const total =
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(requestLogs)
-        .where(where)
-        .get()?.count ?? 0;
+    const total = db.select({ count: sql<number>`count(*)` }).from(requestLogs).where(where).get()?.count ?? 0;
 
     return { rows, total };
   },
 
   prune(db: Db, maxAgeDays = 7): number {
     const cutoff = new Date(Date.now() - maxAgeDays * 86_400_000).toISOString();
-    const result = db
-      .delete(requestLogs)
-      .where(sql`created_at < ${cutoff}`)
-      .run();
+    const result = db.delete(requestLogs).where(sql`created_at < ${cutoff}`).run();
     return result.changes;
   },
 
   summary(db: Db) {
     const today = new Date().toISOString().slice(0, 10);
     const totalToday =
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(requestLogs)
-        .where(sql`created_at >= ${today}`)
-        .get()?.count ?? 0;
+      db.select({ count: sql<number>`count(*)` }).from(requestLogs).where(sql`created_at >= ${today}`).get()?.count ??
+      0;
 
     const bySource = db
       .select({ source: requestLogs.source, count: sql<number>`count(*)` })
@@ -770,7 +771,12 @@ export const logQueries = {
 
 // --- Usage Counter Queries ---
 
-export type UsageCounter = "context_queries" | "embedding_requests" | "embedding_chunks" | "purpose_requests" | "repos_indexed";
+export type UsageCounter =
+  | "context_queries"
+  | "embedding_requests"
+  | "embedding_chunks"
+  | "purpose_requests"
+  | "repos_indexed";
 
 export const usageQueries = {
   increment(db: Db, counter: UsageCounter, amount = 1): void {
@@ -799,15 +805,14 @@ export const usageQueries = {
     return db
       .select()
       .from(usageCounters)
-      .where(sql`synced_at IS NULL AND (context_queries > 0 OR embedding_requests > 0 OR purpose_requests > 0 OR repos_indexed > 0)`)
+      .where(
+        sql`synced_at IS NULL AND (context_queries > 0 OR embedding_requests > 0 OR purpose_requests > 0 OR repos_indexed > 0)`,
+      )
       .all();
   },
 
   markSynced(db: Db, date: string): void {
-    db.update(usageCounters)
-      .set({ synced_at: sql`datetime('now')` })
-      .where(eq(usageCounters.date, date))
-      .run();
+    db.update(usageCounters).set({ synced_at: sql`datetime('now')` }).where(eq(usageCounters.date, date)).run();
   },
 
   getToday(db: Db) {
@@ -841,18 +846,12 @@ export const telemetryQueries = {
 
   markSynced(db: Db, ids: string[]): void {
     if (!ids.length) return;
-    db.update(telemetryEvents)
-      .set({ synced_at: sql`datetime('now')` })
-      .where(inArray(telemetryEvents.id, ids))
-      .run();
+    db.update(telemetryEvents).set({ synced_at: sql`datetime('now')` }).where(inArray(telemetryEvents.id, ids)).run();
   },
 
   prune(db: Db, maxAgeDays = 30): number {
     const cutoff = new Date(Date.now() - maxAgeDays * 86_400_000).toISOString();
-    const result = db
-      .delete(telemetryEvents)
-      .where(sql`synced_at IS NOT NULL AND created_at < ${cutoff}`)
-      .run();
+    const result = db.delete(telemetryEvents).where(sql`synced_at IS NOT NULL AND created_at < ${cutoff}`).run();
     return result.changes;
   },
 };

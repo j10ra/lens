@@ -123,13 +123,13 @@ function resolveRust(dir: string, spec: string, known: Set<string>): string | nu
     base = spec.replace("crate::", "src/").replace(/::/g, "/");
   } else if (spec.startsWith("super::")) {
     const parent = dir.substring(0, dir.lastIndexOf("/"));
-    base = parent + "/" + spec.replace("super::", "").replace(/::/g, "/");
+    base = `${parent}/${spec.replace("super::", "").replace(/::/g, "/")}`;
   } else {
-    base = dir + "/" + spec.replace("self::", "").replace(/::/g, "/");
+    base = `${dir}/${spec.replace("self::", "").replace(/::/g, "/")}`;
   }
-  const candidate = normalizePath(base) + ".rs";
+  const candidate = `${normalizePath(base)}.rs`;
   if (known.has(candidate)) return candidate;
-  const modCandidate = normalizePath(base) + "/mod.rs";
+  const modCandidate = `${normalizePath(base)}/mod.rs`;
   if (known.has(modCandidate)) return modCandidate;
   return null;
 }

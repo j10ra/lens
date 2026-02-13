@@ -59,7 +59,7 @@ export async function listCommand(opts: { json: boolean }): Promise<void> {
 }
 
 function pad(s: string, width: number): string {
-  return s.length >= width ? s.slice(0, width - 1) + " " : s + " ".repeat(width - s.length);
+  return s.length >= width ? `${s.slice(0, width - 1)} ` : s + " ".repeat(width - s.length);
 }
 
 function timeAgo(iso: string): string {

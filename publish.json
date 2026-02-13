@@ -14,6 +14,9 @@
 	"engines": {
 		"node": ">=20"
 	},
+	"scripts": {
+		"postinstall": "echo '\\n  Run \"lens start\" to launch the daemon (auto-starts on login).\\n'"
+	},
 	"license": "MIT",
 	"homepage": "https://lens-engine.com"
 }

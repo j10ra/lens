@@ -633,3 +633,5 @@ Daemon timer (5min)
 | `telemetry_events` | Anonymous telemetry from installations |
 
 All tables have RLS enabled. User-scoped where applicable.
+
+<!-- doc-sync: 91c5414f0dbc67103e451f7aed59ad7b3dd4d262 -->

@@ -1,4 +1,18 @@
 {
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Volumes/Drive/__x/RLM/.claude/hooks/post-edit.sh",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Bash(rlm:*)",
@@ -52,7 +66,8 @@
       "mcp__supabase__execute_sql",
       "Bash(gh issue list:*)",
       "Bash(gh issue comment:*)",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "mcp__lens__get_context"
     ]
   }
 }

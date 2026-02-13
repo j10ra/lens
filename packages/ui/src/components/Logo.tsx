@@ -21,9 +21,7 @@ export function Logo({
       </div>
       <div className="grid flex-1 text-left text-sm leading-tight">
         <span className="truncate font-semibold">{title}</span>
-        <span className="truncate text-xs text-muted-foreground">
-          {subtitle}
-        </span>
+        <span className="truncate text-xs text-muted-foreground">{subtitle}</span>
       </div>
     </>
   );

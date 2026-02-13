@@ -178,8 +178,5 @@ export const telemetryEvents = sqliteTable(
     created_at: now(),
     synced_at: text("synced_at"),
   },
-  (t) => [
-    index("idx_telemetry_events_type").on(t.event_type),
-    index("idx_telemetry_events_synced").on(t.synced_at),
-  ],
+  (t) => [index("idx_telemetry_events_type").on(t.event_type), index("idx_telemetry_events_synced").on(t.synced_at)],
 );

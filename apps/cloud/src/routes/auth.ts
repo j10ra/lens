@@ -1,6 +1,6 @@
-import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
 import { keyQueries } from "@lens/cloud-db";
+import { createClient } from "@supabase/supabase-js";
+import { Hono } from "hono";
 import type { Env } from "../env";
 import { getDb } from "../lib/db";
 import { generateApiKey, hashKey } from "../lib/keys";
@@ -81,7 +81,10 @@ auth.get("/key", async (c) => {
 
   const token = header.slice(7);
   const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_KEY);
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
 
   if (error || !user) {
     return c.json({ error: "Invalid token" }, 401);

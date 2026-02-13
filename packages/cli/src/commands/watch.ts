@@ -1,5 +1,5 @@
+import { get, post } from "../util/client.js";
 import { ensureRepo } from "../util/ensure-repo.js";
-import { post, get } from "../util/client.js";
 import { output } from "../util/format.js";
 
 interface WatchResponse {

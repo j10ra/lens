@@ -1,6 +1,6 @@
-import { detectRepo } from "../util/repo.js";
 import { output } from "../util/format.js";
 import { injectMcp } from "../util/inject-mcp.js";
+import { detectRepo } from "../util/repo.js";
 
 export async function mcpCommand(): Promise<void> {
   const { root_path } = await detectRepo();

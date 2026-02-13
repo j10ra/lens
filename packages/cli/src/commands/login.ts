@@ -1,12 +1,13 @@
 import http from "node:http";
 import { writeAuth } from "../util/auth.js";
-import { post } from "../util/client.js";
 import { openBrowser } from "../util/browser.js";
-import { output, error } from "../util/format.js";
+import { post } from "../util/client.js";
+import { error, output } from "../util/format.js";
 
 const SUPABASE_URL = "https://kuvsaycpvbbmyyxiklap.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dnNheWNwdmJibXl5eGlrbGFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2MzIxNzQsImV4cCI6MjA4NjIwODE3NH0.yllrNUWVHUyFBwegoIeBkiHiIiWcsspHL9126nT2o2Q";
+
 import { getCloudUrl } from "../util/config.js";
 
 const CLOUD_API_URL = getCloudUrl();
@@ -368,13 +369,20 @@ export async function loginCommand(opts: LoginOpts): Promise<void> {
 
       if (req.method === "POST" && url.pathname === "/token") {
         let body = "";
-        req.on("data", (c) => (body += c));
+        req.on("data", (c) => {
+          body += c;
+        });
         req.on("end", async () => {
           try {
             const { access_token, refresh_token, expires_in, user_email } = JSON.parse(body);
             const expires_at = Math.floor(Date.now() / 1000) + Number(expires_in || 3600);
 
-            const tokens = { access_token, refresh_token, user_email, expires_at } as import("../util/auth.js").AuthTokens;
+            const tokens = {
+              access_token,
+              refresh_token,
+              user_email,
+              expires_at,
+            } as import("../util/auth.js").AuthTokens;
 
             // Provision cloud API key
             try {
@@ -382,7 +390,7 @@ export async function loginCommand(opts: LoginOpts): Promise<void> {
                 headers: { Authorization: `Bearer ${access_token}` },
               });
               if (keyRes.ok) {
-                const { api_key } = await keyRes.json() as { api_key: string };
+                const { api_key } = (await keyRes.json()) as { api_key: string };
                 tokens.api_key = api_key;
               } else {
                 error(`Cloud API key failed (${keyRes.status}). Cloud features unavailable until daemon restarts.`);
@@ -394,7 +402,9 @@ export async function loginCommand(opts: LoginOpts): Promise<void> {
             await writeAuth(tokens);
 
             // Notify daemon — refreshes quota cache so dashboard loads with correct plan
-            try { await post("/api/auth/notify"); } catch {}
+            try {
+              await post("/api/auth/notify");
+            } catch {}
 
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true }));
@@ -404,7 +414,7 @@ export async function loginCommand(opts: LoginOpts): Promise<void> {
             cleanup();
             resolve();
             setTimeout(() => process.exit(0), 100);
-          } catch (err) {
+          } catch (_err) {
             res.writeHead(400);
             res.end("Bad request");
           }

@@ -76,7 +76,11 @@ export async function buildContext(
     const cached = cacheGet(key);
     if (cached) {
       trace?.add("cache", 0, "HIT");
-      track(db, "context", { duration_ms: Date.now() - start, result_count: cached.stats.files_in_context, cache_hit: true });
+      track(db, "context", {
+        duration_ms: Date.now() - start,
+        result_count: cached.stats.files_in_context,
+        cache_hit: true,
+      });
       return { ...cached, stats: { ...cached.stats, cached: true, duration_ms: Date.now() - start } };
     }
     const embAvailable = useEmb && (await import("../db/queries")).chunkQueries.hasEmbeddings(db, repoId);
@@ -223,7 +227,11 @@ export async function buildContext(
     };
 
     cacheSet(key, response);
-    track(db, "context", { duration_ms: response.stats.duration_ms, result_count: response.stats.files_in_context, cache_hit: false });
+    track(db, "context", {
+      duration_ms: response.stats.duration_ms,
+      result_count: response.stats.files_in_context,
+      cache_hit: false,
+    });
     return response;
   } catch {
     return {

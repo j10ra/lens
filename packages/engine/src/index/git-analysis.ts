@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Db } from "../db/connection";
-import { statsQueries, cochangeQueries, repoQueries } from "../db/queries";
+import { cochangeQueries, repoQueries, statsQueries } from "../db/queries";
 import { isDocFile } from "./discovery";
 
 const execFileAsync = promisify(execFile);

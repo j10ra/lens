@@ -1,10 +1,10 @@
-import { detectRepo } from "../util/repo.js";
 import { post } from "../util/client.js";
+import { readConfig } from "../util/config.js";
 import { output } from "../util/format.js";
 import { injectClaudeMd } from "../util/inject-claude-md.js";
 import { injectMcp } from "../util/inject-mcp.js";
 import { showProgress } from "../util/progress.js";
-import { readConfig } from "../util/config.js";
+import { detectRepo } from "../util/repo.js";
 
 interface RegisterResponse {
   repo_id: string;

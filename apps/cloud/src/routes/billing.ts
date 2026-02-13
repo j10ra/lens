@@ -1,10 +1,11 @@
-import { Hono } from "hono";
 import { subscriptionQueries } from "@lens/cloud-db";
 import { createClient } from "@supabase/supabase-js";
+import { Hono } from "hono";
+import type Stripe from "stripe";
 import type { Env } from "../env";
-import { apiKeyAuth } from "../middleware/auth";
 import { getDb } from "../lib/db";
 import { createStripe } from "../lib/stripe";
+import { apiKeyAuth } from "../middleware/auth";
 
 const billing = new Hono<{ Bindings: Env }>();
 
@@ -21,7 +22,10 @@ billing.get("/subscribe", async (c) => {
   if (provider === "github" || provider === "google") {
     const bytes = new Uint8Array(16);
     crypto.getRandomValues(bytes);
-    const state = Array.from(bytes).map((b) => b.toString(36)).join("").slice(0, 32);
+    const state = Array.from(bytes)
+      .map((b) => b.toString(36))
+      .join("")
+      .slice(0, 32);
     await c.env.RATE_LIMIT.put(`subscribe:${state}`, interval, { expirationTtl: 600 });
 
     const appUrl = c.env.APP_URL;
@@ -84,7 +88,10 @@ billing.get("/subscribe/callback", async (c) => {
 
   // Validate token, get user
   const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_KEY);
-  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(accessToken);
   if (error || !user) {
     return c.json({ error: "Authentication failed" }, 401);
   }
@@ -133,8 +140,7 @@ billing.post("/checkout", apiKeyAuth, async (c) => {
 
   const body = await c.req.json().catch(() => ({}));
   const interval = body.interval === "yearly" ? "yearly" : "monthly";
-  const priceId =
-    interval === "yearly" ? c.env.STRIPE_PRICE_YEARLY : c.env.STRIPE_PRICE_MONTHLY;
+  const priceId = interval === "yearly" ? c.env.STRIPE_PRICE_YEARLY : c.env.STRIPE_PRICE_MONTHLY;
   const returnUrl = body.return_url || `${c.env.APP_URL}/dashboard/billing`;
 
   try {
@@ -191,13 +197,9 @@ billing.post("/webhooks/stripe", async (c) => {
     return c.json({ error: "Missing signature" }, 400);
   }
 
-  let event;
+  let event: Stripe.Event;
   try {
-    event = await stripe.webhooks.constructEventAsync(
-      body,
-      sig,
-      c.env.STRIPE_WEBHOOK_SECRET,
-    );
+    event = await stripe.webhooks.constructEventAsync(body, sig, c.env.STRIPE_WEBHOOK_SECRET);
   } catch {
     return c.json({ error: "Invalid signature" }, 400);
   }
@@ -210,9 +212,7 @@ billing.post("/webhooks/stripe", async (c) => {
       const userId = session.metadata?.userId ?? session.client_reference_id;
       if (!userId) break;
 
-      const subscription = await stripe.subscriptions.retrieve(
-        session.subscription as string,
-      );
+      const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
 
       // Ensure subscription metadata has userId for future webhook events
       if (!subscription.metadata?.userId) {

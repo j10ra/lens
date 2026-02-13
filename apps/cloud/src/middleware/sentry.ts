@@ -1,5 +1,5 @@
-import { Toucan } from "toucan-js";
 import { createMiddleware } from "hono/factory";
+import { Toucan } from "toucan-js";
 import type { Env } from "../env";
 
 export const sentry = createMiddleware<{ Bindings: Env }>(async (c, next) => {

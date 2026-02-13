@@ -1,17 +1,7 @@
-import { CircleUser, MoreVertical, LogOut } from "lucide-react";
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "./ui/sidebar";
+import { CircleUser, LogOut, MoreVertical } from "lucide-react";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "./ui/sidebar";
 
-export function NavUser({
-  user,
-  onSignOut,
-}: {
-  user: { name: string; email: string };
-  onSignOut?: () => void;
-}) {
+export function NavUser({ user, onSignOut }: { user: { name: string; email: string }; onSignOut?: () => void }) {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -19,9 +9,7 @@ export function NavUser({
           <CircleUser className="!size-8 text-muted-foreground" />
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium">{user.name}</span>
-            <span className="text-muted-foreground truncate text-xs">
-              {user.email}
-            </span>
+            <span className="text-muted-foreground truncate text-xs">{user.email}</span>
           </div>
           {onSignOut ? (
             <button

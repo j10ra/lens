@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 
 const CONFIG_DIR = path.join(os.homedir(), ".lens");
 const AUTH_FILE = path.join(CONFIG_DIR, "auth.json");

@@ -12,7 +12,7 @@ export function formatDuration(ms: number): string {
 
 export function timeAgo(dateStr: string | null): string {
   if (!dateStr) return "never";
-  const diff = Date.now() - new Date(dateStr.endsWith("Z") ? dateStr : dateStr + "Z").getTime();
+  const diff = Date.now() - new Date(dateStr.endsWith("Z") ? dateStr : `${dateStr}Z`).getTime();
   const secs = Math.floor(diff / 1000);
   if (secs < 60) return `${secs}s ago`;
   const mins = Math.floor(secs / 60);

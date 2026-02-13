@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export function CloudAuthGuard({ children }: { children: React.ReactNode }) {
@@ -16,9 +16,7 @@ export function CloudAuthGuard({ children }: { children: React.ReactNode }) {
           <p className="mt-2 text-sm text-muted-foreground">
             Authenticate with the LENS cloud to manage API keys, usage, and billing.
           </p>
-          <code className="mt-4 block rounded-lg bg-muted px-4 py-2 text-sm font-mono">
-            lens login
-          </code>
+          <code className="mt-4 block rounded-lg bg-muted px-4 py-2 text-sm font-mono">lens login</code>
         </div>
       </div>
     );

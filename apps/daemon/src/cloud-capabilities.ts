@@ -65,7 +65,11 @@ export function createCloudCapabilities(
       const start = performance.now();
       const reqBody = JSON.stringify({
         messages: [
-          { role: "system", content: "You are a code analyst. Output ONLY a 1-sentence purpose summary for the given file. No preamble." },
+          {
+            role: "system",
+            content:
+              "You are a code analyst. Output ONLY a 1-sentence purpose summary for the given file. No preamble.",
+          },
           { role: "user", content: prompt },
         ],
         max_tokens: 128,

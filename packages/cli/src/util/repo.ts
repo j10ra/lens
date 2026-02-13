@@ -1,6 +1,6 @@
-import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { resolve, dirname, basename } from "node:path";
+import { readFile } from "node:fs/promises";
+import { basename, dirname, resolve } from "node:path";
 
 export interface RepoInfo {
   root_path: string;

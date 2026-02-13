@@ -122,7 +122,14 @@ export const api = {
       clusters: Array<{ terms: string[]; centroid_term?: string }>;
     }>(`/api/dashboard/repos/${id}/vocab-clusters`),
 
-  logs: (params?: { limit?: number; offset?: number; method?: string; path?: string; status?: number; source?: string }) => {
+  logs: (params?: {
+    limit?: number;
+    offset?: number;
+    method?: string;
+    path?: string;
+    status?: number;
+    source?: string;
+  }) => {
     const sp = new URLSearchParams();
     if (params?.limit) sp.set("limit", String(params.limit));
     if (params?.offset) sp.set("offset", String(params.offset));
@@ -146,27 +153,32 @@ export const api = {
         created_at: string;
       }>;
       total: number;
-      summary: { total_today: number; by_source: Array<{ source: string; count: number }>; by_endpoint: Array<{ method: string; path: string; count: number }> };
+      summary: {
+        total_today: number;
+        by_source: Array<{ source: string; count: number }>;
+        by_endpoint: Array<{ method: string; path: string; count: number }>;
+      };
     }>(`/api/dashboard/logs${qs ? `?${qs}` : ""}`);
   },
 
-  tables: () =>
-    request<{ tables: Array<{ name: string; count: number }> }>("/api/dashboard/tables"),
+  tables: () => request<{ tables: Array<{ name: string; count: number }> }>("/api/dashboard/tables"),
 
   tableRows: (name: string, limit = 50, offset = 0) =>
     request<{ columns: string[]; rows: Record<string, unknown>[]; total: number }>(
       `/api/dashboard/tables/${encodeURIComponent(name)}?limit=${limit}&offset=${offset}`,
     ),
 
-  updateRepoSettings: (id: string, settings: { enable_embeddings?: boolean; enable_summaries?: boolean; enable_vocab_clusters?: boolean }) =>
+  updateRepoSettings: (
+    id: string,
+    settings: { enable_embeddings?: boolean; enable_summaries?: boolean; enable_vocab_clusters?: boolean },
+  ) =>
     request<{ ok: boolean }>(`/api/dashboard/repos/${id}/settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),
     }),
 
-  routes: () =>
-    request<{ routes: Array<{ method: string; path: string }> }>("/api/dashboard/routes"),
+  routes: () => request<{ routes: Array<{ method: string; path: string }> }>("/api/dashboard/routes"),
 
   reindex: (repoId: string) =>
     request<unknown>("/index/run", {
@@ -211,8 +223,7 @@ export const api = {
       body: JSON.stringify({ root_path: rootPath, name }),
     }),
 
-  removeRepo: (id: string) =>
-    request<{ removed: boolean }>(`/repo/${id}`, { method: "DELETE" }),
+  removeRepo: (id: string) => request<{ removed: boolean }>(`/repo/${id}`, { method: "DELETE" }),
 
   localUsage: () =>
     request<{
@@ -269,9 +280,7 @@ export const api = {
     request<{ url: string | null }>(`/api/cloud/billing/portal?return_url=${encodeURIComponent(window.location.href)}`),
 
   refreshPlan: () =>
-    request<{ plan: string; has_capabilities: boolean; refreshed_at: number | null }>(
-      "/api/dashboard/refresh-plan",
-      { method: "POST" },
-    ),
-
+    request<{ plan: string; has_capabilities: boolean; refreshed_at: number | null }>("/api/dashboard/refresh-plan", {
+      method: "POST",
+    }),
 };

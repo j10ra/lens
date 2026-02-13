@@ -1,11 +1,4 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  PageHeader,
-} from "@lens/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, PageHeader } from "@lens/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -131,12 +124,8 @@ export function Overview() {
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto py-4 md:gap-6 md:py-6">
         <section className="px-4 lg:px-6">
           <div className="rounded-xl border border-border bg-background p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              System snapshot
-            </p>
-            <p className="mt-1 text-sm">
-              Live operational metrics for repositories and indexing throughput.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">System snapshot</p>
+            <p className="mt-1 text-sm">Live operational metrics for repositories and indexing throughput.</p>
           </div>
         </section>
 
@@ -166,17 +155,13 @@ export function Overview() {
                         {locked ? "—" : card.value}
                       </CardTitle>
                     </div>
-                    <span
-                      className={`rounded-md border p-1.5 ${card.iconClassName}`}
-                    >
+                    <span className={`rounded-md border p-1.5 ${card.iconClassName}`}>
                       <Icon className="h-4 w-4" />
                     </span>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <p className="text-sm text-muted-foreground">
-                    {card.description}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{card.description}</p>
                 </CardContent>
               </Card>
             );
@@ -194,8 +179,7 @@ export function Overview() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">Unlock enrichment</p>
                 <p className="text-xs text-muted-foreground">
-                  Semantic search, purpose summaries, and vocab clustering with
-                  Pro.
+                  Semantic search, purpose summaries, and vocab clustering with Pro.
                 </p>
               </div>
               <ArrowRight className="h-4 w-4 text-amber-500 shrink-0" />
@@ -208,15 +192,9 @@ export function Overview() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold">Repositories</h2>
-                <p className="text-xs text-muted-foreground">
-                  Tracked codebases and index status
-                </p>
+                <p className="text-xs text-muted-foreground">Tracked codebases and index status</p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate({ to: "/repos" })}
-              >
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/repos" })}>
                 View all
               </Button>
             </div>
@@ -235,63 +213,44 @@ export function Overview() {
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <CardTitle className="truncate text-sm">
-                          {repo.name}
-                        </CardTitle>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {repo.root_path}
-                        </p>
+                        <CardTitle className="truncate text-sm">{repo.name}</CardTitle>
+                        <p className="truncate text-xs text-muted-foreground">{repo.root_path}</p>
                       </div>
-                      <StatusBadge
-                        status={repo.index_status}
-                        className="border-border bg-muted text-foreground"
-                      />
+                      <StatusBadge status={repo.index_status} className="border-border bg-muted text-foreground" />
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="grid grid-cols-5 gap-2 text-xs">
                       <div className="rounded-md border border-border bg-background px-2 py-1.5">
                         <p className="text-muted-foreground">Files</p>
-                        <p className="font-mono font-medium tabular-nums">
-                          {repo.files_indexed}
-                        </p>
+                        <p className="font-mono font-medium tabular-nums">{repo.files_indexed}</p>
                       </div>
                       <div className="rounded-md border border-border bg-background px-2 py-1.5">
                         <p className="text-muted-foreground">Chunks</p>
-                        <p className="font-mono font-medium tabular-nums">
-                          {repo.chunk_count}
-                        </p>
+                        <p className="font-mono font-medium tabular-nums">{repo.chunk_count}</p>
                       </div>
                       <div
                         className={`rounded-md border border-border bg-background px-2 py-1.5 ${isPro ? "" : "opacity-40"}`}
                       >
                         <p className="text-muted-foreground">Embed</p>
-                        <p className="font-mono font-medium tabular-nums">
-                          {isPro ? `${repo.embedded_pct}%` : "—"}
-                        </p>
+                        <p className="font-mono font-medium tabular-nums">{isPro ? `${repo.embedded_pct}%` : "—"}</p>
                       </div>
                       <div
                         className={`rounded-md border border-border bg-background px-2 py-1.5 ${isPro ? "" : "opacity-40"}`}
                       >
                         <p className="text-muted-foreground">Summaries</p>
                         <p className="font-mono font-medium tabular-nums">
-                          {isPro
-                            ? `${repo.purpose_count}/${repo.purpose_total}`
-                            : "—"}
+                          {isPro ? `${repo.purpose_count}/${repo.purpose_total}` : "—"}
                         </p>
                       </div>
                       <div
                         className={`rounded-md border border-border bg-background px-2 py-1.5 ${isPro ? "" : "opacity-40"}`}
                       >
                         <p className="text-muted-foreground">Vocab</p>
-                        <p className="font-mono font-medium tabular-nums">
-                          {isPro ? repo.vocab_cluster_count : "—"}
-                        </p>
+                        <p className="font-mono font-medium tabular-nums">{isPro ? repo.vocab_cluster_count : "—"}</p>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Indexed {timeAgo(repo.last_indexed_at)}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Indexed {timeAgo(repo.last_indexed_at)}</p>
                   </CardContent>
                 </Card>
               ))}

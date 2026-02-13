@@ -1,5 +1,5 @@
+import { Button, cn, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@lens/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@lens/ui";
 
 interface Column<T> {
   key: string;
@@ -22,6 +22,7 @@ interface DataTableProps<T extends Record<string, unknown>> {
   className?: string;
   tableClassName?: string;
   headerClassName?: string;
+  rowKey?: (row: T, index: number) => string;
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -38,6 +39,7 @@ export function DataTable<T extends Record<string, unknown>>({
   className,
   tableClassName,
   headerClassName,
+  rowKey,
 }: DataTableProps<T>) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -47,30 +49,17 @@ export function DataTable<T extends Record<string, unknown>>({
         <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             {title && <h3 className="text-sm font-semibold">{title}</h3>}
-            {description && (
-              <p className="text-xs text-muted-foreground">{description}</p>
-            )}
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
           </div>
           {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
         </div>
       )}
 
       <Table className={cn("min-w-full", tableClassName)}>
-      <TableHeader
-        className={cn(
-          "sticky top-0 z-10 bg-background",
-          headerClassName,
-        )}
-      >
+        <TableHeader className={cn("sticky top-0 z-10 bg-background", headerClassName)}>
           <TableRow className="hover:bg-muted/40">
             {columns.map((col) => (
-              <TableHead
-                key={col.key}
-                className={cn(
-                  "text-xs font-medium text-muted-foreground",
-                  col.className,
-                )}
-              >
+              <TableHead key={col.key} className={cn("text-xs font-medium text-muted-foreground", col.className)}>
                 {col.label}
               </TableHead>
             ))}
@@ -79,21 +68,15 @@ export function DataTable<T extends Record<string, unknown>>({
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="py-10 text-center text-sm text-muted-foreground"
-              >
+              <TableCell colSpan={columns.length} className="py-10 text-center text-sm text-muted-foreground">
                 {emptyMessage}
               </TableCell>
             </TableRow>
           ) : (
             rows.map((row, i) => (
-              <TableRow key={i} className="odd:bg-muted/20">
+              <TableRow key={rowKey ? rowKey(row, i) : JSON.stringify(row)} className="odd:bg-muted/20">
                 {columns.map((col) => (
-                  <TableCell
-                    key={col.key}
-                    className={cn("text-xs", col.className)}
-                  >
+                  <TableCell key={col.key} className={cn("text-xs", col.className)}>
                     {col.render ? col.render(row) : renderCell(row[col.key])}
                   </TableCell>
                 ))}
@@ -106,16 +89,10 @@ export function DataTable<T extends Record<string, unknown>>({
       {total > pageSize && onPageChange && (
         <div className="flex items-center justify-between border-t px-4 py-3 text-xs text-muted-foreground">
           <span>
-            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of{" "}
-            {total}
+            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of {total}
           </span>
           <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon-xs"
-              onClick={() => onPageChange(page - 1)}
-              disabled={page === 0}
-            >
+            <Button variant="outline" size="icon-xs" onClick={() => onPageChange(page - 1)} disabled={page === 0}>
               <ChevronLeft />
             </Button>
             <span className="px-2">
@@ -137,14 +114,9 @@ export function DataTable<T extends Record<string, unknown>>({
 }
 
 function renderCell(value: unknown): React.ReactNode {
-  if (value == null)
-    return <span className="text-muted-foreground/50">null</span>;
+  if (value == null) return <span className="text-muted-foreground/50">null</span>;
   if (typeof value === "object") {
-    return (
-      <pre className="max-w-xs truncate text-xs font-mono text-muted-foreground">
-        {JSON.stringify(value)}
-      </pre>
-    );
+    return <pre className="max-w-xs truncate text-xs font-mono text-muted-foreground">{JSON.stringify(value)}</pre>;
   }
   return String(value);
 }

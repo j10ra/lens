@@ -1,6 +1,6 @@
 import type { Db } from "../db/connection";
-import type { FileMetadataRow, FileStatRow, CochangeRow, VocabCluster } from "../types";
-import { metadataQueries, statsQueries, importQueries, cochangeQueries, repoQueries, jsonParse } from "../db/queries";
+import { cochangeQueries, importQueries, jsonParse, metadataQueries, repoQueries, statsQueries } from "../db/queries";
+import type { CochangeRow, FileMetadataRow, FileStatRow, VocabCluster } from "../types";
 
 export function loadFileMetadata(db: Db, repoId: string): FileMetadataRow[] {
   return metadataQueries.getByRepo(db, repoId);

@@ -1,8 +1,8 @@
-import Database from "better-sqlite3";
-import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { homedir } from "node:os";
+import { join } from "node:path";
+import Database from "better-sqlite3";
+import { type BetterSQLite3Database, drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 
 export type Db = BetterSQLite3Database<typeof schema>;
@@ -33,25 +33,23 @@ export function openDb(customPath?: string): Db {
   sqlite.exec(createTablesSql());
 
   // Migrate: add sections + internals columns to file_metadata
-  const cols = new Set(
-    (sqlite.pragma("table_info(file_metadata)") as { name: string }[]).map((c) => c.name),
-  );
+  const cols = new Set((sqlite.pragma("table_info(file_metadata)") as { name: string }[]).map((c) => c.name));
   if (!cols.has("sections")) sqlite.exec("ALTER TABLE file_metadata ADD COLUMN sections TEXT DEFAULT '[]'");
   if (!cols.has("internals")) sqlite.exec("ALTER TABLE file_metadata ADD COLUMN internals TEXT DEFAULT '[]'");
 
   // Migrate: add pro feature toggle columns to repos
-  const repoCols = new Set(
-    (sqlite.pragma("table_info(repos)") as { name: string }[]).map((c) => c.name),
-  );
-  if (!repoCols.has("enable_embeddings")) sqlite.exec("ALTER TABLE repos ADD COLUMN enable_embeddings INTEGER NOT NULL DEFAULT 1");
-  if (!repoCols.has("enable_summaries")) sqlite.exec("ALTER TABLE repos ADD COLUMN enable_summaries INTEGER NOT NULL DEFAULT 1");
-  if (!repoCols.has("enable_vocab_clusters")) sqlite.exec("ALTER TABLE repos ADD COLUMN enable_vocab_clusters INTEGER NOT NULL DEFAULT 1");
-  if (!repoCols.has("last_vocab_cluster_commit")) sqlite.exec("ALTER TABLE repos ADD COLUMN last_vocab_cluster_commit TEXT");
+  const repoCols = new Set((sqlite.pragma("table_info(repos)") as { name: string }[]).map((c) => c.name));
+  if (!repoCols.has("enable_embeddings"))
+    sqlite.exec("ALTER TABLE repos ADD COLUMN enable_embeddings INTEGER NOT NULL DEFAULT 1");
+  if (!repoCols.has("enable_summaries"))
+    sqlite.exec("ALTER TABLE repos ADD COLUMN enable_summaries INTEGER NOT NULL DEFAULT 1");
+  if (!repoCols.has("enable_vocab_clusters"))
+    sqlite.exec("ALTER TABLE repos ADD COLUMN enable_vocab_clusters INTEGER NOT NULL DEFAULT 1");
+  if (!repoCols.has("last_vocab_cluster_commit"))
+    sqlite.exec("ALTER TABLE repos ADD COLUMN last_vocab_cluster_commit TEXT");
 
   // Migrate: add response_body column to request_logs
-  const logCols = new Set(
-    (sqlite.pragma("table_info(request_logs)") as { name: string }[]).map((c) => c.name),
-  );
+  const logCols = new Set((sqlite.pragma("table_info(request_logs)") as { name: string }[]).map((c) => c.name));
   if (!logCols.has("response_body")) sqlite.exec("ALTER TABLE request_logs ADD COLUMN response_body TEXT");
   if (!logCols.has("trace")) sqlite.exec("ALTER TABLE request_logs ADD COLUMN trace TEXT");
 

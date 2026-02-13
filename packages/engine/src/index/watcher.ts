@@ -1,10 +1,10 @@
-import { watch, type FSWatcher } from "chokidar";
 import { readFile, stat } from "node:fs/promises";
 import { relative } from "node:path";
+import { type FSWatcher, watch } from "chokidar";
 import type { Db } from "../db/connection";
 import { chunkQueries } from "../db/queries";
-import { isBinaryExt, detectLanguage, MAX_FILE_SIZE } from "./discovery";
 import { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./chunker";
+import { detectLanguage, isBinaryExt, MAX_FILE_SIZE } from "./discovery";
 
 interface WatcherEntry {
   watcher: FSWatcher;

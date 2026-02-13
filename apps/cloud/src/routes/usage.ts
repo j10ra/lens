@@ -1,13 +1,8 @@
+import { quotaQueries, subscriptionQueries, type UsageCounters, usageQueries } from "@lens/cloud-db";
 import { Hono } from "hono";
-import {
-  subscriptionQueries,
-  usageQueries,
-  quotaQueries,
-  type UsageCounters,
-} from "@lens/cloud-db";
 import type { Env } from "../env";
-import { apiKeyAuth } from "../middleware/auth";
 import { getDb } from "../lib/db";
+import { apiKeyAuth } from "../middleware/auth";
 
 const usage = new Hono<{ Bindings: Env }>();
 usage.use("*", apiKeyAuth);

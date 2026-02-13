@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import { openBrowser } from "../util/browser.js";
-import { output, error } from "../util/format.js";
+import { error, output } from "../util/format.js";
 
 const PID_FILE = join(homedir(), ".lens", "daemon.pid");
 

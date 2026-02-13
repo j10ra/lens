@@ -1,5 +1,5 @@
-import { Hono } from "hono";
 import { sql } from "drizzle-orm";
+import { Hono } from "hono";
 import type { Env } from "../env";
 import { getDb } from "../lib/db";
 
@@ -39,9 +39,7 @@ telemetryRoutes.post("/", async (c) => {
   if (count >= 100) {
     return c.json({ error: "rate limit exceeded" }, 429);
   }
-  c.executionCtx.waitUntil(
-    c.env.RATE_LIMIT.put(kvKey, String(count + 1), { expirationTtl: 3600 }),
-  );
+  c.executionCtx.waitUntil(c.env.RATE_LIMIT.put(kvKey, String(count + 1), { expirationTtl: 3600 }));
 
   const db = getDb(c.env.DATABASE_URL);
   const now = new Date().toISOString();

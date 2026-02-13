@@ -14,9 +14,7 @@ async function findTargetFile(repoRoot: string): Promise<string | null> {
     try {
       await fs.access(fullPath);
       return fullPath;
-    } catch {
-      continue;
-    }
+    } catch {}
   }
   return null;
 }

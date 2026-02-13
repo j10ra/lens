@@ -51,7 +51,7 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
         connFailures++;
         if (connFailures >= MAX_CONN_FAILURES) {
           process.stdout.write(
-            `\n  ${red("✗")} ${bold("Daemon unavailable")} — ${dim("connection lost after " + connFailures + " retries")}\n`,
+            `\n  ${red("✗")} ${bold("Daemon unavailable")} — ${dim(`connection lost after ${connFailures} retries`)}\n`,
           );
           process.stdout.write(`  ${dim("Restart with: lens start")}\n\n`);
           process.exit(1);
@@ -136,7 +136,9 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
         if (embDone) {
           lines.push(`  ${green("✓")} Embeddings      ${dim(`${s.embedded_count}/${s.embeddable_count} code chunks`)}`);
         } else if (s.embedding_quota_exceeded) {
-          lines.push(`  ${yellow("⚠")} Embeddings      ${dim(`quota exceeded — ${s.embedded_count}/${s.embeddable_count}`)}`);
+          lines.push(
+            `  ${yellow("⚠")} Embeddings      ${dim(`quota exceeded — ${s.embedded_count}/${s.embeddable_count}`)}`,
+          );
         } else if (s.embeddable_count === 0) {
           lines.push(`  ${dim("○")} Embeddings      ${dim("no code chunks")}`);
         } else {
@@ -149,7 +151,9 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
         if (sumDone) {
           lines.push(`  ${green("✓")} Summaries       ${dim(`${s.purpose_count}/${s.purpose_total} files`)}`);
         } else if (s.purpose_quota_exceeded) {
-          lines.push(`  ${yellow("⚠")} Summaries       ${dim(`quota exceeded — ${s.purpose_count}/${s.purpose_total}`)}`);
+          lines.push(
+            `  ${yellow("⚠")} Summaries       ${dim(`quota exceeded — ${s.purpose_count}/${s.purpose_total}`)}`,
+          );
         } else if (s.purpose_total > 0) {
           lines.push(
             `  ${cyan(f)} Summaries       ${createBar(Math.round((s.purpose_count / s.purpose_total) * 100), 20)} ${dim(`${s.purpose_count}/${s.purpose_total}`)}`,
@@ -174,7 +178,10 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
 
     let allDone: boolean;
     if (hasCaps) {
-      const embDone = (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) || s.embeddable_count === 0 || !!s.embedding_quota_exceeded;
+      const embDone =
+        (s.embedded_count >= s.embeddable_count && s.embeddable_count > 0) ||
+        s.embeddable_count === 0 ||
+        !!s.embedding_quota_exceeded;
       const sumDone = (s.purpose_count >= s.purpose_total && s.purpose_total > 0) || !!s.purpose_quota_exceeded;
       allDone = structuralDone && embDone && sumDone;
     } else {
@@ -208,7 +215,7 @@ export async function showProgress(repoId: string, name: string, timeoutMs = 180
     if (lastRendered) {
       process.stdout.write(`\x1b[${TOTAL_LINES}A\x1b[J`);
     }
-    process.stdout.write(output + "\n");
+    process.stdout.write(`${output}\n`);
     lastRendered = output;
 
     if (allDone) {

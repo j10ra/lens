@@ -1,7 +1,7 @@
 import type { Db } from "../db/connection";
 import { chunkQueries, importQueries } from "../db/queries";
-import { extractImportSpecifiers, resolveImport } from "./imports";
 import { detectLanguage } from "./discovery";
+import { extractImportSpecifiers, resolveImport } from "./imports";
 
 export function buildAndPersistImportGraph(db: Db, repoId: string): number {
   const rows = chunkQueries.getAllByRepo(db, repoId);
@@ -10,7 +10,7 @@ export function buildAndPersistImportGraph(db: Db, repoId: string): number {
   for (const row of rows) {
     const existing = files.get(row.path);
     if (existing) {
-      existing.content += "\n" + row.content;
+      existing.content += `\n${row.content}`;
     } else {
       files.set(row.path, {
         content: row.content,

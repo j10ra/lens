@@ -1,9 +1,9 @@
-import { Hono } from "hono";
 import { keyQueries } from "@lens/cloud-db";
+import { Hono } from "hono";
 import type { Env } from "../env";
-import { apiKeyAuth } from "../middleware/auth";
 import { getDb } from "../lib/db";
 import { generateApiKey, hashKey } from "../lib/keys";
+import { apiKeyAuth } from "../middleware/auth";
 
 const keys = new Hono<{ Bindings: Env }>();
 keys.use("*", apiKeyAuth);
@@ -11,9 +11,7 @@ keys.use("*", apiKeyAuth);
 // POST /api/keys — create new API key
 keys.post("/", async (c) => {
   const userId = c.get("userId");
-  const body = await c.req
-    .json<{ name?: string }>()
-    .catch(() => ({ name: undefined }));
+  const body = await c.req.json<{ name?: string }>().catch(() => ({ name: undefined }));
   const db = getDb(c.env.DATABASE_URL);
 
   const { full, prefix } = generateApiKey();

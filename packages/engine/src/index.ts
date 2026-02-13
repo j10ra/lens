@@ -1,83 +1,77 @@
 // DB
-export { openDb, getDb, closeDb, getRawDb, type Db } from "./db/connection";
-
-// Types
-export type {
-  Repo,
-  Chunk,
-  FileMetadata,
-  FileImport,
-  FileStat,
-  FileCochange,
-  IndexResult,
-  ContextResponse,
-  VocabCluster,
-  FileMetadataRow,
-  FileStatRow,
-  CochangeRow,
-  VectorResult,
-  InterpretedQuery,
-  ContextData,
-  EmbedResult,
-  EnrichResult,
-  RegisterResponse,
-  StatusResponse,
-} from "./types";
 
 // Capabilities
 export type { Capabilities } from "./capabilities";
-
-// Repo
-export { registerRepo, getRepo, listRepos, removeRepo, getRepoStatus } from "./repo/repo";
-export { deriveIdentityKey } from "./repo/identity";
-
-// Index
-export { runIndex, ensureIndexed, computeMaxImportDepth } from "./index/engine";
-export { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./index/chunker";
-export { fullScan, diffScan, getHeadCommit, detectLanguage, isDocFile, isBinaryExt } from "./index/discovery";
-export { extractImportSpecifiers, resolveImport } from "./index/imports";
-export { extractFileMetadata, extractAndPersistMetadata } from "./index/extract-metadata";
-export { buildAndPersistImportGraph } from "./index/import-graph";
-export { analyzeGitHistory, parseGitLog } from "./index/git-analysis";
-export { ensureEmbedded } from "./index/embed";
-export { enrichPurpose } from "./index/enrich-purpose";
-export { buildVocabClusters, extractVocab, cosine, agglomerativeCluster } from "./index/vocab-clusters";
-export { startWatcher, stopWatcher, getWatcherStatus } from "./index/watcher";
-
 // Context
 export { buildContext, type ContextOptions } from "./context/context";
-export { interpretQuery, isNoisePath } from "./context/query-interpreter";
 export { formatContextPack } from "./context/formatter";
-export { vectorSearch } from "./context/vector";
+export { interpretQuery, isNoisePath } from "./context/query-interpreter";
 export {
-  loadFileMetadata,
-  getAllFileStats,
-  getReverseImports,
-  getForwardImports,
   get2HopReverseDeps,
-  getCochanges,
-  getIndegrees,
+  getAllFileStats,
   getCochangePartners,
+  getCochanges,
+  getForwardImports,
+  getIndegrees,
+  getReverseImports,
+  loadFileMetadata,
   loadVocabClusters,
 } from "./context/structural";
-
+export { vectorSearch } from "./context/vector";
+export { closeDb, type Db, getDb, getRawDb, openDb } from "./db/connection";
 // Query helpers (for advanced usage)
 export {
-  repoQueries,
   chunkQueries,
-  metadataQueries,
-  importQueries,
-  statsQueries,
   cochangeQueries,
+  importQueries,
   logQueries,
-  usageQueries,
-  telemetryQueries,
+  metadataQueries,
+  repoQueries,
   settingsQueries,
+  statsQueries,
+  telemetryQueries,
   type UsageCounter,
+  usageQueries,
 } from "./db/queries";
+export { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./index/chunker";
+export { detectLanguage, diffScan, fullScan, getHeadCommit, isBinaryExt, isDocFile } from "./index/discovery";
+export { ensureEmbedded } from "./index/embed";
+// Index
+export { computeMaxImportDepth, ensureIndexed, runIndex } from "./index/engine";
+export { enrichPurpose } from "./index/enrich-purpose";
+export { extractAndPersistMetadata, extractFileMetadata } from "./index/extract-metadata";
+export { analyzeGitHistory, parseGitLog } from "./index/git-analysis";
+export { buildAndPersistImportGraph } from "./index/import-graph";
+export { extractImportSpecifiers, resolveImport } from "./index/imports";
+export { agglomerativeCluster, buildVocabClusters, cosine, extractVocab } from "./index/vocab-clusters";
+export { getWatcherStatus, startWatcher, stopWatcher } from "./index/watcher";
+export { deriveIdentityKey } from "./repo/identity";
+// Repo
+export { getRepo, getRepoStatus, listRepos, registerRepo, removeRepo } from "./repo/repo";
+// Telemetry
+export { setTelemetryEnabled, track } from "./telemetry";
 
 // Trace
 export { RequestTrace, type TraceStep } from "./trace";
-
-// Telemetry
-export { track, setTelemetryEnabled } from "./telemetry";
+// Types
+export type {
+  Chunk,
+  CochangeRow,
+  ContextData,
+  ContextResponse,
+  EmbedResult,
+  EnrichResult,
+  FileCochange,
+  FileImport,
+  FileMetadata,
+  FileMetadataRow,
+  FileStat,
+  FileStatRow,
+  IndexResult,
+  InterpretedQuery,
+  RegisterResponse,
+  Repo,
+  StatusResponse,
+  VectorResult,
+  VocabCluster,
+} from "./types";

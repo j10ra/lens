@@ -21,10 +21,7 @@ export function ProgressBar({ value, max, label, className }: ProgressBarProps) 
         </div>
       )}
       <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full rounded-full bg-primary transition-all duration-300"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

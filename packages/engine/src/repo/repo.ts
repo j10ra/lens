@@ -1,16 +1,10 @@
 import type { Db } from "../db/connection";
-import type { RegisterResponse, StatusResponse } from "../types";
-import { repoQueries, chunkQueries, metadataQueries } from "../db/queries";
-import type { VocabCluster } from "../types";
-import { deriveIdentityKey } from "./identity";
+import { chunkQueries, metadataQueries, repoQueries } from "../db/queries";
 import { getHeadCommit } from "../index/discovery";
+import type { RegisterResponse, StatusResponse, VocabCluster } from "../types";
+import { deriveIdentityKey } from "./identity";
 
-export function registerRepo(
-  db: Db,
-  rootPath: string,
-  name?: string,
-  remoteUrl?: string,
-): RegisterResponse {
+export function registerRepo(db: Db, rootPath: string, name?: string, remoteUrl?: string): RegisterResponse {
   const identityKey = deriveIdentityKey(rootPath, remoteUrl);
   const repoName = name ?? rootPath.split("/").pop() ?? "unknown";
   const { id, created } = repoQueries.upsert(db, identityKey, repoName, rootPath, remoteUrl ?? null);

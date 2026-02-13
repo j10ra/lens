@@ -11,8 +11,9 @@ const RUST_EXPORT_RE = /^pub\s+(?:fn|struct|enum|trait|type|mod)\s+(\w+)/gm;
 const CSHARP_EXPORT_RE =
   /^\s*(?:public|internal)\s+(?:static\s+)?(?:abstract\s+|sealed\s+|partial\s+)?(?:class|interface|enum|struct|record|delegate)\s+(\w+)/gm;
 const CSHARP_EXPORT_METHOD_RE =
-  /^\s*public\s+(?:static\s+)?(?:async\s+)?(?:override\s+)?(?:virtual\s+)?[\w<>\[\]?.]+\s+(\w+)\s*\(/gm;
-const JAVA_EXPORT_RE = /^\s*(?:public)\s+(?:static\s+)?(?:abstract\s+|final\s+)?(?:class|interface|enum|record)\s+(\w+)/gm;
+  /^\s*public\s+(?:static\s+)?(?:async\s+)?(?:override\s+)?(?:virtual\s+)?[\w<>[\]?.]+\s+(\w+)\s*\(/gm;
+const JAVA_EXPORT_RE =
+  /^\s*(?:public)\s+(?:static\s+)?(?:abstract\s+|final\s+)?(?:class|interface|enum|record)\s+(\w+)/gm;
 
 const JSDOC_RE = /^\/\*\*\s*([\s\S]*?)\*\//m;
 const PY_DOCSTRING_RE = /^(?:["']{3})([\s\S]*?)(?:["']{3})/m;
@@ -145,7 +146,7 @@ const UNIVERSAL_DECL_RES: RegExp[] = [
   /^\s*(?:const|let|var|val)\s+(\w+)\s*[=:]/gm,
   /^\s*(?:abstract\s+|sealed\s+|partial\s+|data\s+)?(?:class|struct|enum|trait|interface|record|object|mod)\s+(\w+)/gm,
   /^\s*type\s+(\w+)\s*[=<{]/gm,
-  /^\s*(?:private|protected|internal)\s+(?:static\s+)?(?:async\s+)?(?:suspend\s+)?(?:override\s+)?[\w<>\[\]?.]+\s+(\w+)\s*\(/gm,
+  /^\s*(?:private|protected|internal)\s+(?:static\s+)?(?:async\s+)?(?:suspend\s+)?(?:override\s+)?[\w<>[\]?.]+\s+(\w+)\s*\(/gm,
 ];
 
 const EXPORT_LINE_RE = /^(?:export|pub\s|public\s)/;
@@ -158,9 +159,30 @@ function universalSkipLine(line: string): boolean {
 }
 
 const SKIP_NAMES = new Set([
-  "if","for","foreach","while","switch","using","catch","lock",
-  "return","throw","yield","try","do","else","new","await",
-  "base","this","super","self","import","require","from","package",
+  "if",
+  "for",
+  "foreach",
+  "while",
+  "switch",
+  "using",
+  "catch",
+  "lock",
+  "return",
+  "throw",
+  "yield",
+  "try",
+  "do",
+  "else",
+  "new",
+  "await",
+  "base",
+  "this",
+  "super",
+  "self",
+  "import",
+  "require",
+  "from",
+  "package",
 ]);
 
 function universalSkipName(name: string): boolean {
@@ -183,13 +205,7 @@ function collectMatches(
       const pattern = new RegExp(re.source, re.flags);
       for (const m of line.matchAll(pattern)) {
         const name = m[1];
-        if (
-          name &&
-          name.length >= 6 &&
-          !exportSet.has(name) &&
-          !seen.has(name) &&
-          !skipName?.(name)
-        ) {
+        if (name && name.length >= 6 && !exportSet.has(name) && !seen.has(name) && !skipName?.(name)) {
           seen.add(name);
           results.push(name);
         }
@@ -224,7 +240,7 @@ export function extractAndPersistMetadata(db: Db, repoId: string): number {
   for (const row of rows) {
     const existing = files.get(row.path);
     if (existing) {
-      existing.content += "\n" + row.content;
+      existing.content += `\n${row.content}`;
     } else {
       files.set(row.path, {
         content: row.content,

@@ -1,7 +1,7 @@
-import type { Db } from "../db/connection";
 import type { Capabilities } from "../capabilities";
+import type { Db } from "../db/connection";
+import { jsonParse, metadataQueries } from "../db/queries";
 import type { EnrichResult } from "../types";
-import { metadataQueries, jsonParse } from "../db/queries";
 
 const PURPOSE_BATCH_LIMIT = 200;
 const PURPOSE_CONCURRENCY = 10;

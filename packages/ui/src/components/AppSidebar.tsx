@@ -32,11 +32,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   navGroups?: NavGroup[];
   primaryAction?: NavItem;
   currentPath: string;
-  renderLink: (props: {
-    href: string;
-    className?: string;
-    children: React.ReactNode;
-  }) => React.ReactNode;
+  renderLink: (props: { href: string; className?: string; children: React.ReactNode }) => React.ReactNode;
   brand?: { title: string; subtitle: string };
   healthy?: boolean;
   connectionLabel?: string;
@@ -61,11 +57,7 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" className="hover:bg-transparent">
-              <Logo
-                healthy={healthy}
-                title={brand.title}
-                subtitle={brand.subtitle}
-              />
+              <Logo healthy={healthy} title={brand.title} subtitle={brand.subtitle} />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -80,9 +72,7 @@ export function AppSidebar({
                     {renderLink({
                       href: primaryAction.href,
                       children: (
-                        <SidebarMenuButton
-                          className="border border-border bg-muted/40 hover:bg-muted h-9 font-medium"
-                        >
+                        <SidebarMenuButton className="border border-border bg-muted/40 hover:bg-muted h-9 font-medium">
                           <primaryAction.icon />
                           <span>{primaryAction.label}</span>
                         </SidebarMenuButton>
@@ -93,7 +83,10 @@ export function AppSidebar({
                     {renderLink({
                       href: primaryAction.href,
                       children: (
-                        <button className="flex size-9 items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors">
+                        <button
+                          type="button"
+                          className="flex size-9 items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors"
+                        >
                           <ArrowRight className="size-4 text-muted-foreground" />
                         </button>
                       ),
@@ -110,9 +103,7 @@ export function AppSidebar({
             <SidebarMenu>
               {navItems.map(({ href, icon: Icon, label }) => {
                 const isActive =
-                  href === "/" || href === "/dashboard"
-                    ? currentPath === href
-                    : currentPath.startsWith(href);
+                  href === "/" || href === "/dashboard" ? currentPath === href : currentPath.startsWith(href);
                 return (
                   <SidebarMenuItem key={href}>
                     {renderLink({

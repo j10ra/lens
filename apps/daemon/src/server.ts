@@ -1,38 +1,37 @@
-import { Hono } from "hono";
-import { existsSync, readFileSync, writeFileSync, statSync, watch } from "node:fs";
-import { join, extname } from "node:path";
+import { existsSync, readFileSync, statSync, watch, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import type { Db, Capabilities } from "@lens/engine";
-import { getCloudUrl, ensureTelemetryId, isTelemetryEnabled, getTelemetryId } from "./config";
+import { extname, join } from "node:path";
+import type { Capabilities, Db } from "@lens/engine";
 import {
-  registerRepo,
-  getRepo,
-  listRepos,
-  removeRepo,
-  getRepoStatus,
-  runIndex,
   buildContext,
-  startWatcher,
-  stopWatcher,
-  getWatcherStatus,
-  getHeadCommit,
-  repoQueries,
-  chunkQueries,
-  metadataQueries,
-  importQueries,
-  statsQueries,
-  cochangeQueries,
-  logQueries,
-  ensureEmbedded,
-  enrichPurpose,
   buildVocabClusters,
+  chunkQueries,
+  enrichPurpose,
+  ensureEmbedded,
+  getHeadCommit,
   getRawDb,
-  usageQueries,
+  getRepo,
+  getRepoStatus,
+  getWatcherStatus,
+  importQueries,
+  listRepos,
+  logQueries,
+  metadataQueries,
+  RequestTrace,
+  registerRepo,
+  removeRepo,
+  repoQueries,
+  runIndex,
+  setTelemetryEnabled,
+  startWatcher,
+  statsQueries,
+  stopWatcher,
   telemetryQueries,
   track,
-  setTelemetryEnabled,
-  RequestTrace,
+  usageQueries,
 } from "@lens/engine";
+import { Hono } from "hono";
+import { ensureTelemetryId, getCloudUrl, getTelemetryId, isTelemetryEnabled } from "./config";
 
 declare module "hono" {
   interface ContextVariableMap {
@@ -118,12 +117,12 @@ export function createApp(
   // --- Telemetry Init ---
   const telemetryEnabled = isTelemetryEnabled();
   setTelemetryEnabled(telemetryEnabled);
-  const { telemetry_id, first_run } = ensureTelemetryId();
+  const { first_run } = ensureTelemetryId();
 
   if (first_run) {
     console.log(
       "[LENS] Anonymous telemetry is enabled. No PII, no repo paths, no code.\n" +
-      "[LENS] Opt out: lens config set telemetry false",
+        "[LENS] Opt out: lens config set telemetry false",
     );
     track(db, "install", {
       os: process.platform,
@@ -146,7 +145,12 @@ export function createApp(
     const start = performance.now();
     const path = new URL(c.req.url).pathname;
 
-    if (path.startsWith("/dashboard/") || path.startsWith("/api/dashboard/") || path === "/health" || path.endsWith("/events")) {
+    if (
+      path.startsWith("/dashboard/") ||
+      path.startsWith("/api/dashboard/") ||
+      path === "/health" ||
+      path.endsWith("/events")
+    ) {
       return next();
     }
 
@@ -224,12 +228,15 @@ export function createApp(
       const maxRepos = quotaCache?.quota?.maxRepos ?? 50;
       trace.end("quotaCheck", `${currentRepos}/${maxRepos}`);
       if (currentRepos >= maxRepos) {
-        return c.json({
-          error: "Repo limit reached",
-          current: currentRepos,
-          limit: maxRepos,
-          plan: quotaCache?.plan ?? "unknown",
-        }, 429);
+        return c.json(
+          {
+            error: "Repo limit reached",
+            current: currentRepos,
+            limit: maxRepos,
+            plan: quotaCache?.plan ?? "unknown",
+          },
+          429,
+        );
       }
 
       trace.step("registerRepo");
@@ -249,29 +256,65 @@ export function createApp(
             const tasks: Promise<any>[] = [];
             if (repo?.enable_vocab_clusters && quotaRemaining("embeddingChunks") > 0) {
               bg.step("vocabClusters");
-              tasks.push(buildVocabClusters(db, result.repo_id, caps).then(() => { bg.end("vocabClusters"); results.vocabClusters = "done"; }));
+              tasks.push(
+                buildVocabClusters(db, result.repo_id, caps).then(() => {
+                  bg.end("vocabClusters");
+                  results.vocabClusters = "done";
+                }),
+              );
             } else {
               bg.add("vocabClusters", 0, !repo?.enable_vocab_clusters ? "disabled" : "quota exceeded");
             }
             if (repo?.enable_embeddings && quotaRemaining("embeddingChunks") > 0) {
               bg.step("embeddings");
-              tasks.push(ensureEmbedded(db, result.repo_id, caps).then((er) => { bg.end("embeddings", `${er.embedded_count} embedded`); results.embeddings = er; }));
+              tasks.push(
+                ensureEmbedded(db, result.repo_id, caps).then((er) => {
+                  bg.end("embeddings", `${er.embedded_count} embedded`);
+                  results.embeddings = er;
+                }),
+              );
             } else {
               bg.add("embeddings", 0, !repo?.enable_embeddings ? "disabled" : "quota exceeded");
             }
             if (repo?.enable_summaries && quotaRemaining("purposeRequests") > 0) {
               bg.step("purpose");
-              tasks.push(enrichPurpose(db, result.repo_id, caps).then((pr) => { bg.end("purpose", `${pr.enriched} enriched`); results.purpose = pr; }));
+              tasks.push(
+                enrichPurpose(db, result.repo_id, caps).then((pr) => {
+                  bg.end("purpose", `${pr.enriched} enriched`);
+                  results.purpose = pr;
+                }),
+              );
             } else {
               bg.add("purpose", 0, !repo?.enable_summaries ? "disabled" : "quota exceeded");
             }
             await Promise.all(tasks);
             const resBody = JSON.stringify(results);
             const bgDuration = Math.round(performance.now() - bgStart);
-            logQueries.insert(db, "BG", `/enrichment/${result.repo_id}`, 200, bgDuration, "system", reqBody, resBody.length, resBody, bg.serialize());
+            logQueries.insert(
+              db,
+              "BG",
+              `/enrichment/${result.repo_id}`,
+              200,
+              bgDuration,
+              "system",
+              reqBody,
+              resBody.length,
+              resBody,
+              bg.serialize(),
+            );
           })
           .catch((e) => {
-            logQueries.insert(db, "BG", `/enrichment/${result.repo_id}`, 500, 0, "system", JSON.stringify({ repo_id: result.repo_id }), undefined, String(e));
+            logQueries.insert(
+              db,
+              "BG",
+              `/enrichment/${result.repo_id}`,
+              500,
+              0,
+              "system",
+              JSON.stringify({ repo_id: result.repo_id }),
+              undefined,
+              String(e),
+            );
           });
       }
 
@@ -417,19 +460,34 @@ export function createApp(
       const tasks: Promise<any>[] = [];
       if (repo?.enable_vocab_clusters && quotaRemaining("embeddingChunks") > 0) {
         bg.step("vocabClusters");
-        tasks.push(buildVocabClusters(db, repo_id, caps).then(() => { bg.end("vocabClusters"); results.vocabClusters = "done"; }));
+        tasks.push(
+          buildVocabClusters(db, repo_id, caps).then(() => {
+            bg.end("vocabClusters");
+            results.vocabClusters = "done";
+          }),
+        );
       } else {
         bg.add("vocabClusters", 0, !repo?.enable_vocab_clusters ? "disabled" : "quota exceeded");
       }
       if (repo?.enable_embeddings && quotaRemaining("embeddingChunks") > 0) {
         bg.step("embeddings");
-        tasks.push(ensureEmbedded(db, repo_id, caps).then((er) => { bg.end("embeddings", `${er.embedded_count} embedded`); results.embeddings = er; }));
+        tasks.push(
+          ensureEmbedded(db, repo_id, caps).then((er) => {
+            bg.end("embeddings", `${er.embedded_count} embedded`);
+            results.embeddings = er;
+          }),
+        );
       } else {
         bg.add("embeddings", 0, !repo?.enable_embeddings ? "disabled" : "quota exceeded");
       }
       if (repo?.enable_summaries && quotaRemaining("purposeRequests") > 0) {
         bg.step("purpose");
-        tasks.push(enrichPurpose(db, repo_id, caps).then((pr) => { bg.end("purpose", `${pr.enriched} enriched`); results.purpose = pr; }));
+        tasks.push(
+          enrichPurpose(db, repo_id, caps).then((pr) => {
+            bg.end("purpose", `${pr.enriched} enriched`);
+            results.purpose = pr;
+          }),
+        );
       } else {
         bg.add("purpose", 0, !repo?.enable_summaries ? "disabled" : "quota exceeded");
       }
@@ -437,7 +495,18 @@ export function createApp(
         .then(() => {
           const resBody = JSON.stringify(results);
           const bgDuration = Math.round(performance.now() - bgStart);
-          logQueries.insert(db, "BG", `/enrichment/${repo_id}`, 200, bgDuration, "system", reqBody, resBody.length, resBody, bg.serialize());
+          logQueries.insert(
+            db,
+            "BG",
+            `/enrichment/${repo_id}`,
+            200,
+            bgDuration,
+            "system",
+            reqBody,
+            resBody.length,
+            resBody,
+            bg.serialize(),
+          );
         })
         .catch((e) => {
           logQueries.insert(db, "BG", `/enrichment/${repo_id}`, 500, 0, "system", reqBody, undefined, String(e));
@@ -600,7 +669,12 @@ export function createApp(
       body: JSON.stringify({ refresh_token: token }),
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const data = (await res.json()) as {
+      access_token: string;
+      refresh_token: string;
+      expires_in?: number;
+      user?: { id: string; email?: string };
+    };
     return {
       access_token: data.access_token,
       refresh_token: data.refresh_token,
@@ -616,16 +690,23 @@ export function createApp(
 
   function emitRepoEvent() {
     for (const ctrl of repoClients) {
-      try { ctrl.enqueue(encoder.encode("data: repo-changed\n\n")); }
-      catch { repoClients.delete(ctrl); }
+      try {
+        ctrl.enqueue(encoder.encode("data: repo-changed\n\n"));
+      } catch {
+        repoClients.delete(ctrl);
+      }
     }
   }
 
   trackRoute("GET", "/api/repo/events");
-  app.get("/api/repo/events", (c) => {
+  app.get("/api/repo/events", (_c) => {
     const stream = new ReadableStream({
-      start(ctrl) { repoClients.add(ctrl); },
-      cancel() { /* cleaned up on next failed enqueue */ },
+      start(ctrl) {
+        repoClients.add(ctrl);
+      },
+      cancel() {
+        /* cleaned up on next failed enqueue */
+      },
     });
     return new Response(stream, {
       headers: {
@@ -642,8 +723,11 @@ export function createApp(
 
   function emitAuthEvent() {
     for (const ctrl of authClients) {
-      try { ctrl.enqueue(encoder.encode("data: auth-changed\n\n")); }
-      catch { authClients.delete(ctrl); }
+      try {
+        ctrl.enqueue(encoder.encode("data: auth-changed\n\n"));
+      } catch {
+        authClients.delete(ctrl);
+      }
     }
   }
 
@@ -659,10 +743,14 @@ export function createApp(
   } catch {}
 
   trackRoute("GET", "/api/auth/events");
-  app.get("/api/auth/events", (c) => {
+  app.get("/api/auth/events", (_c) => {
     const stream = new ReadableStream({
-      start(ctrl) { authClients.add(ctrl); },
-      cancel() { /* cleaned up on next failed enqueue */ },
+      start(ctrl) {
+        authClients.add(ctrl);
+      },
+      cancel() {
+        /* cleaned up on next failed enqueue */
+      },
     });
     return new Response(stream, {
       headers: {
@@ -895,7 +983,9 @@ export function createApp(
       const structural = metadataQueries.getStructuralStats(db, id);
       const watcher = getWatcherStatus(id);
       let currentHead: string | null = null;
-      try { currentHead = await getHeadCommit(repo.root_path); } catch {}
+      try {
+        currentHead = await getHeadCommit(repo.root_path);
+      } catch {}
       const vocabClusters: unknown[] = repo.vocab_clusters ? JSON.parse(repo.vocab_clusters) : [];
       return c.json({
         ...repo,
@@ -922,7 +1012,11 @@ export function createApp(
       const id = c.req.param("id");
       const repo = repoQueries.getById(db, id);
       if (!repo) return c.json({ error: "repo not found" }, 404);
-      const body = await c.req.json() as { enable_embeddings?: boolean; enable_summaries?: boolean; enable_vocab_clusters?: boolean };
+      const body = (await c.req.json()) as {
+        enable_embeddings?: boolean;
+        enable_summaries?: boolean;
+        enable_vocab_clusters?: boolean;
+      };
       const flags: { enable_embeddings?: number; enable_summaries?: number; enable_vocab_clusters?: number } = {};
       if (body.enable_embeddings !== undefined) flags.enable_embeddings = body.enable_embeddings ? 1 : 0;
       if (body.enable_summaries !== undefined) flags.enable_summaries = body.enable_summaries ? 1 : 0;
@@ -947,7 +1041,9 @@ export function createApp(
       const meta = metadataQueries.getByRepo(db, id);
       const raw = getRawDb();
       const chunkCounts = raw
-        .prepare("SELECT path, count(*) as chunk_count, SUM(CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END) as embedded_count FROM chunks WHERE repo_id = ? GROUP BY path")
+        .prepare(
+          "SELECT path, count(*) as chunk_count, SUM(CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END) as embedded_count FROM chunks WHERE repo_id = ? GROUP BY path",
+        )
         .all(id) as Array<{ path: string; chunk_count: number; embedded_count: number }>;
       const countMap = new Map(chunkCounts.map((r) => [r.path, r]));
       let all = meta.map((m) => {
@@ -989,7 +1085,9 @@ export function createApp(
       // Chunk stats
       const raw = getRawDb();
       const chunkRow = raw
-        .prepare("SELECT count(*) as chunk_count, SUM(CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END) as embedded_count FROM chunks WHERE repo_id = ? AND path = ?")
+        .prepare(
+          "SELECT count(*) as chunk_count, SUM(CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END) as embedded_count FROM chunks WHERE repo_id = ? AND path = ?",
+        )
         .get(id, filePath) as { chunk_count: number; embedded_count: number };
 
       // Import graph: what this file imports + what imports this file
@@ -1002,7 +1100,9 @@ export function createApp(
 
       // Co-changes (top 10 by count)
       const cochangeRows = raw
-        .prepare("SELECT path_a, path_b, cochange_count FROM file_cochanges WHERE repo_id = ? AND (path_a = ? OR path_b = ?) ORDER BY cochange_count DESC LIMIT 10")
+        .prepare(
+          "SELECT path_a, path_b, cochange_count FROM file_cochanges WHERE repo_id = ? AND (path_a = ? OR path_b = ?) ORDER BY cochange_count DESC LIMIT 10",
+        )
         .all(id, filePath, filePath) as Array<{ path_a: string; path_b: string; cochange_count: number }>;
       const cochanges = cochangeRows.map((r) => ({
         path: r.path_a === filePath ? r.path_b : r.path_a,
@@ -1021,11 +1121,13 @@ export function createApp(
         embedded_count: chunkRow.embedded_count,
         imports: allImports.map((i) => i.target_path),
         imported_by: allImporters.map((i) => i.source_path),
-        git: fileStat ? {
-          commit_count: fileStat.commit_count,
-          recent_count: fileStat.recent_count,
-          last_modified: fileStat.last_modified?.toISOString() ?? null,
-        } : null,
+        git: fileStat
+          ? {
+              commit_count: fileStat.commit_count,
+              recent_count: fileStat.recent_count,
+              last_modified: fileStat.last_modified?.toISOString() ?? null,
+            }
+          : null,
         cochanges,
       });
     } catch (e: any) {
@@ -1043,19 +1145,22 @@ export function createApp(
       const offset = Number(c.req.query("offset") || 0);
       const pathFilter = c.req.query("path") || undefined;
       const raw = getRawDb();
-      const where = pathFilter
-        ? "WHERE repo_id = ? AND path = ?"
-        : "WHERE repo_id = ?";
+      const where = pathFilter ? "WHERE repo_id = ? AND path = ?" : "WHERE repo_id = ?";
       const params = pathFilter ? [id, pathFilter] : [id];
       const rows = raw
-        .prepare(`SELECT id, path, chunk_index, start_line, end_line, language, CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END as has_embedding FROM chunks ${where} ORDER BY path, chunk_index LIMIT ? OFFSET ?`)
+        .prepare(
+          `SELECT id, path, chunk_index, start_line, end_line, language, CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END as has_embedding FROM chunks ${where} ORDER BY path, chunk_index LIMIT ? OFFSET ?`,
+        )
         .all(...params, limit, offset) as Array<{
-          id: string; path: string; chunk_index: number;
-          start_line: number; end_line: number; language: string | null; has_embedding: number;
-        }>;
-      const totalRow = raw
-        .prepare(`SELECT count(*) as count FROM chunks ${where}`)
-        .get(...params) as { count: number };
+        id: string;
+        path: string;
+        chunk_index: number;
+        start_line: number;
+        end_line: number;
+        language: string | null;
+        has_embedding: number;
+      }>;
+      const totalRow = raw.prepare(`SELECT count(*) as count FROM chunks ${where}`).get(...params) as { count: number };
       return c.json({
         chunks: rows.map((r) => ({ ...r, has_embedding: r.has_embedding === 1 })),
         total: totalRow.count,
@@ -1072,8 +1177,22 @@ export function createApp(
       const chunkId = c.req.param("chunkId");
       const raw = getRawDb();
       const row = raw
-        .prepare("SELECT id, path, chunk_index, start_line, end_line, content, language, chunk_hash, CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END as has_embedding FROM chunks WHERE id = ? AND repo_id = ?")
-        .get(chunkId, id) as { id: string; path: string; chunk_index: number; start_line: number; end_line: number; content: string; language: string | null; chunk_hash: string; has_embedding: number } | undefined;
+        .prepare(
+          "SELECT id, path, chunk_index, start_line, end_line, content, language, chunk_hash, CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END as has_embedding FROM chunks WHERE id = ? AND repo_id = ?",
+        )
+        .get(chunkId, id) as
+        | {
+            id: string;
+            path: string;
+            chunk_index: number;
+            start_line: number;
+            end_line: number;
+            content: string;
+            language: string | null;
+            chunk_hash: string;
+            has_embedding: number;
+          }
+        | undefined;
       if (!row) return c.json({ error: "chunk not found" }, 404);
       return c.json({ ...row, has_embedding: row.has_embedding === 1 });
     } catch (e: any) {
@@ -1118,7 +1237,9 @@ export function createApp(
     try {
       const raw = getRawDb();
       const tables = raw
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '__drizzle%' ORDER BY name")
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '__drizzle%' ORDER BY name",
+        )
         .all() as Array<{ name: string }>;
       const result = tables.map((t) => {
         const row = raw.prepare(`SELECT count(*) as count FROM "${t.name}"`).get() as { count: number };
@@ -1139,9 +1260,7 @@ export function createApp(
       const raw = getRawDb();
 
       // Validate table name exists
-      const tableCheck = raw
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?")
-        .get(name);
+      const tableCheck = raw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name);
       if (!tableCheck) return c.json({ error: "table not found" }, 404);
 
       const columns = (raw.prepare(`PRAGMA table_info("${name}")`).all() as Array<{ name: string }>).map(
@@ -1261,9 +1380,9 @@ export function createApp(
         cloudProxy("GET", "/api/subscription"),
       ]);
       if (res.ok) {
-        const data = await res.json() as any;
+        const data = (await res.json()) as any;
         const plan = (data.plan ?? "free").trim();
-        const subData = subRes.ok ? ((await subRes.json()) as any).subscription ?? null : null;
+        const subData = subRes.ok ? (((await subRes.json()) as any).subscription ?? null) : null;
         quotaCache = {
           plan,
           usage: data.usage ?? {},
@@ -1283,9 +1402,15 @@ export function createApp(
             const { createCloudCapabilities } = await import("./cloud-capabilities");
             caps = createCloudCapabilities(
               apiKey,
-              (counter, amount) => { try { usageQueries.increment(db, counter as any, amount); } catch {} },
+              (counter, amount) => {
+                try {
+                  usageQueries.increment(db, counter as any, amount);
+                } catch {}
+              },
               (method, path, status, duration, source, reqBody, resBody) => {
-                try { logQueries.insert(db, method, path, status, duration, source, reqBody, resBody?.length, resBody); } catch {}
+                try {
+                  logQueries.insert(db, method, path, status, duration, source, reqBody, resBody?.length, resBody);
+                } catch {}
               },
             );
             console.error("[LENS] Cloud capabilities recovered (Pro plan)");
@@ -1307,7 +1432,7 @@ export function createApp(
       }
     } catch {
       // Network error — also reset to prevent stale Pro
-      quotaCache = { plan: "free", usage: {}, quota: {}, fetchedAt: Date.now() };
+      quotaCache = { plan: "free", usage: {}, quota: {}, subscription: null, fetchedAt: Date.now() };
       caps = undefined;
     }
   }
@@ -1345,7 +1470,10 @@ export function createApp(
         signal: AbortSignal.timeout(10000),
       });
       if (res.ok) {
-        telemetryQueries.markSynced(db, unsynced.map((e) => e.id));
+        telemetryQueries.markSynced(
+          db,
+          unsynced.map((e) => e.id),
+        );
       }
     } catch {}
 

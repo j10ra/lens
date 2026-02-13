@@ -1,7 +1,7 @@
-import type { Db } from "../db/connection";
 import type { Capabilities } from "../capabilities";
-import type { EmbedResult } from "../types";
+import type { Db } from "../db/connection";
 import { chunkQueries } from "../db/queries";
+import type { EmbedResult } from "../types";
 
 const MAX_API_CALLS = 2000;
 const POOL_SIZE = 32;
@@ -60,7 +60,10 @@ export async function ensureEmbedded(db: Db, repoId: string, caps?: Capabilities
 
         embedded += batch.length;
       } catch (err) {
-        console.error(`[LENS] Embed batch failed (${batch.length} chunks, ~${batchTokens} tokens):`, (err as Error).message);
+        console.error(
+          `[LENS] Embed batch failed (${batch.length} chunks, ~${batchTokens} tokens):`,
+          (err as Error).message,
+        );
         poolFailed = true;
         break;
       }

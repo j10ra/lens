@@ -1,10 +1,7 @@
 const VOYAGE_URL = "https://api.voyageai.com/v1/embeddings";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-export async function proxyVoyage(
-  apiKey: string,
-  body: unknown,
-): Promise<Response> {
+export async function proxyVoyage(apiKey: string, body: unknown): Promise<Response> {
   return fetch(VOYAGE_URL, {
     method: "POST",
     headers: {
@@ -15,10 +12,7 @@ export async function proxyVoyage(
   });
 }
 
-export async function proxyOpenRouter(
-  apiKey: string,
-  body: unknown,
-): Promise<Response> {
+export async function proxyOpenRouter(apiKey: string, body: unknown): Promise<Response> {
   return fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {

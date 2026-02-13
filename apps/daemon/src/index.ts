@@ -1,9 +1,9 @@
-import { writeFileSync, unlinkSync, readFileSync, statSync, watchFile, openSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { homedir } from "node:os";
 import { spawn } from "node:child_process";
-import { openDb, closeDb } from "@lens/engine";
+import { openSync, readFileSync, statSync, unlinkSync, watchFile, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { Capabilities } from "@lens/engine";
+import { closeDb, openDb } from "@lens/engine";
 
 import { getCloudUrl } from "./config";
 
@@ -67,7 +67,11 @@ async function loadCapabilities(db: ReturnType<typeof openDb>): Promise<Capabili
       console.error(`[LENS] Plan check failed (${res.status}), capabilities disabled`);
       return {};
     }
-    const usageData = await res.json() as { plan?: string; usage?: Record<string, number>; quota?: Record<string, number> };
+    const usageData = (await res.json()) as {
+      plan?: string;
+      usage?: Record<string, number>;
+      quota?: Record<string, number>;
+    };
     const planData = {
       plan: usageData.plan ?? "free",
       usage: usageData.usage ?? {},
@@ -83,9 +87,15 @@ async function loadCapabilities(db: ReturnType<typeof openDb>): Promise<Capabili
     const { usageQueries, logQueries } = await import("@lens/engine");
     const caps = createCloudCapabilities(
       apiKey,
-      (counter, amount) => { try { usageQueries.increment(db, counter as any, amount); } catch {} },
+      (counter, amount) => {
+        try {
+          usageQueries.increment(db, counter as any, amount);
+        } catch {}
+      },
       (method, path, status, duration, source, reqBody, resBody) => {
-        try { logQueries.insert(db, method, path, status, duration, source, reqBody, resBody?.length, resBody); } catch {}
+        try {
+          logQueries.insert(db, method, path, status, duration, source, reqBody, resBody?.length, resBody);
+        } catch {}
       },
     );
     console.error("[LENS] Cloud capabilities enabled (Pro plan)");
@@ -132,9 +142,9 @@ async function main() {
     // Resolve dashboard dist (sibling app in monorepo or bundled)
     const selfDir = dirname(fileURLToPath(import.meta.url));
     const candidates = [
-      resolve(selfDir, "../../dashboard/dist"),     // monorepo dev
-      resolve(selfDir, "../dashboard"),              // legacy
-      resolve(selfDir, "dashboard"),                 // publish: sibling
+      resolve(selfDir, "../../dashboard/dist"), // monorepo dev
+      resolve(selfDir, "../dashboard"), // legacy
+      resolve(selfDir, "dashboard"), // publish: sibling
     ];
     const dashboardDist = candidates.find((p) => existsSync(p));
 

@@ -1,13 +1,4 @@
-import {
-  boolean,
-  date,
-  integer,
-  pgTable,
-  text,
-  timestamp,
-  unique,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { boolean, date, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 export const planQuotas = pgTable("plan_quotas", {
   plan: text("plan").primaryKey(),
