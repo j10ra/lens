@@ -17,7 +17,7 @@ import { unwatchCommand, watchCommand, watchStatusCommand } from "./commands/wat
 import { isTelemetryEnabled } from "./util/config.js";
 import { error } from "./util/format.js";
 
-const program = new Command().name("lens").description("LENS — Local-first repo context engine").version("0.1.19");
+const program = new Command().name("lens").description("LENS — Local-first repo context engine").version("0.1.20");
 
 function trackCommand(name: string): void {
   if (!isTelemetryEnabled()) return;
