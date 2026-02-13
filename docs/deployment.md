@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Two deployment targets: **npm package** (CLI + daemon) and **Cloudflare Workers** (cloud API + admin panel).
+Three deployment targets: **npm package** (CLI + daemon), **Railway** (cloud API + admin), **Cloudflare Pages** (marketing site).
 
 ---
 
@@ -42,8 +42,8 @@ Equivalent to `build:publish` + `npm install -g .` + `lens daemon stop` + `lens 
 ### Publish to npm
 
 ```bash
-cd publish
-npm publish
+pnpm -w release          # interactive: bump version, build, publish, commit + tag
+git push && git push --tags
 ```
 
 Package name: `lens-engine`, binaries: `lens` + `lens-daemon`.
@@ -66,114 +66,77 @@ lens login                    # unlock Pro features
 
 ---
 
-## 2. Cloudflare Workers (`lens-cloud`)
+## 2. Railway (`lens-cloud`)
 
 The cloud API handles auth, API keys, usage metering, billing (Stripe), and AI proxy (Voyage + OpenRouter). Admin panel is TanStack Start SSR.
 
-### Prerequisites
+Deployed on Railway — auto-deploys from `main` branch. No wrangler/CF Workers.
 
-```bash
-npm install -g wrangler
-wrangler login
-```
+### Environment Variables
 
-### Step 1: Create KV Namespace
+Set in Railway dashboard (project → service → Variables):
 
-Rate limiting uses Cloudflare KV.
+| Variable | Source | Required |
+|----------|--------|----------|
+| `DATABASE_URL` | Supabase connection pooler | Yes |
+| `SUPABASE_URL` | Supabase project URL | Yes |
+| `SUPABASE_SERVICE_KEY` | Supabase service_role key | Yes |
+| `STRIPE_SECRET_KEY` | Stripe API key | Yes |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | Yes |
+| `STRIPE_PRICE_MONTHLY` | Stripe price ID (monthly) | Yes |
+| `STRIPE_PRICE_YEARLY` | Stripe price ID (yearly) | Yes |
+| `VOYAGE_API_KEY` | Voyage AI API key | Yes |
+| `OPENROUTER_API_KEY` | OpenRouter API key | Yes |
+| `SENTRY_DSN` | Sentry project DSN | No |
+| `VITE_SUPABASE_URL` | Supabase URL (client-side) | Yes |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon key (client-side) | Yes |
+| `VITE_ADMIN_EMAILS` | Comma-separated admin emails | Yes |
+| `VITE_SENTRY_DSN` | Sentry DSN (client-side) | No |
 
-```bash
-# Production
-wrangler kv namespace create RATE_LIMIT
-# Copy the id from output
+### Custom Domain
 
-# Preview (for staging)
-wrangler kv namespace create RATE_LIMIT --preview
-```
+Configure in Railway dashboard → service → Settings → Custom Domain → `cloud.lens-engine.com`.
 
-Update `apps/cloud/wrangler.toml`:
-```toml
-[[kv_namespaces]]
-binding = "RATE_LIMIT"
-id = "<paste production id>"
-preview_id = "<paste preview id>"
-```
-
-### Step 2: Set Secrets
-
-Seven secrets required:
-
-```bash
-cd apps/cloud
-
-# Supabase (from project settings → API)
-wrangler secret put SUPABASE_URL          # https://kuvsaycpvbbmyyxiklap.supabase.co
-wrangler secret put SUPABASE_SERVICE_KEY  # service_role key (NOT anon)
-
-# Stripe (from Stripe Dashboard → Developers → API keys)
-wrangler secret put STRIPE_SECRET_KEY       # sk_live_...
-wrangler secret put STRIPE_WEBHOOK_SECRET   # whsec_... (from webhook endpoint)
-
-# AI Providers
-wrangler secret put VOYAGE_API_KEY       # Voyage AI dashboard
-wrangler secret put OPENROUTER_API_KEY   # OpenRouter dashboard
-
-# Monitoring
-wrangler secret put SENTRY_DSN           # Sentry project DSN
-```
-
-### Step 3: Set Environment Variables
-
-Update `wrangler.toml` vars section:
-```toml
-[vars]
-ENVIRONMENT = "production"
-DATABASE_URL = "postgresql://postgres.kuvsaycpvbbmyyxiklap:PASSWORD@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
-STRIPE_PRICE_MONTHLY = "price_..."
-STRIPE_PRICE_YEARLY = "price_..."
-VITE_ADMIN_EMAILS = "admin@example.com"
-```
-
-### Step 4: Deploy
-
-```bash
-cd apps/cloud
-pnpm build              # vite build → .output/
-wrangler deploy          # deploys to CF Workers
-```
-
-### Step 5: Custom Domain
-
-```bash
-wrangler domains add cloud.lens-engine.com
-```
-
-Or configure in Cloudflare Dashboard → Workers → lens-cloud → Custom Domains.
-
-### Step 6: Stripe Webhook
+### Stripe Webhook
 
 1. Go to Stripe Dashboard → Developers → Webhooks
 2. Add endpoint: `https://cloud.lens-engine.com/api/billing/webhooks/stripe`
 3. Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
-4. Copy signing secret → `wrangler secret put STRIPE_WEBHOOK_SECRET`
+4. Copy signing secret → set as `STRIPE_WEBHOOK_SECRET` in Railway
 
-### Step 7: Verify
+### Verify
 
 ```bash
-# Health check
 curl https://cloud.lens-engine.com/api/health
-
-# Auth callback (should redirect)
 curl -I https://cloud.lens-engine.com/auth/callback
-
-# Admin panel (should render login)
 curl https://cloud.lens-engine.com/dashboard
 ```
 
 ---
 
-## 3. Supabase Database
+## 3. Cloudflare Pages (`lens-web`)
 
-Already running at `kuvsaycpvbbmyyxiklap` (ap-northeast-2). Tables managed by Drizzle migrations.
+Static marketing site (TanStack Start, static output). Deployed on Cloudflare Pages.
+
+### Deploy
+
+Auto-deploys from `main` branch via Cloudflare Pages git integration, or manual:
+
+```bash
+cd apps/web
+pnpm build
+# Output in .output/public/
+```
+
+### Custom Domain
+
+`lens-engine.com` — configured in Cloudflare Pages dashboard.
+
+---
+
+## 4. Supabase Database
+
+Running at `kuvsaycpvbbmyyxiklap` (ap-northeast-2). Tables managed by Drizzle migrations.
 
 ### Tables
 
@@ -198,28 +161,7 @@ All tables have Row-Level Security enabled. `api_keys`, `subscriptions`, and `us
 
 ---
 
-## 4. Environment Variables Reference
-
-### Cloud (`apps/cloud/.env`)
-
-| Variable | Source | Required |
-|----------|--------|----------|
-| `DATABASE_URL` | Supabase connection pooler | Yes |
-| `SUPABASE_URL` | Supabase project URL | Yes |
-| `SUPABASE_SERVICE_KEY` | Supabase service_role key | Yes |
-| `STRIPE_SECRET_KEY` | Stripe API key | Yes |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | Yes |
-| `STRIPE_PRICE_MONTHLY` | Stripe price ID (monthly) | Yes |
-| `STRIPE_PRICE_YEARLY` | Stripe price ID (yearly) | Yes |
-| `VOYAGE_API_KEY` | Voyage AI API key | Yes |
-| `OPENROUTER_API_KEY` | OpenRouter API key | Yes |
-| `SENTRY_DSN` | Sentry project DSN | No |
-| `VITE_SUPABASE_URL` | Supabase URL (client-side) | Yes |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon key (client-side) | Yes |
-| `VITE_ADMIN_EMAILS` | Comma-separated admin emails | Yes |
-| `VITE_SENTRY_DSN` | Sentry DSN (client-side) | No |
-
-### Daemon (`~/.lens/config.json`)
+## 5. Daemon Config (`~/.lens/config.json`)
 
 | Key | Default | Purpose |
 |-----|---------|---------|
@@ -228,60 +170,6 @@ All tables have Row-Level Security enabled. `api_keys`, `subscriptions`, and `us
 | `telemetry_id` | auto-generated UUID | Installation identifier |
 
 Override cloud URL: `LENS_CLOUD_URL=http://localhost:3001 lens start`
-
----
-
-## 5. CI/CD (GitHub Actions)
-
-### npm Publish Workflow
-
-```yaml
-name: Publish npm
-on:
-  release:
-    types: [published]
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org
-      - run: pnpm install
-      - run: pnpm -w build:publish
-      - run: cd publish && npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-```
-
-### CF Workers Deploy Workflow
-
-```yaml
-name: Deploy Cloud
-on:
-  push:
-    branches: [main]
-    paths: [apps/cloud/**, packages/cloud-db/**]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: pnpm install
-      - run: pnpm --filter @lens/cloud-db build
-      - run: pnpm --filter @lens/cloud build
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          workingDirectory: apps/cloud
-```
 
 ---
 
@@ -295,11 +183,16 @@ jobs:
 - [ ] `lens repo register` → indexes current repo
 - [ ] `lens context "test"` → returns context pack
 
-### Cloudflare Workers
-- [ ] KV namespace created, ID in wrangler.toml
-- [ ] All 7 secrets set via `wrangler secret put`
-- [ ] `wrangler deploy` succeeds
+### Railway (Cloud)
+- [ ] All env vars set in Railway dashboard
+- [ ] Auto-deploy from main working
 - [ ] `curl /api/health` returns 200
 - [ ] Stripe webhook endpoint added + verified
 - [ ] Custom domain configured + DNS propagated
 - [ ] Admin panel loads at `/dashboard`
+
+### Cloudflare Pages (Web)
+- [ ] Pages project connected to repo
+- [ ] Build command + output dir configured
+- [ ] Custom domain configured
+- [ ] Site loads at `lens-engine.com`

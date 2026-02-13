@@ -2,46 +2,11 @@
 
 LENS is a local-first repo context engine that indexes codebases and serves context packs to AI agents. Three layers: engine (SQLite), daemon (HTTP + MCP), cloud (API + admin).
 
-```
-┌──────────────────────────────────────────────────────────┐
-│  AI Agent (Claude Code, Cursor, etc.)                    │
-│  ← MCP stdio or HTTP POST /context                      │
-└─────────────────┬────────────────────────────────────────┘
-                  │
-┌─────────────────┼────────────────────────────────────────┐
-│                 │    CLI (`lens` command)                 │
-│                 │    login, context, repo, index, status  │
-│                 │    ← HTTP to daemon :4111               │
-└─────────────────┼────────────────────────────────────────┘
-                  │
-┌─────────────────▼────────────────────────────────────────┐
-│  Layer 2: Daemon  (Hono, :4111)                          │
-│  ┌──────────┐ ┌──────────┐ ┌───────────┐                │
-│  │ REST API │ │ MCP svr  │ │ Dashboard │                │
-│  └────┬─────┘ └────┬─────┘ └───────────┘                │
-│       │             │                                     │
-│  ┌────▼─────────────▼──────┐  ┌────────────────┐        │
-│  │  Layer 1: Engine        │  │ Cloud Proxy    │        │
-│  │  SQLite (better-sqlite3)│  │ (authenticated)│        │
-│  └─────────────────────────┘  └───────┬────────┘        │
-└───────────────────────────────────────┼──────────────────┘
-                                        │
-┌───────────────────────────────────────▼──────────────────┐
-│  Layer 3: Cloud  (Hono API + TanStack Start SSR)         │
-│  ┌──────┐ ┌──────┐ ┌───────┐ ┌────────┐ ┌──────┐       │
-│  │ Auth │ │ Keys │ │ Usage │ │ Proxy  │ │Stripe│       │
-│  └──────┘ └──────┘ └───────┘ └───┬────┘ └──────┘       │
-│                                   │                       │
-│                          ┌────────▼────────┐             │
-│                          │ Voyage  OpenRtr  │             │
-│                          └─────────────────┘             │
-└───────────────────────────────┬──────────────────────────┘
-                                │
-                    ┌───────────▼───────────┐
-                    │  Supabase (Postgres)  │
-                    │  Auth + RLS           │
-                    └───────────────────────┘
-```
+> **Version note:** This documents the v0.1.x architecture. A future v1.x.x may live in a separate folder with significant structural changes.
+
+## Diagram
+
+See [architecture.drawio](architecture.drawio) for the interactive system overview.
 
 ---
 
@@ -90,6 +55,17 @@ After `runIndex` completes, two background tasks run (Pro only):
 - `enrichPurpose()` — LLM-generated 1-sentence summaries per file
 
 Both check quota remaining before starting (see [Quota Enforcement](#quota-enforcement)).
+
+#### Trigger Matrix
+
+| Trigger | Core Index | Enrichment |
+|---|---|---|
+| `lens repo register` / `POST /repo/register` | full scan | yes |
+| `lens index` / `POST /index/run` | diff scan (or full if `--force`) | yes |
+| `lens context` / `POST /context` | diff scan via `ensureIndexed()` | **no** |
+| File watcher (chokidar) | diff scan via `runIndex()` | **no** |
+
+Enrichment = expensive API calls (Voyage, LLM). Only explicit user actions trigger it.
 
 ### Context Pack Pipeline
 
@@ -166,18 +142,20 @@ Serialized as JSON into `request_logs.trace` column. Dashboard Requests page ren
 | `lens index [--force]` | Trigger re-index |
 | `lens context "goal"` | Query context pack |
 | `lens status` | Repo indexing status |
-| `lens daemon start/stop` | Manage daemon process |
+| `lens daemon start/stop` | Manage daemon process + OS auto-start |
 | `lens dashboard` | Open dashboard in browser |
 | `lens init` | Write `.mcp.json` for MCP auto-discovery |
 | `lens config set/get` | Manage `~/.lens/config.json` |
 
-### Key Files
+### Daemon Auto-Start
 
-- `packages/cli/src/index.ts` — Commander program, command registration
-- `packages/cli/src/commands/login.ts` — Local HTTP server for OAuth callback
-- `packages/cli/src/util/client.ts` — HTTP client for daemon API
-- `packages/cli/src/util/auth.ts` — Read/write `~/.lens/auth.json`
-- `packages/cli/src/util/config.ts` — Read/write `~/.lens/config.json`
+`lens daemon start` registers OS-level auto-start so the daemon survives reboots. `lens daemon stop` removes it.
+
+| Platform | Mechanism | Path |
+|----------|-----------|------|
+| macOS | LaunchAgent | `~/Library/LaunchAgents/com.lens.daemon.plist` |
+| Linux | systemd user service | `~/.config/systemd/user/lens-daemon.service` |
+| Windows | Registry Run key | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LensDaemon` |
 
 ---
 
@@ -249,6 +227,30 @@ Dashboard subscribes to both for real-time updates.
 | Telemetry sync | 60s | POST buffered events to cloud |
 | Log prune | 1 hr | Delete request logs older than 7 days |
 
+### MCP Integration
+
+Stdio (JSON-RPC) via `lens-daemon --stdio`.
+
+#### Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_context` | Ranked context pack for a goal |
+| `list_repos` | List indexed repositories |
+| `get_status` | Indexing status for a repo |
+| `index_repo` | Trigger re-indexing |
+
+#### Auto-Discovery
+
+`lens init` writes `.mcp.json`:
+```json
+{
+  "mcpServers": {
+    "lens": { "command": "lens-daemon", "args": ["--stdio"] }
+  }
+}
+```
+
 ---
 
 ## Authentication
@@ -297,7 +299,7 @@ Daemon auto-refreshes expired Supabase JWTs via `/auth/v1/token?grant_type=refre
 
 ---
 
-## Capabilities Lifecycle (Pro Features)
+## Capabilities (Pro Features)
 
 "Capabilities" = `embedTexts()` + `generatePurpose()`. Only available to Pro subscribers.
 
@@ -362,42 +364,13 @@ Each repo has three independent flags (default: enabled). Controlled via dashboa
 
 ---
 
-## Request Tracking
+## Layer 3: Cloud (`apps/cloud`)
 
-### Local (Daemon SQLite)
+Headless Hono API (auth, keys, usage, proxy, billing) + TanStack Start SSR admin panel.
 
-Every API call → `request_logs`:
+### Quota Enforcement
 
-| Column | Value |
-|--------|-------|
-| `method` | HTTP method |
-| `path` | URL path |
-| `status` | Response status code |
-| `duration_ms` | Response time |
-| `source` | "cli", "mcp", "dashboard", "api" |
-| `created_at` | Timestamp |
-
-Pruned hourly (7-day retention). Dashboard shows filterable table.
-
-### Cloud (Supabase `usage_daily`)
-
-Daily aggregated counters per user:
-
-| Counter | What it tracks |
-|---------|---------------|
-| `context_queries` | Context pack requests |
-| `embedding_requests` | Voyage API calls |
-| `embedding_chunks` | Text chunks embedded |
-| `purpose_requests` | OpenRouter completions |
-| `repos_indexed` | Index operations |
-
-Incremented in cloud proxy routes via `usageQueries.sync()` (upsert on `user_id + date`).
-
----
-
-## Quota Enforcement
-
-### Plan Quotas Table
+#### Plan Quotas Table
 
 `plan_quotas` in Supabase (editable via admin Rates page):
 
@@ -410,7 +383,7 @@ Incremented in cloud proxy routes via `usageQueries.sync()` (upsert on `user_id 
 | `purpose_requests` | integer | 0 | 5,000 |
 | `repos_indexed` | integer | 0 | 1,000 |
 
-### Cloud-Side Enforcement
+#### Cloud-Side Enforcement
 
 **Quota middleware** (`apps/cloud/src/middleware/quota.ts`):
 1. Get subscription → determine plan
@@ -424,7 +397,7 @@ Incremented in cloud proxy routes via `usageQueries.sync()` (upsert on `user_id 
 - `/api/proxy/chat`: checks `purposeRequests`
 - Both require Pro plan (`requirePro()` → 403 if free)
 
-### Daemon-Side Enforcement
+#### Daemon-Side Enforcement
 
 **Quota cache** (5-min TTL, in-memory):
 ```
@@ -445,11 +418,9 @@ currentRepos >= quotaCache.quota.maxRepos → 429
 
 **Graceful degradation**: When cloud unreachable, `quotaCache = null`, all limits return Infinity (no enforcement). Requests will fail at cloud proxy level if quota is actually exceeded.
 
----
+### Rate Limiting
 
-## Rate Limiting
-
-Token bucket in Cloudflare KV (`apps/cloud/src/middleware/rate-limit.ts`):
+Token bucket via KV store (`apps/cloud/src/middleware/rate-limit.ts`):
 
 ```
 Capacity: 60 tokens
@@ -461,6 +432,54 @@ TTL: 120s
 Applied to all API-key-authenticated routes. Returns 429 + `Retry-After` header.
 
 Telemetry: separate limit, 100 req/hr per `telemetry_id` (no auth required).
+
+### Request Tracking (Cloud)
+
+Daily aggregated counters per user in Supabase `usage_daily`:
+
+| Counter | What it tracks |
+|---------|---------------|
+| `context_queries` | Context pack requests |
+| `embedding_requests` | Voyage API calls |
+| `embedding_chunks` | Text chunks embedded |
+| `purpose_requests` | OpenRouter completions |
+| `repos_indexed` | Index operations |
+
+Incremented in cloud proxy routes via `usageQueries.sync()` (upsert on `user_id + date`).
+
+### Admin Panel
+
+Cloud TanStack Start SSR at `/dashboard`. Admin-only (email allowlist).
+
+#### Guard
+
+**Client**: `VITE_ADMIN_EMAILS` checked in `AuthProvider`.
+**Server**: `requireAdmin(accessToken)` → JWT verify + email check → 403 on mismatch.
+
+#### Pages
+
+| Route | Purpose |
+|-------|---------|
+| `/dashboard` | Overview: user count, revenue, events |
+| `/dashboard/users` | Supabase Auth admin: all users |
+| `/dashboard/usage` | Aggregated usage (all users) |
+| `/dashboard/rates` | Editable plan_quotas (auto-save) |
+| `/dashboard/billing` | All subscriptions |
+| `/dashboard/telemetry` | Event stream + per-user breakdown |
+
+All pages use TanStack Start server functions (`createServerFn`) calling Supabase admin APIs or Drizzle directly.
+
+### Supabase Tables
+
+| Table | Purpose |
+|-------|---------|
+| `plan_quotas` | Per-plan quota limits (PK: plan) |
+| `api_keys` | API key store (SHA-256, prefix-indexed) |
+| `subscriptions` | Stripe subscription state per user |
+| `usage_daily` | Daily usage counters (unique: user_id + date) |
+| `telemetry_events` | Anonymous telemetry from installations |
+
+All tables have RLS enabled. User-scoped where applicable.
 
 ---
 
@@ -521,7 +540,7 @@ lens config set telemetry false
 | Free | $0 | $0 |
 | Pro | $9/mo | $90/yr (17% savings) |
 
-### Flow
+### Checkout Flow
 
 ```
 Dashboard → POST /api/cloud/billing/checkout { interval }
@@ -530,8 +549,12 @@ Dashboard → POST /api/cloud/billing/checkout { interval }
     → Returns checkout URL
   → Dashboard opens Stripe Checkout
   → Stripe redirects back to dashboard
+```
 
-Webhook: POST /api/billing/webhooks/stripe
+### Webhooks
+
+```
+POST /api/billing/webhooks/stripe
   → checkout.session.completed → upsert subscription (pro/active)
   → customer.subscription.updated → update period dates
   → customer.subscription.deleted → set free/canceled
@@ -542,59 +565,9 @@ Manage subscription via Stripe Customer Portal (cancel, change plan, update paym
 
 ---
 
-## Admin Panel
+## Data Flows
 
-Cloud TanStack Start SSR at `/dashboard`. Admin-only (email allowlist).
-
-### Guard
-
-**Client**: `VITE_ADMIN_EMAILS` checked in `AuthProvider`.
-**Server**: `requireAdmin(accessToken)` → JWT verify + email check → 403 on mismatch.
-
-### Pages
-
-| Route | Purpose |
-|-------|---------|
-| `/dashboard` | Overview: user count, revenue, events |
-| `/dashboard/users` | Supabase Auth admin: all users |
-| `/dashboard/usage` | Aggregated usage (all users) |
-| `/dashboard/rates` | Editable plan_quotas (auto-save) |
-| `/dashboard/billing` | All subscriptions |
-| `/dashboard/telemetry` | Event stream + per-user breakdown |
-
-All pages use TanStack Start server functions (`createServerFn`) calling Supabase admin APIs or Drizzle directly.
-
----
-
-## MCP Integration
-
-### Transport
-
-Stdio (JSON-RPC) via `lens-daemon --stdio`.
-
-### Tools
-
-| Tool | Description |
-|------|-------------|
-| `get_context` | Ranked context pack for a goal |
-| `list_repos` | List indexed repositories |
-| `get_status` | Indexing status for a repo |
-| `index_repo` | Trigger re-indexing |
-
-### Auto-Discovery
-
-`lens init` writes `.mcp.json`:
-```json
-{
-  "mcpServers": {
-    "lens": { "command": "lens-daemon", "args": ["--stdio"] }
-  }
-}
-```
-
----
-
-## Data Flow Summary
+### Register + Index
 
 ```
 lens repo register
@@ -604,34 +577,34 @@ lens repo register
     → [Pro] ensureEmbedded() → POST /api/proxy/embed → Voyage API
     → [Pro] enrichPurpose() → POST /api/proxy/chat → OpenRouter API
     → track(db, "index", {...})
+```
 
+### Context Query
+
+```
 lens context "goal"
   → POST /context (daemon)
     → buildContext() → autoIndex → TF-IDF → co-change → [Pro] semantic boost
     → usageQueries.increment(db, "context_queries")
     → track(db, "context", {...})
+```
 
+### Telemetry Sync
+
+```
 Daemon timer (60s)
   → syncTelemetryToCloud()
     → POST /api/telemetry (cloud)
     → Insert into Supabase telemetry_events
+```
 
+### Quota Refresh
+
+```
 Daemon timer (5min)
   → refreshQuotaCache()
     → GET /api/usage/current (cloud, API key auth)
     → Update in-memory quotaCache
 ```
 
-## Supabase Tables (Cloud)
-
-| Table | Purpose |
-|-------|---------|
-| `plan_quotas` | Per-plan quota limits (PK: plan) |
-| `api_keys` | API key store (SHA-256, prefix-indexed) |
-| `subscriptions` | Stripe subscription state per user |
-| `usage_daily` | Daily usage counters (unique: user_id + date) |
-| `telemetry_events` | Anonymous telemetry from installations |
-
-All tables have RLS enabled. User-scoped where applicable.
-
-<!-- doc-sync: 91c5414f0dbc67103e451f7aed59ad7b3dd4d262 -->
+<!-- doc-sync: 8b8479cc92fd4f971955b6a9132f4b325dcfb0ac -->

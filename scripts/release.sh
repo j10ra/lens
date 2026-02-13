@@ -31,33 +31,23 @@ sed -i '' "s/.version(\"$CURRENT\")/.version(\"$NEW\")/" "$CLI_INDEX"
 echo "Building..."
 pnpm -w build:publish
 
-# 4. Update publish/package.json (copied from publish.json during build)
-# Already correct since build:publish copies publish.json → publish/package.json
-
-# 5. Verify
+# 4. Verify
 BUILT_VER=$(node -p "require('$ROOT/publish/package.json').version")
-CLI_VER=$(grep -o 'version("[^"]*")' "$ROOT/publish/cli.js" | head -1)
 echo "publish/package.json: $BUILT_VER"
-echo "publish/cli.js: $CLI_VER"
 
 if [ "$BUILT_VER" != "$NEW" ]; then
   echo "ERROR: publish/package.json version mismatch!"
   exit 1
 fi
 
-# 6. Publish
-echo ""
-read -p "Publish lens-engine@$NEW to npm? [y/N] " CONFIRM
-if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
-  cd "$ROOT/publish" && npm publish
-  echo "Published lens-engine@$NEW"
+# 5. Publish
+cd "$ROOT/publish" && npm publish
+echo "Published lens-engine@$NEW"
 
-  # 7. Commit + tag
-  cd "$ROOT"
-  git add publish.json packages/cli/src/index.ts
-  git commit -m "release: v$NEW"
-  git tag "v$NEW"
-  echo "Committed + tagged v$NEW (run 'git push && git push --tags' to push)"
-else
-  echo "Skipped publish. Files are updated — run 'cd publish && npm publish' manually."
-fi
+# 6. Commit + tag + push
+cd "$ROOT"
+git add publish.json packages/cli/src/index.ts
+git commit -m "release: v$NEW"
+git tag "v$NEW"
+git push && git push --tags
+echo "Released v$NEW"
