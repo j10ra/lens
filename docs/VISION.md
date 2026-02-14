@@ -93,24 +93,24 @@ LENS is to coding agents what a project wiki + senior teammate is to a new hire.
 
 When an agent asks `lens context "fix the rate limiting bug"`, LENS returns a **context pack** — a structured briefing containing:
 
-### What it returns today (v0.1.x)
+### What it returns today (v0.2.x — post Phase 1-3)
 
 | Component | Description |
 |-----------|-------------|
-| Ranked files | Top files scored by TF-IDF + co-change + git activity + import depth |
+| Ranked files (5-7) | Top files scored by TF-IDF + co-change + git activity + import depth |
+| Purpose summaries | One-line description of what each file does (LLM-generated, always rendered) |
+| Import chains | Full paths with direction arrows (← importers, → dependencies) |
+| Code slices | ±10 lines around resolved symbols, syntax-highlighted fenced blocks |
+| Co-change warnings | "changed together Nx" counts per file pair |
 | Export names | What each file exposes |
-| Purpose summary | One-line description of what the file does (LLM-generated) |
-| Start-here pointer | Single entry point recommendation |
+| Query-kind templates | 4 specialized layouts: natural, symbol, error, stack_trace |
 
-### What it should return (target state)
+### What's still missing (post-gate)
 
 | Component | Description |
 |-----------|-------------|
-| Ranked files (top 5-7) | Not just "start here" with 1 file — the full relevant set |
-| Purpose summaries | Always rendered (currently computed but not displayed) |
-| Import chains | How ranked files connect to each other (A imports B which uses C) |
-| Code snippets | Key function signatures and relevant lines, not just paths |
-| Co-change warnings | "These files always change together — don't miss file Y when editing X" |
+| Specialized routing | `route.issue`, `route.question`, `route.change` instead of generic `get_context` |
+| 1-hop type expansion | Include referenced types/interfaces from imports in slices |
 | Relationship narrative | Brief explanation of how the pieces fit together |
 
 ## Benchmark Evidence
@@ -142,22 +142,22 @@ LENS agents found 50% more patterns with 26% fewer tool calls. Critically, LENS 
 
 This is the core value: LENS converts wasted orientation calls into productive investigation calls. The agent doesn't just find more — it has budget left to actually *think* about what it found.
 
-#### The gap (v0.1.x)
+#### The gap (closed in Phases 1-3)
 
-The benchmarks validate the approach but expose a delivery gap. Even when LENS wins, the context pack is thinner than it should be:
-- Returns 1 file ("start here") when 5-6 are needed
-- Doesn't render the import chains it already computed
-- Purpose summaries are scored but not displayed in output
-- No code snippets — just paths and export names
-- No relationship narrative between files
+The initial benchmarks (v0.1.x) validated the approach but exposed a delivery gap. Phases 1-3 closed it:
+- ~~Returns 1 file ("start here") when 5-6 are needed~~ → 5-7 ranked files per query
+- ~~Doesn't render the import chains it already computed~~ → Full paths with ← → direction arrows
+- ~~Purpose summaries are scored but not displayed in output~~ → Always rendered in all templates
+- ~~No code snippets — just paths and export names~~ → ±10 line code slices with syntax highlighting
+- No relationship narrative between files *(still missing — post-gate)*
 
-The scoring engine is solid. The output format undersells the knowledge LENS has. Closing this gap is the difference between "useful file finder" and "senior engineer headstart."
+The scoring engine is solid. The output now delivers the knowledge LENS has. Remaining gap: specialized routing (route.issue, route.question, route.change) to replace the single generic `get_context` tool.
 
 ## North Star: What "Senior Engineer" Looks Like
 
 For the query `"fix the rate limiting bug where tokens don't refill correctly"`:
 
-### Today's output
+### v0.1.x output (before Phases 1-3)
 ```
 # fix the rate limiting bug where tokens don't refill correctly
 
@@ -169,30 +169,47 @@ apps/cloud/src/middleware/rate-limit.ts:12 → rateLimit()
 ## Blast radius: 1 consumer
 ```
 
-### Target output
+### v0.2.x output (current — after Phases 1-3)
 ```
-# fix the rate limiting bug where tokens don't refill correctly
+# Error: fix the rate limiting bug where tokens don't refill correctly
 
-## Key files (5)
-1. apps/cloud/src/middleware/rate-limit.ts — Token bucket implementation
-   rateLimit(): refill calc at L25, bucket state at L18
-2. apps/cloud/src/env.ts — KVStore interface (state persistence)
-3. apps/cloud/src/api.ts:20 — Where middleware is applied
-4. apps/cloud/src/routes/proxy.ts:48 — Reads Retry-After header
-5. apps/cloud/src/middleware/auth.ts — Runs before rate-limit (userId source)
+## Error Source
+1. **apps/cloud/src/middleware/rate-limit.ts:25** — Token bucket implementation
+   Exports: rateLimit
+   ← apps/cloud/src/api.ts | → apps/cloud/src/env.ts
+   ```typescript
+   const elapsed = now - bucket.lastRefill;
+   const refill = Math.floor(elapsed / 1000) * REFILL_RATE;
+   bucket.tokens = Math.min(bucket.tokens + refill, MAX_TOKENS);
+   ```
 
-## How they connect
-auth.ts validates Bearer token → sets c.var.userId
-→ rate-limit.ts reads userId for per-user bucket
-→ proxy.ts checks rate-limit headers before forwarding
+## Also References
+2. **apps/cloud/src/env.ts** — KVStore interface (state persistence)
+3. **apps/cloud/src/routes/proxy.ts:48** — Reads Retry-After header
+4. **apps/cloud/src/middleware/auth.ts** — Runs before rate-limit (userId source)
+```
+
+### Target output (post-gate, with specialized routing)
+```
+# route.issue: rate limiting bug — tokens don't refill correctly
+
+## Crash Point
+apps/cloud/src/middleware/rate-limit.ts:25 — Token bucket implementation
+  `rateLimit()`
+  ```typescript
+  const elapsed = now - bucket.lastRefill;
+  const refill = Math.floor(elapsed / 1000) * REFILL_RATE;
+  ```
+
+## Call Chain
+auth.ts → rate-limit.ts → proxy.ts
 
 ## Co-change warning
-rate-limit.ts + proxy.ts changed together 4 times — update both.
+rate-limit.ts + proxy.ts changed together 4x — update both.
 
-## Relevant signatures
-rate-limit.ts:25  const elapsed = now - bucket.lastRefill
-rate-limit.ts:26  const refill = Math.floor(elapsed / 1000) * REFILL_RATE
-env.ts:8          interface KVStore { get(key: string): Promise<string | null> }
+## Blast radius
+3 consumers: api.ts, proxy.ts, auth.ts
+Tests: rate-limit.test.ts
 ```
 
 ## The Agent Workflow: Route → Load → Act
@@ -214,15 +231,14 @@ Where Route is LENS's product — specialized routing that gives the agent exact
 | `route.change` | "Change behavior Y" | Primary file → dependents → tests → risk | Grep can't show blast radius |
 | `pack.build` | Selected files + focus | Key code sections + types + interfaces | Precision extraction, not file listing |
 
-### Context slicing — the moat
+### Context slicing — the moat (shipped)
 
-If LENS only outputs file lists, the agent still opens/scans and wastes time. `pack.build` extracts:
-- The relevant functions (not whole files)
-- Referenced types and interfaces
-- Nearby code around symbols
-- Config entries
+If LENS only outputs file lists, the agent still opens/scans and wastes time. Code slicing extracts:
+- ±10 lines around resolved symbols (function signatures, key logic)
+- Syntax-highlighted fenced blocks in the context pack
+- Max 1-3 slices per query, progressively stripped if over token budget
 
-This is what separates LENS from a better Grep.
+This is what separates LENS from a better Grep. Agents receiving a LENS context pack can start editing without Read calls on symbol and error queries. Post-gate: 1-hop type expansion and structured slice outputs (`key_code`, `relevant_lines`, `imports_from`).
 
 ## Honest Risks & Competitive Landscape
 
@@ -239,7 +255,7 @@ Not everything agents can replicate cheaply:
 - **Co-change clusters** — "these 2 files always change together" requires git history analysis. Agents can't derive this from grep.
 - **Precomputed import graph** — agents build this file-by-file via Read. LENS has it instantly. Real savings on large codebases (1K+ files).
 - **Structural relationships** — "auth → rate-limit → proxy" flow is expensive to discover cold.
-- **Context slicing** (planned) — extracting relevant functions, not whole files. This is the moat, but it doesn't exist yet.
+- **Context slicing** (shipped) — extracting ±10 lines around resolved symbols, not whole files. Agents can reason about code structure from the context pack alone.
 
 ### Where LENS is thin
 
@@ -249,11 +265,11 @@ Not everything agents can replicate cheaply:
 
 ### The benchmark gap
 
-The n=3 exploratory benchmark is **promising but not evidence**. The targeted query loss (LENS adds overhead) is a real concern. Without a proper eval harness, we're building on faith.
+The initial n=3 exploratory benchmark was promising but not evidence. The eval harness (Phase 1, n=20) now provides repeatable measurement: Hit@3=95%, Recall@5=83%, avg 19ms. The targeted query overhead concern remains — LENS adds latency when the agent already knows where to look. Fresh A/B benchmarks (n=20+) at the GO/NO-GO gate will determine if the output improvements from Phases 2-3 translate to measurable agent productivity gains.
 
 ### Implication
 
-**Prove value before building infrastructure.** Cloud/billing/deploy are premature until the eval harness shows LENS consistently beats a cold agent. The scoring engine is solid — the question is whether the *output* matters enough.
+**Prove value before building infrastructure.** Cloud/billing/deploy are premature until A/B benchmarks show LENS consistently beats a cold agent on exploratory tasks. The scoring engine and output are now solid — the question is whether agents *use the richer output* to work faster.
 
 ## Goals & Milestones
 
@@ -265,11 +281,11 @@ See [ROADMAP.md](ROADMAP.md) for the full implementation plan with phases, files
 ### G2: Rich context packs (formatter rewrite) `✅ DONE`
 4 query-kind templates (natural/symbol/error/stack_trace). TOKEN_CAP 350→1200. Purpose summaries, full import paths, co-change counts always rendered. Bounded chunk content search for error queries. Noise exclusion (publish/, dist/ → score=0). Hit@3 85%→95%, natural 92%→100%, error 33%→67%, avg duration 37→15ms.
 
-### G3: Context slicing (`pack.build`) — the moat `⬜ NOT STARTED`
-Return relevant code sections, not file paths. The engine has chunks with line ranges — extract ±10 lines around resolved symbols, include referenced types. Agent should understand code structure from the context pack alone. **This is what separates LENS from a better Grep.**
+### G3: Context slicing — the moat `✅ DONE`
+Code slices ship in all 4 context pack templates. `sliceContext()` extracts ±10 symmetric lines around resolved snippet anchors. Max 1-3 slices per query kind, syntax-highlighted fenced blocks. TOKEN_CAP 1200→2000. Progressive stripping drops slices first when over budget. Hit@3=95% (no regression), +4ms avg overhead. 1-hop type expansion deferred to post-gate.
 
-### G4: GO/NO-GO gate `⬜ NOT STARTED`
-Re-run eval harness + A/B benchmarks after G2-G3. Does LENS consistently beat a cold agent? If yes → proceed to specialized routing + cloud. If no → pivot or stop.
+### G4: GO/NO-GO gate `⬜ NEXT`
+Re-run A/B benchmarks (n=20+) with the full Phase 1-3 engine. Does LENS consistently beat a cold agent on exploratory tasks? Eval harness already passes (Hit@3=95%, Recall@5=83%). A/B benchmarks will measure agent-level impact: tool calls saved, task completion rate, investigation quality.
 
 ### G5: Specialized routing (only after gate passes) `⬜ NOT STARTED`
 Three MCP tools that each beat `get_context` on their use case. Stack traces resolve to source. "Where is X" finds the decision point. Change impact shows blast radius.
@@ -314,12 +330,13 @@ LENS is most valuable when the agent **doesn't know what it doesn't know**. A se
 
 ## Success Metrics
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| Agent tool calls saved (exploratory) | ~26% fewer | 50% fewer |
-| Agent answer completeness | +50% more findings | +100% (all relevant files found) |
-| Context pack files returned | 1-2 | 5-7 with relationships |
-| First useful Read after LENS | After 2-3 more searches | Immediate (file + line) |
-| Time to orient on unfamiliar code | Same as manual | 3x faster |
-| Agent completes task within turn budget | 2/3 vs 1/3 (LENS vs no-LENS) | 95%+ with LENS |
-| Wasted orientation calls after LENS | 2-3 Grep/Glob | 0 (straight to Read) |
+| Metric | v0.1.x | v0.2.x (current) | Target |
+|--------|--------|------------------|--------|
+| Agent tool calls saved (exploratory) | ~26% fewer | TBD (GO/NO-GO) | 50% fewer |
+| Agent answer completeness | +50% more findings | TBD (GO/NO-GO) | +100% (all relevant files found) |
+| Context pack files returned | 1-2 | 5-7 with relationships | 5-7 with relationships ✅ |
+| First useful Read after LENS | After 2-3 more searches | Immediate (file + line + code) | Immediate ✅ |
+| Eval Hit@3 | 85% | 95% | >80% ✅ |
+| Eval Recall@5 | 75% | 83% | >80% ✅ |
+| Avg query latency | 37ms | 19ms (warm) | <200ms ✅ |
+| Agent completes task within turn budget | 2/3 vs 1/3 | TBD (GO/NO-GO) | 95%+ with LENS |
