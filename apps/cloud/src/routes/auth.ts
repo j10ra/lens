@@ -73,6 +73,7 @@ auth.get("/callback", async (c) => {
 });
 
 // GET /auth/key — exchange Supabase Bearer token for an API key
+// Returns existing active key if created < 30s ago (dedup guard)
 auth.get("/key", async (c) => {
   const header = c.req.header("Authorization");
   if (!header?.startsWith("Bearer ")) {
@@ -91,9 +92,20 @@ auth.get("/key", async (c) => {
   }
 
   const db = getDb(c.env.DATABASE_URL);
-
-  // Revoke existing cli-auth key to prevent accumulation
   const existing = await keyQueries.listByUser(db, user.id);
+
+  // Dedup: if an active cli-auth key was created in the last 30s, return it
+  // This prevents race conditions when daemon calls /auth/key concurrently
+  const recentActive = existing.find(
+    (k) => k.name === "cli-auth" && !k.revokedAt && Date.now() - new Date(k.createdAt).getTime() < 30_000,
+  );
+  if (recentActive) {
+    // Can't return the key (we only store hashes), so just acknowledge
+    // The daemon already has it in auth.json from the first call
+    return c.json({ error: "Key recently provisioned, use existing key" }, 409);
+  }
+
+  // Revoke existing cli-auth keys
   for (const k of existing) {
     if (k.name === "cli-auth" && !k.revokedAt) {
       await keyQueries.revoke(db, k.id, user.id);

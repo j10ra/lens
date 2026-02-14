@@ -10,6 +10,7 @@ import { getCloudUrl } from "./config";
 const LENS_DIR = join(homedir(), ".lens");
 const PID_FILE = join(LENS_DIR, "daemon.pid");
 const LOG_FILE = join(LENS_DIR, "daemon.log");
+const AUTH_FILE = join(LENS_DIR, "auth.json");
 
 function writePid() {
   writeFileSync(PID_FILE, String(process.pid));
@@ -21,28 +22,31 @@ function removePid() {
   } catch {}
 }
 
-async function ensureApiKey(data: Record<string, unknown>): Promise<string | undefined> {
-  if (data.api_key) return data.api_key as string;
-  if (!data.access_token) return undefined;
-
-  const cloudUrl = getCloudUrl();
+function readApiKeyFromDisk(): string | null {
   try {
+    const data = JSON.parse(readFileSync(AUTH_FILE, "utf-8"));
+    return (data.api_key as string) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function provisionNewKey(): Promise<string | null> {
+  try {
+    const data = JSON.parse(readFileSync(AUTH_FILE, "utf-8"));
+    if (!data.access_token) return null;
+    const cloudUrl = getCloudUrl();
     const res = await fetch(`${cloudUrl}/auth/key`, {
       headers: { Authorization: `Bearer ${data.access_token}` },
     });
-    if (!res.ok) {
-      console.error(`[LENS] API key provisioning failed (${res.status})`);
-      return undefined;
-    }
+    if (!res.ok) return null;
     const { api_key } = (await res.json()) as { api_key: string };
     data.api_key = api_key;
-    const authPath = join(homedir(), ".lens", "auth.json");
-    writeFileSync(authPath, JSON.stringify(data, null, 2), { mode: 0o600 });
-    console.error("[LENS] API key auto-provisioned");
+    writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
+    console.error("[LENS] API key re-provisioned");
     return api_key;
-  } catch (e: any) {
-    console.error(`[LENS] API key provisioning error: ${e?.message}`);
-    return undefined;
+  } catch {
+    return null;
   }
 }
 
@@ -53,16 +57,36 @@ interface CapabilitiesResult {
 
 async function loadCapabilities(db: ReturnType<typeof openDb>): Promise<CapabilitiesResult> {
   try {
-    const authPath = join(homedir(), ".lens", "auth.json");
-    const data = JSON.parse(readFileSync(authPath, "utf-8"));
-    const apiKey = await ensureApiKey(data);
-    if (!apiKey) return {};
+    let apiKey = readApiKeyFromDisk();
+    if (!apiKey) {
+      apiKey = await provisionNewKey();
+      if (!apiKey) return {};
+    }
 
-    // Check plan — only Pro users get cloud capabilities
     const cloudUrl = getCloudUrl();
     const res = await fetch(`${cloudUrl}/api/usage/current`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
+
+    // On 401, try re-provisioning once
+    if (res.status === 401) {
+      apiKey = await provisionNewKey();
+      if (!apiKey) return {};
+      const retry = await fetch(`${cloudUrl}/api/usage/current`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!retry.ok) {
+        console.error(`[LENS] Plan check failed after re-provision (${retry.status})`);
+        return {};
+      }
+      const usageData = (await retry.json()) as {
+        plan?: string;
+        usage?: Record<string, number>;
+        quota?: Record<string, number>;
+      };
+      return buildCapsResult(db, usageData);
+    }
+
     if (!res.ok) {
       console.error(`[LENS] Plan check failed (${res.status}), capabilities disabled`);
       return {};
@@ -72,37 +96,45 @@ async function loadCapabilities(db: ReturnType<typeof openDb>): Promise<Capabili
       usage?: Record<string, number>;
       quota?: Record<string, number>;
     };
-    const planData = {
-      plan: usageData.plan ?? "free",
-      usage: usageData.usage ?? {},
-      quota: usageData.quota ?? {},
-    };
-
-    if (usageData.plan !== "pro") {
-      console.error(`[LENS] Plan: ${usageData.plan ?? "free"} — Pro features disabled`);
-      return { planData };
-    }
-
-    const { createCloudCapabilities } = await import("./cloud-capabilities");
-    const { usageQueries, logQueries } = await import("@lens/engine");
-    const caps = createCloudCapabilities(
-      apiKey,
-      (counter, amount) => {
-        try {
-          usageQueries.increment(db, counter as any, amount);
-        } catch {}
-      },
-      (method, path, status, duration, source, reqBody, resBody) => {
-        try {
-          logQueries.insert(db, method, path, status, duration, source, reqBody, resBody?.length, resBody);
-        } catch {}
-      },
-    );
-    console.error("[LENS] Cloud capabilities enabled (Pro plan)");
-    return { caps, planData };
+    return buildCapsResult(db, usageData);
   } catch {
     return {};
   }
+}
+
+async function buildCapsResult(
+  db: ReturnType<typeof openDb>,
+  usageData: { plan?: string; usage?: Record<string, number>; quota?: Record<string, number> },
+): Promise<CapabilitiesResult> {
+  const planData = {
+    plan: usageData.plan ?? "free",
+    usage: usageData.usage ?? {},
+    quota: usageData.quota ?? {},
+  };
+
+  if (usageData.plan !== "pro") {
+    console.error(`[LENS] Plan: ${usageData.plan ?? "free"} — Pro features disabled`);
+    return { planData };
+  }
+
+  const { createCloudCapabilities } = await import("./cloud-capabilities");
+  const { usageQueries, logQueries } = await import("@lens/engine");
+  const caps = createCloudCapabilities(
+    () => Promise.resolve(readApiKeyFromDisk()),
+    provisionNewKey,
+    (counter, amount) => {
+      try {
+        usageQueries.increment(db, counter as any, amount);
+      } catch {}
+    },
+    (method, path, status, duration, source, reqBody, resBody) => {
+      try {
+        logQueries.insert(db, method, path, status, duration, source, reqBody, resBody?.length, resBody);
+      } catch {}
+    },
+  );
+  console.error("[LENS] Cloud capabilities enabled (Pro plan)");
+  return { caps, planData };
 }
 
 async function main() {

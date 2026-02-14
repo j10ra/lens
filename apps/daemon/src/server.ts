@@ -1401,7 +1401,8 @@ export function createApp(
           if (apiKey) {
             const { createCloudCapabilities } = await import("./cloud-capabilities");
             caps = createCloudCapabilities(
-              apiKey,
+              () => readApiKey(),
+              provisionApiKey,
               (counter, amount) => {
                 try {
                   usageQueries.increment(db, counter as any, amount);

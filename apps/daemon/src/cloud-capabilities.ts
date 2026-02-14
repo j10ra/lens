@@ -12,38 +12,59 @@ export type RequestLogger = (
   responseBody?: string,
 ) => void;
 
+export type KeyGetter = () => Promise<string | null>;
+export type KeyRefresher = () => Promise<string | null>;
+
 export function createCloudCapabilities(
-  apiKey: string,
+  getKey: KeyGetter,
+  refreshKey: KeyRefresher,
   trackUsage?: UsageTracker,
   logRequest?: RequestLogger,
 ): Capabilities {
   const CLOUD_API_URL = getCloudUrl();
-  const headers = {
-    Authorization: `Bearer ${apiKey}`,
-    "Content-Type": "application/json",
-  };
+
+  async function cloudFetch(path: string, reqBody: string): Promise<{ res: Response; resText: string }> {
+    const apiKey = await getKey();
+    if (!apiKey) throw new Error("No API key available");
+
+    const start = performance.now();
+    let res = await fetch(`${CLOUD_API_URL}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: reqBody,
+    });
+    let resText = await res.text();
+    let duration = Math.round(performance.now() - start);
+    logRequest?.("POST", path, res.status, duration, "cloud", reqBody, resText);
+
+    // 401 retry: re-provision key and try once more
+    if (res.status === 401) {
+      const newKey = await refreshKey();
+      if (newKey) {
+        const retryStart = performance.now();
+        res = await fetch(`${CLOUD_API_URL}${path}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${newKey}`, "Content-Type": "application/json" },
+          body: reqBody,
+        });
+        resText = await res.text();
+        duration = Math.round(performance.now() - retryStart);
+        logRequest?.("POST", path, res.status, duration, "cloud-retry", reqBody, resText);
+      }
+    }
+
+    return { res, resText };
+  }
 
   return {
     async embedTexts(texts: string[], isQuery?: boolean): Promise<number[][]> {
-      const start = performance.now();
       const reqBody = JSON.stringify({
         input: texts,
         model: "voyage-code-3",
         input_type: isQuery ? "query" : "document",
       });
-      const res = await fetch(`${CLOUD_API_URL}/api/proxy/embed`, {
-        method: "POST",
-        headers,
-        body: reqBody,
-      });
-
-      const resText = await res.text();
-      const duration = Math.round(performance.now() - start);
-      logRequest?.("POST", "/api/proxy/embed", res.status, duration, "cloud", reqBody, resText);
-
-      if (!res.ok) {
-        throw new Error(`Cloud embed failed (${res.status}): ${resText}`);
-      }
+      const { res, resText } = await cloudFetch("/api/proxy/embed", reqBody);
+      if (!res.ok) throw new Error(`Cloud embed failed (${res.status}): ${resText}`);
 
       const data = JSON.parse(resText) as { data?: Array<{ embedding: number[] }> };
       trackUsage?.("embedding_requests");
@@ -62,7 +83,6 @@ export function createCloudCapabilities(
         .filter(Boolean)
         .join("\n");
 
-      const start = performance.now();
       const reqBody = JSON.stringify({
         messages: [
           {
@@ -74,19 +94,8 @@ export function createCloudCapabilities(
         ],
         max_tokens: 128,
       });
-      const res = await fetch(`${CLOUD_API_URL}/api/proxy/chat`, {
-        method: "POST",
-        headers,
-        body: reqBody,
-      });
-
-      const resText = await res.text();
-      const duration = Math.round(performance.now() - start);
-      logRequest?.("POST", "/api/proxy/chat", res.status, duration, "cloud", reqBody, resText);
-
-      if (!res.ok) {
-        throw new Error(`Cloud purpose failed (${res.status}): ${resText}`);
-      }
+      const { res, resText } = await cloudFetch("/api/proxy/chat", reqBody);
+      if (!res.ok) throw new Error(`Cloud purpose failed (${res.status}): ${resText}`);
 
       const data = JSON.parse(resText) as { choices?: Array<{ message?: { content?: string } }> };
       trackUsage?.("purpose_requests");
