@@ -1,6 +1,6 @@
 import type { Capabilities } from "../capabilities";
 import type { Db } from "../db/connection";
-import { repoQueries } from "../db/queries";
+import { chunkQueries, repoQueries } from "../db/queries";
 import { ensureIndexed } from "../index/engine";
 import { track } from "../telemetry";
 import type { RequestTrace } from "../trace";
@@ -122,6 +122,38 @@ export async function buildContext(
       parsed,
     );
     trace?.end("interpretQuery", `${interpreted.files.length} files (${parsed.kind})`);
+
+    // Error content search — find files containing the error string in chunk content
+    if (parsed.kind === "error_message") {
+      trace?.step("errorContentSearch");
+      const rawError = parsed.raw
+        .replace(/^(Error|TypeError|ReferenceError|SyntaxError|RangeError|FATAL|WARN|ERR):\s*/i, "")
+        .trim();
+      if (rawError.length >= 5) {
+        const contentHits = chunkQueries.searchContent(db, repoId, rawError).filter((p) => !isNoisePath(p));
+
+        // Prefer files already scored by TF-IDF (intersection), then new files
+        const scored = contentHits.filter((p) => (interpreted.scores.get(p) ?? 0) > 0);
+        const unscored = contentHits.filter((p) => (interpreted.scores.get(p) ?? 0) === 0);
+        const capped = [...scored.slice(0, 3), ...unscored.slice(0, Math.max(0, 3 - scored.length))];
+
+        const existingSet = new Set(interpreted.files.map((f) => f.path));
+        for (const p of capped) {
+          const currentScore = interpreted.scores.get(p) ?? 0;
+          interpreted.scores.set(p, currentScore + 40);
+          if (!existingSet.has(p)) {
+            const meta = metadata.find((m) => m.path === p);
+            interpreted.files.push({
+              path: p,
+              reason: meta?.docstring?.slice(0, 80) || `contains "${rawError.slice(0, 30)}"`,
+            });
+            existingSet.add(p);
+          }
+        }
+        interpreted.files.sort((a, b) => (interpreted.scores.get(b.path) ?? 0) - (interpreted.scores.get(a.path) ?? 0));
+      }
+      trace?.end("errorContentSearch");
+    }
 
     trace?.step("cochangePromotion");
     const topForCochange = interpreted.files.slice(0, 5).map((f) => f.path);

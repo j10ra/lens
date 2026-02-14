@@ -1,218 +1,326 @@
-import type { ContextData, ResolvedSnippet } from "../types";
+import type { CochangeRow, ContextData, ResolvedSnippet } from "../types";
 
-type Confidence = "high" | "moderate" | "low";
-const TOKEN_CAP = 350;
+const TOKEN_CAP = 1200;
+
+function estimateTokens(s: string): number {
+  return Math.ceil(s.length / 4);
+}
 
 function basename(p: string): string {
   const i = p.lastIndexOf("/");
   return i >= 0 ? p.substring(i + 1) : p;
 }
 
-function estimateTokens(s: string): number {
-  return Math.ceil(s.length / 4);
+// --- Helpers ---
+
+function getPurpose(path: string, data: ContextData): string {
+  for (const m of data.metadata) {
+    if (m.path === path && m.purpose) return m.purpose;
+  }
+  return "";
 }
 
-function detectConfidence(scores: Map<string, number> | undefined): Confidence {
-  if (!scores || scores.size === 0) return "low";
-  const vals = [...scores.values()].sort((a, b) => b - a);
-  if (vals.length === 1) return "high";
-  const top = vals[0];
-  const second = vals[1] || 0;
-  const ratio = top / (second || 1);
+function renderImports(path: string, data: ContextData): string {
+  const fwd = data.forwardImports.get(path)?.slice(0, 3) ?? [];
+  const rev = data.reverseImports.get(path)?.slice(0, 3) ?? [];
+  const parts: string[] = [];
+  if (rev.length) parts.push(`\u2190 ${rev.join(", ")}`);
+  if (fwd.length) parts.push(`\u2192 ${fwd.join(", ")}`);
+  return parts.join(" | ");
+}
 
-  // Strong absolute signal (query-kind boosts produce scores >50)
-  if (top >= 60 || (top >= 40 && ratio >= 2.0)) return "high";
-  if (ratio >= 2.5) return "high";
-  if (top >= 25 && ratio >= 1.5) return "moderate";
-  if (ratio >= 1.5) return "moderate";
-  return "low";
+function renderCochanges(path: string, cochanges: CochangeRow[], limit = 2): string {
+  const partners: Array<{ name: string; count: number }> = [];
+  for (const cc of cochanges) {
+    if (cc.path === path) partners.push({ name: basename(cc.partner), count: cc.count });
+    else if (cc.partner === path) partners.push({ name: basename(cc.path), count: cc.count });
+  }
+  partners.sort((a, b) => b.count - a.count);
+  return partners
+    .slice(0, limit)
+    .map((p) => `${p.name} (${p.count}x)`)
+    .join(", ");
+}
+
+function getExports(path: string, data: ContextData): string[] {
+  for (const m of data.metadata) {
+    if (m.path === path) return m.exports ?? [];
+  }
+  return [];
 }
 
 function fileLabel(path: string, snippet?: ResolvedSnippet): string {
-  const sym = snippet?.symbol ? ` → ${snippet.symbol}()` : "";
   const line = snippet?.line ? `:${snippet.line}` : "";
-  return `${path}${line}${sym}`;
+  return `${path}${line}`;
 }
 
-function formatHigh(data: ContextData): string {
-  const L: string[] = [];
-  const files = data.files.slice(0, 5);
-  const snippets = data.snippets ?? new Map();
-  const purposeMap = new Map<string, string>();
-  for (const m of data.metadata) {
-    if (m.purpose) purposeMap.set(m.path, m.purpose);
-  }
+// --- Templates ---
 
-  L.push(`# ${data.goal}`);
-  L.push("");
-
-  // Start here — top file
-  const top = files[0];
-  if (top) {
-    const snip = snippets.get(top.path);
-    L.push("## Start here");
-    L.push(`${fileLabel(top.path, snip)}`);
-    L.push(`  ${top.reason}`);
-    const purpose = purposeMap.get(top.path);
-    if (purpose) L.push(`  ${purpose}`);
-    L.push("");
-  }
-
-  // Chain — importers of top file
-  const chainFiles = files.slice(1);
-  const chainLines: string[] = [];
-  for (const f of chainFiles) {
-    const rev = data.reverseImports.get(files[0]?.path ?? "");
-    const isImporter = rev?.includes(f.path);
-    const hop2 = data.hop2Deps.get(files[0]?.path ?? "");
-    const isHop2 = hop2?.includes(f.path);
-    const snip = snippets.get(f.path);
-    if (isImporter) {
-      chainLines.push(`← ${fileLabel(f.path, snip)} (imports ${basename(files[0].path)})`);
-    } else if (isHop2) {
-      chainLines.push(`← ${fileLabel(f.path, snip)} (2-hop)`);
-    }
-  }
-  if (chainLines.length > 0) {
-    L.push("## Chain");
-    for (const line of chainLines) L.push(line);
-    L.push("");
-  }
-
-  // Tests
-  const tests = data.testFiles?.get(files[0]?.path ?? "");
-  if (tests?.length) {
-    L.push("## Tests");
-    for (const t of tests) L.push(basename(t));
-    L.push("");
-  }
-
-  // Blast radius
-  const consumers = data.reverseImports.get(files[0]?.path ?? "");
-  if (consumers?.length) {
-    L.push(`## Blast radius: ${consumers.length} consumer${consumers.length > 1 ? "s" : ""}`);
-  }
-
-  return L.join("\n");
-}
-
-function formatModerate(data: ContextData): string {
-  const L: string[] = [];
-  const files = data.files.slice(0, 5);
-  const snippets = data.snippets ?? new Map();
-  const purposeMap = new Map<string, string>();
-  for (const m of data.metadata) {
-    if (m.purpose) purposeMap.set(m.path, m.purpose);
-  }
-
-  L.push(`# ${data.goal}`);
-  L.push("");
-
-  const mostLikely = files.slice(0, 2);
-  const alsoRelevant = files.slice(2);
-
-  if (mostLikely.length > 0) {
-    L.push("## Most likely");
-    for (let i = 0; i < mostLikely.length; i++) {
-      const f = mostLikely[i];
-      const snip = snippets.get(f.path);
-      L.push(`${i + 1}. ${fileLabel(f.path, snip)} — ${f.reason}`);
-
-      // Inline chain + tests
-      const parts: string[] = [];
-      const rev = data.reverseImports.get(f.path);
-      const fwd = data.forwardImports.get(f.path);
-      if (rev?.length || fwd?.length) {
-        const deps = [...(fwd?.slice(0, 2).map(basename) ?? []), ...(rev?.slice(0, 2).map(basename) ?? [])];
-        parts.push(deps.join(", "));
-      }
-      const tests = data.testFiles?.get(f.path);
-      if (tests?.length) parts.push(`tests: ${tests.map(basename).join(", ")}`);
-      if (parts.length > 0) L.push(`   ← ${parts.join(" | ")}`);
-
-      const purpose = purposeMap.get(f.path);
-      if (purpose) L.push(`   ${purpose}`);
-    }
-    L.push("");
-  }
-
-  if (alsoRelevant.length > 0) {
-    L.push("## Also relevant");
-    for (let i = 0; i < alsoRelevant.length; i++) {
-      const f = alsoRelevant[i];
-      const snip = snippets.get(f.path);
-      L.push(`${mostLikely.length + i + 1}. ${fileLabel(f.path, snip)} — ${f.reason}`);
-    }
-  }
-
-  return L.join("\n");
-}
-
-function formatLow(data: ContextData): string {
+function formatNatural(data: ContextData): string {
   const L: string[] = [];
   const files = data.files.slice(0, 7);
   const snippets = data.snippets ?? new Map();
 
   L.push(`# ${data.goal}`);
   L.push("");
-  L.push("## Candidates (ranked)");
+  L.push("## Key Files");
+
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
     const snip = snippets.get(f.path);
-    L.push(`${i + 1}. ${fileLabel(f.path, snip)} — ${f.reason}`);
+    const purpose = getPurpose(f.path, data);
+    const label = fileLabel(f.path, snip);
+    L.push(`${i + 1}. **${label}**${purpose ? ` \u2014 ${purpose}` : ""}`);
+
+    const exports = getExports(f.path, data);
+    if (exports.length) L.push(`   Exports: ${exports.slice(0, 5).join(", ")}`);
+
+    const imports = renderImports(f.path, data);
+    if (imports) L.push(`   ${imports}`);
+
+    const cochangeStr = renderCochanges(f.path, data.cochanges);
+    if (cochangeStr) L.push(`   Co-changes: ${cochangeStr}`);
+  }
+
+  // Test files
+  const testLines: string[] = [];
+  const testFiles = data.testFiles;
+  if (testFiles) {
+    const seen = new Set<string>();
+    for (const f of files.slice(0, 5)) {
+      const tests = testFiles.get(f.path);
+      if (tests) {
+        for (const t of tests) {
+          if (!seen.has(t)) {
+            seen.add(t);
+            testLines.push(`- ${t}`);
+          }
+        }
+      }
+    }
+  }
+  if (testLines.length) {
+    L.push("");
+    L.push("## Tests");
+    for (const t of testLines) L.push(t);
   }
 
   return L.join("\n");
 }
 
-function progressiveStrip(output: string, _data: ContextData): string {
-  let result = output;
+function formatSymbol(data: ContextData): string {
+  const L: string[] = [];
+  const files = data.files;
+  const snippets = data.snippets ?? new Map();
+  const top = files[0];
+  if (!top) return `# ${data.goal}\n\nNo files found.`;
 
-  // Strip purpose lines first
-  if (estimateTokens(result) > TOKEN_CAP) {
-    result = result
-      .split("\n")
-      .filter((l) => {
-        const trimmed = l.trimStart();
-        // Remove purpose lines (indented non-header, non-numbered, non-arrow lines)
-        if (l.startsWith("   ") && !trimmed.startsWith("←") && !trimmed.match(/^\d+\./)) {
-          // Keep reason lines (directly after numbered items)
-          return false;
-        }
-        return true;
-      })
-      .join("\n");
+  const snip = snippets.get(top.path);
+  const purpose = getPurpose(top.path, data);
+
+  L.push(`# Symbol: ${data.goal}`);
+  L.push("");
+  L.push("## Definition");
+  L.push(`**${fileLabel(top.path, snip)}**${purpose ? ` \u2014 ${purpose}` : ""}`);
+
+  // Show signature from snippet or exports
+  if (snip?.symbol) {
+    L.push(`  \`${snip.symbol}\``);
+  } else {
+    const exports = getExports(top.path, data);
+    if (exports.length) L.push(`  Exports: ${exports.slice(0, 5).join(", ")}`);
   }
 
-  // Strip chain section
-  if (estimateTokens(result) > TOKEN_CAP) {
-    const chainIdx = result.indexOf("## Chain");
-    if (chainIdx >= 0) {
-      const nextSection = result.indexOf("\n## ", chainIdx + 1);
-      result =
-        nextSection >= 0
-          ? result.substring(0, chainIdx) + result.substring(nextSection + 1)
-          : result.substring(0, chainIdx);
+  // Dependents (reverse imports)
+  const rev = data.reverseImports.get(top.path);
+  if (rev?.length) {
+    L.push("");
+    L.push("## Dependents");
+    L.push(`\u2190 ${rev.slice(0, 5).join(", ")}`);
+  }
+
+  // Co-changes
+  const cochangeStr = renderCochanges(top.path, data.cochanges, 3);
+  if (cochangeStr) {
+    L.push("");
+    L.push("## Co-changes");
+    L.push(cochangeStr);
+  }
+
+  // Other relevant files
+  if (files.length > 1) {
+    L.push("");
+    L.push("## Also relevant");
+    for (let i = 1; i < Math.min(files.length, 5); i++) {
+      const f = files[i];
+      const p = getPurpose(f.path, data);
+      L.push(`${i + 1}. ${f.path}${p ? ` \u2014 ${p}` : ""}`);
     }
   }
 
-  // Reduce to top 3 files
-  if (estimateTokens(result) > TOKEN_CAP) {
-    const lines = result.split("\n");
+  return L.join("\n");
+}
+
+function formatError(data: ContextData): string {
+  const L: string[] = [];
+  const files = data.files;
+  const snippets = data.snippets ?? new Map();
+
+  L.push(`# Error: ${data.goal}`);
+  L.push("");
+
+  if (files.length === 0) {
+    L.push("No matching files found.");
+    return L.join("\n");
+  }
+
+  const top = files[0];
+  const snip = snippets.get(top.path);
+  const purpose = getPurpose(top.path, data);
+
+  L.push("## Error Source");
+  L.push(`1. **${fileLabel(top.path, snip)}**${purpose ? ` \u2014 ${purpose}` : ""}`);
+
+  const exports = getExports(top.path, data);
+  if (exports.length) L.push(`   Exports: ${exports.slice(0, 5).join(", ")}`);
+
+  const imports = renderImports(top.path, data);
+  if (imports) L.push(`   ${imports}`);
+
+  if (files.length > 1) {
+    L.push("");
+    L.push("## Also References");
+    for (let i = 1; i < Math.min(files.length, 5); i++) {
+      const f = files[i];
+      const s = snippets.get(f.path);
+      const p = getPurpose(f.path, data);
+      L.push(`${i + 1}. **${fileLabel(f.path, s)}**${p ? ` \u2014 ${p}` : ""}`);
+    }
+  }
+
+  return L.join("\n");
+}
+
+function formatStackTrace(data: ContextData): string {
+  const L: string[] = [];
+  const files = data.files;
+  const snippets = data.snippets ?? new Map();
+
+  L.push("# Stack Trace");
+  L.push("");
+
+  if (files.length === 0) {
+    L.push("No matching files found.");
+    return L.join("\n");
+  }
+
+  const top = files[0];
+  const snip = snippets.get(top.path);
+  const purpose = getPurpose(top.path, data);
+
+  L.push("## Crash Point");
+  L.push(`**${fileLabel(top.path, snip)}**${purpose ? ` \u2014 ${purpose}` : ""}`);
+
+  if (snip?.symbol) {
+    L.push(`  \`${snip.symbol}\``);
+  }
+
+  // Call chain from import graph
+  const chain: string[] = [];
+  const fwd = data.forwardImports.get(top.path);
+  const rev = data.reverseImports.get(top.path);
+  if (rev?.length || fwd?.length) {
+    const callers = rev?.slice(0, 2) ?? [];
+    const deps = fwd?.slice(0, 2) ?? [];
+    if (callers.length || deps.length) {
+      const parts = [...callers.map((c) => `${c} \u2192`), top.path, ...deps.map((d) => `\u2192 ${d}`)];
+      chain.push(parts.join(" "));
+    }
+  }
+  if (chain.length) {
+    L.push("");
+    L.push("## Call Chain");
+    for (const c of chain) L.push(c);
+  }
+
+  // Related files
+  if (files.length > 1) {
+    L.push("");
+    L.push("## Related");
+    for (let i = 1; i < Math.min(files.length, 5); i++) {
+      const f = files[i];
+      const p = getPurpose(f.path, data);
+      const cochangeStr = renderCochanges(f.path, data.cochanges, 1);
+      L.push(`- ${f.path}${p ? ` \u2014 ${p}` : ""}${cochangeStr ? ` (${cochangeStr})` : ""}`);
+    }
+  }
+
+  return L.join("\n");
+}
+
+// --- Progressive Stripping ---
+
+function progressiveStrip(output: string, _data: ContextData): string {
+  let lines = output.split("\n");
+
+  // 1. Truncate co-change lines (keep top 1 per file)
+  if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
+    lines = lines.map((l) => {
+      if (l.trimStart().startsWith("Co-changes:")) {
+        const match = l.match(/Co-changes:\s*([^,]+)/);
+        if (match) return `${l.substring(0, l.indexOf("Co-changes:"))}Co-changes: ${match[1].trim()}`;
+      }
+      return l;
+    });
+  }
+
+  // 2. Drop test files section
+  if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
+    const testIdx = lines.findIndex((l) => l.startsWith("## Tests"));
+    if (testIdx >= 0) {
+      let endIdx = lines.findIndex((l, i) => i > testIdx && l.startsWith("## "));
+      if (endIdx < 0) endIdx = lines.length;
+      lines.splice(testIdx, endIdx - testIdx);
+    }
+  }
+
+  // 3. Truncate import arrows (keep top 2 per direction)
+  if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
+    lines = lines.filter((l) => {
+      const trimmed = l.trimStart();
+      return !(trimmed.startsWith("\u2190") || trimmed.startsWith("\u2192")) || !trimmed.includes("|");
+    });
+  }
+
+  // 4. Reduce to top 5 files
+  if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
     const reduced: string[] = [];
     let fileCount = 0;
     for (const line of lines) {
       if (/^\d+\./.test(line.trimStart())) {
         fileCount++;
-        if (fileCount > 3) continue;
+        if (fileCount > 5) continue;
       }
       reduced.push(line);
     }
-    result = reduced.join("\n");
+    lines = reduced;
   }
 
-  return result;
+  // 5. Drop purpose summaries (last resort)
+  if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
+    lines = lines.map((l) => {
+      const dashIdx = l.indexOf(" \u2014 ");
+      if (dashIdx > 0 && (l.includes("**") || /^\d+\./.test(l.trimStart()))) {
+        return l.substring(0, dashIdx);
+      }
+      return l;
+    });
+  }
+
+  return lines.join("\n");
 }
+
+// --- Score relevance filter (unchanged) ---
 
 function filterByScoreRelevance(data: ContextData): ContextData {
   if (!data.scores || data.scores.size === 0) return data;
@@ -221,32 +329,35 @@ function filterByScoreRelevance(data: ContextData): ContextData {
   const threshold = topScore * 0.15;
   const filtered = data.files.filter((f) => {
     const score = data.scores?.get(f.path);
-    // Keep files without scores (co-change/semantic promoted) only if in top 5
     if (score === undefined) return data.files.indexOf(f) < 5;
     return score >= threshold;
   });
   return { ...data, files: filtered };
 }
 
+// --- Entry point ---
+
 export function formatContextPack(data: ContextData): string {
   const filtered = filterByScoreRelevance(data);
-  const confidence = detectConfidence(filtered.scores);
 
   let output: string;
-  switch (confidence) {
-    case "high":
-      output = formatHigh(filtered);
+  switch (filtered.queryKind) {
+    case "symbol":
+      output = formatSymbol(filtered);
       break;
-    case "moderate":
-      output = formatModerate(filtered);
+    case "error_message":
+      output = formatError(filtered);
+      break;
+    case "stack_trace":
+      output = formatStackTrace(filtered);
       break;
     default:
-      output = formatLow(filtered);
+      output = formatNatural(filtered);
       break;
   }
 
   if (estimateTokens(output) > TOKEN_CAP) {
-    output = progressiveStrip(output, data);
+    output = progressiveStrip(output, filtered);
   }
 
   return output;

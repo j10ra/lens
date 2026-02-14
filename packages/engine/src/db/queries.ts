@@ -333,6 +333,17 @@ export const chunkQueries = {
       .all();
   },
 
+  searchContent(db: Db, repoId: string, searchString: string): string[] {
+    if (!searchString || searchString.length < 4) return [];
+    const rows = db
+      .select({ path: chunks.path })
+      .from(chunks)
+      .where(and(eq(chunks.repo_id, repoId), sql`INSTR(LOWER(${chunks.content}), ${searchString.toLowerCase()}) > 0`))
+      .groupBy(chunks.path)
+      .all();
+    return rows.map((r) => r.path);
+  },
+
   getStats(db: Db, repoId: string) {
     const row = db
       .select({

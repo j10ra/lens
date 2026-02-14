@@ -25,8 +25,8 @@ Eval harness → Formatter rewrite → Context slicing → GO/NO-GO → Routing 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | 1. Eval harness | ✅ Done | Baseline recorded 2026-02-15 |
-| 2. Formatter rewrite | ⬜ Not started | `← YOU ARE HERE` |
-| 3. Context slicing | ⬜ Not started | |
+| 2. Formatter rewrite | ✅ Done | Hit@3 85%→95%, natural 100%, error 67%, 15ms avg. See results below |
+| 3. Context slicing | ⬜ Not started | `← YOU ARE HERE` |
 | GO/NO-GO gate | ⬜ Not started | |
 | 4. Specialized routing | ⬜ Blocked (gate) | |
 | 5. Weight tuning | ⬜ Blocked (gate) | |
@@ -50,6 +50,42 @@ Eval harness → Formatter rewrite → Context slicing → GO/NO-GO → Routing 
 - GO/NO-GO target (Top-3 >80%) barely passes at 85%. Error kind drags it down.
 - n=20 intentionally thin — expand to 30-50 after Phase 2.
 - Some gold expectations may need revisiting (e.g., `err-02` expects `client.ts` but `daemon-ctrl.ts` is arguably relevant).
+
+#### Phase 2 Results (2026-02-15, v0.1.20, n=20, no embeddings)
+
+| Metric | Phase 1 | Phase 2 | Delta |
+|--------|---------|---------|-------|
+| Hit@1 | 70% | 70% | — |
+| Hit@3 | 85% | 95% | +10% |
+| Entry@1 | 65% | 60% | -5% |
+| Entry@3 | 80% | 90% | +10% |
+| Recall@5 | 75% | 83% | +8% |
+| Avg ms | 37 | 15 | -22ms |
+
+**By kind:**
+
+| Kind | Hit@3 (P1) | Hit@3 (P2) | Recall@5 (P1) | Recall@5 (P2) |
+|------|-----------|-----------|--------------|--------------|
+| Natural (12) | 92% | 100% | 75% | 75% |
+| Symbol (5) | 100% | 100% | 100% | 100% |
+| Error (3) | 33% | 67% | 33% | 83% |
+
+Verified stable across 3 consecutive runs.
+
+**What shipped:**
+1. **Formatter rewrite** (`formatter.ts`) — 4 query-kind templates (natural/symbol/error/stack_trace) replacing 3 confidence templates. TOKEN_CAP 350→1200. Purpose summaries, full import paths with direction arrows (← →), co-change counts, exports rendered per file.
+2. **Error metadata scoring** (`query-interpreter.ts`) — raw error string search in docstring/sections/internals/purpose fields. +40 boost. Didn't move numbers (error strings live in throw statements, not metadata).
+3. **Chunk content search** (`queries.ts` + `context.ts`) — for `error_message` queries, `INSTR(LOWER(content), ...)` across chunk table. Bounded: intersect with TF-IDF scored files first, cap at 3 matches, +40 boost. Fixed err-01.
+4. **Noise exclusion** (`query-interpreter.ts`) — added `publish/` to noise paths, changed noise dampening from `*0.3` to `score=0` (full exclusion). Fixed nat-02 and halved avg query time.
+
+**What didn't move:**
+- err-02 ("LENS daemon is not running") — `client.ts` at Recall@5=100% but not top 3. `daemon-ctrl.ts` ranks higher (legitimately relevant to "daemon not running"). Gold expectation is arguably too narrow.
+
+**Observations:**
+- Noise exclusion was the highest-impact fix: eliminated generated artifacts (publish/, dist/) from competing in rankings. Fixed nat-02 and reduced avg duration 37→15ms.
+- Error content search needed bounding — unbounded +50 to all INSTR matches (18 files for err-01) caused regressions. Capped to 3 files with TF-IDF intersection.
+- Formatter rewrite doesn't affect ranking (output-only). Its value is in richer agent consumption, not measurable by Hit@N.
+- GO/NO-GO target (Top-3 >80%) now passes comfortably at 95%.
 
 ### Execution approach
 
@@ -105,7 +141,7 @@ The engine is ~70% built. Scoring, indexing, and structural analysis work. The p
 | Purpose summaries (LLM-generated) | `engine/src/db/queries.ts` (metadata) | Stored, scored, stripped from output |
 | Sections + internals extraction | `engine/src/index/metadata.ts` | 28 files w/ sections, 109 w/ internals |
 | Snippet resolution (symbol → file:line) | `engine/src/context/snippet.ts:52` | Resolves, but only shows `path:line → symbol()` |
-| Confidence-based formatting (3 templates) | `engine/src/context/formatter.ts` | Routes on score ratio, not query kind |
+| Query-kind-driven formatting (4 templates) | `engine/src/context/formatter.ts` | Routes on queryKind, TOKEN_CAP=1200 |
 | Vocab clusters (Voyage embeddings) | `engine/src/index/vocab-clusters.ts` | Working, boosts scoring |
 | Vector search (semantic) | `engine/src/context/context.ts:103` | Optional, Pro feature |
 
@@ -113,13 +149,13 @@ The engine is ~70% built. Scoring, indexing, and structural analysis work. The p
 
 | Gap | Impact |
 |-----|--------|
-| 350 token cap strips purpose, chains, everything | Output is a file list, not a briefing |
+| ~~350 token cap strips purpose, chains, everything~~ | ~~Output is a file list, not a briefing~~ → Fixed (Phase 2) |
 | One generic tool (`get_context`) | No specialization per query type |
 | No code snippets in output | Agent still needs to Read every file to understand it |
-| Import chains shown as basenames only | Agent can't navigate relationships |
-| Co-change counts hidden | Agent misses "always change together" warnings |
-| Query kind doesn't drive output shape | Stack trace gets same template as "how does X work" |
-| **No evaluation harness** | **Can't measure if changes improve anything** |
+| ~~Import chains shown as basenames only~~ | ~~Agent can't navigate relationships~~ → Fixed (Phase 2) |
+| ~~Co-change counts hidden~~ | ~~Agent misses "always change together" warnings~~ → Fixed (Phase 2) |
+| ~~Query kind doesn't drive output shape~~ | ~~Stack trace gets same template as "how does X work"~~ → Fixed (Phase 2) |
+| ~~No evaluation harness~~ | ~~Can't measure if changes improve anything~~ → Fixed (Phase 1) |
 
 ---
 

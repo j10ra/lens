@@ -168,6 +168,7 @@ const NOISE_PATHS = [
   "node_modules/",
   "dist/",
   "build/",
+  "publish/",
   "vendor/",
   "vendors/",
   "/scripts/",
@@ -363,10 +364,27 @@ export function interpretQuery(
         const sym = parsed.symbol;
         if ((f.exports ?? []).includes(sym)) score += 100;
         else if ((f.internals ?? []).includes(sym)) score += 80;
-      } else if (parsed.kind === "error_message" && parsed.errorToken) {
-        const token = parsed.errorToken.toLowerCase();
-        if (exportsLower.includes(token) || internalsLower.includes(token) || pathLower.includes(token)) {
-          score += 30;
+      } else if (parsed.kind === "error_message") {
+        if (parsed.errorToken) {
+          const token = parsed.errorToken.toLowerCase();
+          if (exportsLower.includes(token) || internalsLower.includes(token) || pathLower.includes(token)) {
+            score += 30;
+          }
+        }
+        // Search metadata fields for raw error string (stripped of common prefixes)
+        const rawError = parsed.raw
+          .replace(/^(Error|TypeError|ReferenceError|SyntaxError|RangeError|FATAL|WARN|ERR):\s*/i, "")
+          .toLowerCase()
+          .trim();
+        if (rawError.length >= 5) {
+          if (
+            docLower.includes(rawError) ||
+            sectionsLower.includes(rawError) ||
+            internalsLower.includes(rawError) ||
+            purposeLower.includes(rawError)
+          ) {
+            score += 40;
+          }
         }
       }
     }
@@ -414,7 +432,7 @@ export function interpretQuery(
     }
 
     if (score > 0 && isNoisePath(f.path)) {
-      score *= 0.3;
+      score = 0;
     }
 
     // Hub dampening: penalize files with excessive exports (data-layer hubs)
