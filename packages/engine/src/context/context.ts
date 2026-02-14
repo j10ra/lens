@@ -54,6 +54,8 @@ function cacheSet(key: string, response: ContextResponse): void {
 
 export interface ContextOptions {
   useEmbeddings?: boolean;
+  includeRankedFiles?: boolean;
+  skipCache?: boolean;
 }
 
 export async function buildContext(
@@ -75,16 +77,18 @@ export async function buildContext(
     const commit = repo?.last_indexed_commit ?? null;
 
     const useEmb = options?.useEmbeddings !== false;
-    const key = cacheKey(repoId, goal, commit, useEmb);
-    const cached = cacheGet(key);
-    if (cached) {
-      trace?.add("cache", 0, "HIT");
-      track(db, "context", {
-        duration_ms: Date.now() - start,
-        result_count: cached.stats.files_in_context,
-        cache_hit: true,
-      });
-      return { ...cached, stats: { ...cached.stats, cached: true, duration_ms: Date.now() - start } };
+    if (!options?.skipCache) {
+      const key = cacheKey(repoId, goal, commit, useEmb);
+      const cached = cacheGet(key);
+      if (cached) {
+        trace?.add("cache", 0, "HIT");
+        track(db, "context", {
+          duration_ms: Date.now() - start,
+          result_count: cached.stats.files_in_context,
+          cache_hit: true,
+        });
+        return { ...cached, stats: { ...cached.stats, cached: true, duration_ms: Date.now() - start } };
+      }
     }
     const embAvailable = useEmb && (await import("../db/queries")).chunkQueries.hasEmbeddings(db, repoId);
 
@@ -256,7 +260,19 @@ export async function buildContext(
       },
     };
 
-    cacheSet(key, response);
+    if (options?.includeRankedFiles) {
+      response.ranked_files = interpreted.files.map((f) => ({
+        path: f.path,
+        reason: f.reason,
+        score: interpreted.scores.get(f.path) ?? 0,
+      }));
+      response.query_kind = parsed.kind;
+    }
+
+    if (!options?.skipCache) {
+      const key = cacheKey(repoId, goal, commit, useEmb);
+      cacheSet(key, response);
+    }
     track(db, "context", {
       duration_ms: response.stats.duration_ms,
       result_count: response.stats.files_in_context,

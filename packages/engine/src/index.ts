@@ -36,6 +36,10 @@ export {
   type UsageCounter,
   usageQueries,
 } from "./db/queries";
+// Eval
+export { GOLD_DATASET, type GoldQuery } from "./eval/gold-dataset";
+export { computeMetrics, type EvalSummary, type KindBreakdown, type QueryResult } from "./eval/metrics";
+export { type EvalOptions, runEval } from "./eval/runner";
 export { chunkFile, DEFAULT_CHUNKING_PARAMS } from "./index/chunker";
 export { detectLanguage, diffScan, fullScan, getHeadCommit, isBinaryExt, isDocFile } from "./index/discovery";
 export { ensureEmbedded } from "./index/embed";

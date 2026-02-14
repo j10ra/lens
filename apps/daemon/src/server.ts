@@ -21,6 +21,7 @@ import {
   registerRepo,
   removeRepo,
   repoQueries,
+  runEval,
   runIndex,
   setTelemetryEnabled,
   startWatcher,
@@ -437,6 +438,23 @@ export function createApp(
       const result = await buildContext(db, repo_id, goal, caps, c.get("trace"), { useEmbeddings });
       usageQueries.increment(db, "context_queries");
       return c.json(result);
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  // --- Eval ---
+
+  trackRoute("POST", "/eval/run");
+  app.post("/eval/run", async (c) => {
+    try {
+      const trace = c.get("trace");
+      const { repo_id, filter_kind } = await c.req.json();
+      if (!repo_id) return c.json({ error: "repo_id required" }, 400);
+      trace.step("runEval");
+      const summary = await runEval(db, repo_id, { filterKind: filter_kind });
+      trace.end("runEval", `${summary.total} queries`);
+      return c.json(summary);
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
     }

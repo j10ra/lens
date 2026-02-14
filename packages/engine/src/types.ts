@@ -85,6 +85,8 @@ export interface ContextResponse {
     duration_ms: number;
     cached: boolean;
   };
+  ranked_files?: Array<{ path: string; reason: string; score: number }>;
+  query_kind?: QueryKind;
 }
 
 export interface VocabCluster {

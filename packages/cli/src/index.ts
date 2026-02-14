@@ -5,6 +5,7 @@ import { contextCommand } from "./commands/context.js";
 import { startCommand, stopCommand } from "./commands/daemon-ctrl.js";
 import { daemonStatsCommand } from "./commands/daemon-stats.js";
 import { dashboardCommand } from "./commands/dashboard.js";
+import { evalCommand } from "./commands/eval.js";
 import { indexCommand } from "./commands/index.js";
 import { listCommand } from "./commands/list.js";
 import { loginCommand } from "./commands/login.js";
@@ -90,6 +91,14 @@ program
   .option("--force", "Full re-scan (default: diff scan, changed files only)", false)
   .option("--status", "Show index status", false)
   .action((opts) => run(() => indexCommand(opts), "index"));
+
+// lens eval
+program
+  .command("eval")
+  .description("Run evaluation harness against current repo")
+  .option("--json", "Output as JSON", false)
+  .option("--kind <kind>", "Filter by query kind (natural, symbol, error_message)")
+  .action((opts) => run(() => evalCommand(opts), "eval"));
 
 // lens status
 program
