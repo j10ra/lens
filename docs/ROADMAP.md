@@ -26,8 +26,8 @@ Eval harness → Formatter rewrite → Context slicing → GO/NO-GO → Routing 
 |-------|--------|-------|
 | 1. Eval harness | ✅ Done | Baseline recorded 2026-02-15 |
 | 2. Formatter rewrite | ✅ Done | Hit@3 85%→95%, natural 100%, error 67%, 15ms avg. See results below |
-| 3. Context slicing | ⬜ Not started | `← YOU ARE HERE` |
-| GO/NO-GO gate | ⬜ Not started | |
+| 3. Context slicing | ✅ Done | Hit@3 95% (no regression), 19ms avg. Code slices in all 4 templates. See results below |
+| GO/NO-GO gate | ⬜ Not started | `← YOU ARE HERE` |
 | 4. Specialized routing | ⬜ Blocked (gate) | |
 | 5. Weight tuning | ⬜ Blocked (gate) | |
 | 6. Cloud + monetization | 🧊 Frozen | ~70% done, paused until gate passes |
@@ -86,6 +86,41 @@ Verified stable across 3 consecutive runs.
 - Error content search needed bounding — unbounded +50 to all INSTR matches (18 files for err-01) caused regressions. Capped to 3 files with TF-IDF intersection.
 - Formatter rewrite doesn't affect ranking (output-only). Its value is in richer agent consumption, not measurable by Hit@N.
 - GO/NO-GO target (Top-3 >80%) now passes comfortably at 95%.
+
+#### Phase 3 Results (2026-02-15, v0.1.20, n=20, no embeddings)
+
+| Metric | Phase 2 | Phase 3 | Delta |
+|--------|---------|---------|-------|
+| Hit@1 | 70% | 65% | -5% |
+| Hit@3 | 95% | 95% | — |
+| Entry@1 | 60% | 55% | -5% |
+| Entry@3 | 90% | 90% | — |
+| Recall@5 | 83% | 83% | — |
+| Avg ms | 15 | 19 | +4ms |
+
+**By kind:**
+
+| Kind | Hit@3 (P2) | Hit@3 (P3) | Recall@5 (P2) | Recall@5 (P3) |
+|------|-----------|-----------|--------------|--------------|
+| Natural (12) | 100% | 100% | 75% | 75% |
+| Symbol (5) | 100% | 100% | 100% | 100% |
+| Error (3) | 67% | 67% | 83% | 83% |
+
+**What shipped:**
+1. **Code slicer** (`slicer.ts`) — new module: `sliceContext()` extracts ±10 lines around resolved snippet anchors. Max slices by query kind: symbol=1, error=1, stack_trace=2, natural=3. Capped at 25 lines per slice.
+2. **Formatter integration** (`formatter.ts`) — TOKEN_CAP 1200→2000. `renderSlice()` renders fenced code blocks with `guessLang()` syntax highlighting. All 4 templates updated.
+3. **Progressive stripping update** — new step 0: strip code slices first (highest token cost, lowest information density for orientation). Existing steps renumbered 2-6.
+4. **Pipeline wiring** (`context.ts`) — `sliceContext` runs after `resolveSnippets`, passes `slices` into `ContextData`.
+
+**What didn't change:**
+- Ranking unchanged — slicing is output-only, no scoring impact. Hit@1 variance (-5%) is within noise (err-02 and sym-03 are borderline cases).
+- err-02 still misses — same root cause as Phase 2.
+
+**Observations:**
+- Slicing adds ~4ms avg — chunk lookup via `getByRepoPaths` is a single bounded SQLite query, well within the 25ms budget.
+- 1-hop type resolution deferred — extracting referenced types from imports is high-complexity, low-value for first pass. Forward import paths already point the agent to the right file.
+- Context packs now contain enough code for agents to start editing without Read calls on symbol/error queries. Natural queries show function signatures and surrounding context.
+- TOKEN_CAP at 2000 accommodates 2-3 slices without immediate stripping. Progressive stripping handles overflow gracefully.
 
 ### Execution approach
 
@@ -151,7 +186,7 @@ The engine is ~70% built. Scoring, indexing, and structural analysis work. The p
 |-----|--------|
 | ~~350 token cap strips purpose, chains, everything~~ | ~~Output is a file list, not a briefing~~ → Fixed (Phase 2) |
 | One generic tool (`get_context`) | No specialization per query type |
-| No code snippets in output | Agent still needs to Read every file to understand it |
+| ~~No code snippets in output~~ | ~~Agent still needs to Read every file to understand it~~ → Fixed (Phase 3) |
 | ~~Import chains shown as basenames only~~ | ~~Agent can't navigate relationships~~ → Fixed (Phase 2) |
 | ~~Co-change counts hidden~~ | ~~Agent misses "always change together" warnings~~ → Fixed (Phase 2) |
 | ~~Query kind doesn't drive output shape~~ | ~~Stack trace gets same template as "how does X work"~~ → Fixed (Phase 2) |
