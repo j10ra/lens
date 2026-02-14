@@ -5,8 +5,11 @@ export type { Capabilities } from "./capabilities";
 // Context
 export { buildContext, type ContextOptions } from "./context/context";
 export { formatContextPack } from "./context/formatter";
+export { parseQuery } from "./context/input-parser";
 export { interpretQuery, isNoisePath } from "./context/query-interpreter";
+export { resolveSnippets } from "./context/snippet";
 export {
+  discoverTestFiles,
   get2HopReverseDeps,
   getAllFileStats,
   getCochangePartners,
@@ -69,8 +72,11 @@ export type {
   FileStatRow,
   IndexResult,
   InterpretedQuery,
+  ParsedQuery,
+  QueryKind,
   RegisterResponse,
   Repo,
+  ResolvedSnippet,
   StatusResponse,
   VectorResult,
   VocabCluster,

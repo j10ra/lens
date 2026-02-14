@@ -1,119 +1,253 @@
-import type { CochangeRow, ContextData } from "../types";
+import type { ContextData, ResolvedSnippet } from "../types";
+
+type Confidence = "high" | "moderate" | "low";
+const TOKEN_CAP = 350;
 
 function basename(p: string): string {
   const i = p.lastIndexOf("/");
   return i >= 0 ? p.substring(i + 1) : p;
 }
 
-function daysAgo(d: Date | null): string {
-  if (!d) return "unknown";
-  const days = Math.round((Date.now() - d.getTime()) / 86_400_000);
-  if (days === 0) return "today";
-  if (days === 1) return "1d ago";
-  return `${days}d ago`;
+function estimateTokens(s: string): number {
+  return Math.ceil(s.length / 4);
 }
 
-export function formatContextPack(data: ContextData): string {
-  const L: string[] = [];
-  const files = data.files.slice(0, 15);
+function detectConfidence(scores: Map<string, number> | undefined): Confidence {
+  if (!scores || scores.size === 0) return "low";
+  const vals = [...scores.values()].sort((a, b) => b - a);
+  if (vals.length === 1) return "high";
+  const top = vals[0];
+  const second = vals[1] || 0;
+  const ratio = top / (second || 1);
 
-  const exportsMap = new Map<string, string[]>();
+  // Strong absolute signal (query-kind boosts produce scores >50)
+  if (top >= 60 || (top >= 40 && ratio >= 2.0)) return "high";
+  if (ratio >= 2.5) return "high";
+  if (top >= 25 && ratio >= 1.5) return "moderate";
+  if (ratio >= 1.5) return "moderate";
+  return "low";
+}
+
+function fileLabel(path: string, snippet?: ResolvedSnippet): string {
+  const sym = snippet?.symbol ? ` → ${snippet.symbol}()` : "";
+  const line = snippet?.line ? `:${snippet.line}` : "";
+  return `${path}${line}${sym}`;
+}
+
+function formatHigh(data: ContextData): string {
+  const L: string[] = [];
+  const files = data.files.slice(0, 5);
+  const snippets = data.snippets ?? new Map();
+  const purposeMap = new Map<string, string>();
   for (const m of data.metadata) {
-    if (m.exports?.length) exportsMap.set(m.path, m.exports);
+    if (m.purpose) purposeMap.set(m.path, m.purpose);
   }
 
   L.push(`# ${data.goal}`);
   L.push("");
 
-  if (files.length > 0) {
-    L.push("## Files");
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      const exports = exportsMap.get(f.path);
-      const exportStr = exports?.length ? ` — exports: ${exports.slice(0, 5).join(", ")}` : "";
-      L.push(`${i + 1}. ${f.path}${exportStr}`);
-    }
+  // Start here — top file
+  const top = files[0];
+  if (top) {
+    const snip = snippets.get(top.path);
+    L.push("## Start here");
+    L.push(`${fileLabel(top.path, snip)}`);
+    L.push(`  ${top.reason}`);
+    const purpose = purposeMap.get(top.path);
+    if (purpose) L.push(`  ${purpose}`);
     L.push("");
   }
 
-  const depLines: string[] = [];
-  for (const f of files.slice(0, 5)) {
-    const fwd = data.forwardImports.get(f.path);
-    const rev = data.reverseImports.get(f.path);
-    const hop2 = data.hop2Deps.get(f.path);
-    if (!fwd?.length && !rev?.length) continue;
-
-    depLines.push(f.path);
-    if (fwd?.length) {
-      depLines.push(`  imports: ${fwd.slice(0, 5).map(basename).join(", ")}`);
-    }
-    if (rev?.length) {
-      let revStr = rev.slice(0, 4).map(basename).join(", ");
-      if (hop2?.length) {
-        revStr += ` → ${hop2.slice(0, 3).map(basename).join(", ")}`;
-      }
-      depLines.push(`  imported by: ${revStr}`);
+  // Chain — importers of top file
+  const chainFiles = files.slice(1);
+  const chainLines: string[] = [];
+  for (const f of chainFiles) {
+    const rev = data.reverseImports.get(files[0]?.path ?? "");
+    const isImporter = rev?.includes(f.path);
+    const hop2 = data.hop2Deps.get(files[0]?.path ?? "");
+    const isHop2 = hop2?.includes(f.path);
+    const snip = snippets.get(f.path);
+    if (isImporter) {
+      chainLines.push(`← ${fileLabel(f.path, snip)} (imports ${basename(files[0].path)})`);
+    } else if (isHop2) {
+      chainLines.push(`← ${fileLabel(f.path, snip)} (2-hop)`);
     }
   }
-  if (depLines.length > 0) {
-    L.push("## Dependency Graph");
-    for (const line of depLines) L.push(line);
+  if (chainLines.length > 0) {
+    L.push("## Chain");
+    for (const line of chainLines) L.push(line);
     L.push("");
   }
 
-  if (data.cochanges.length > 0) {
-    const clusters = buildClusters(data.cochanges);
-    if (clusters.length > 0) {
-      L.push("## Co-change Clusters");
-      for (const c of clusters) {
-        L.push(`[${c.members.map(basename).join(", ")}] — ${c.count} co-commits`);
-      }
-      L.push("");
-    }
+  // Tests
+  const tests = data.testFiles?.get(files[0]?.path ?? "");
+  if (tests?.length) {
+    L.push("## Tests");
+    for (const t of tests) L.push(basename(t));
+    L.push("");
   }
 
-  const activityLines: string[] = [];
-  for (const f of files.slice(0, 5)) {
-    const stat = data.fileStats.get(f.path);
-    if (!stat || stat.commit_count === 0) continue;
-    activityLines.push(
-      `${basename(f.path)}: ${stat.commit_count} commits, ${stat.recent_count}/90d, last: ${daysAgo(stat.last_modified)}`,
-    );
-  }
-  if (activityLines.length > 0) {
-    L.push("## Activity");
-    for (const line of activityLines) L.push(line);
+  // Blast radius
+  const consumers = data.reverseImports.get(files[0]?.path ?? "");
+  if (consumers?.length) {
+    L.push(`## Blast radius: ${consumers.length} consumer${consumers.length > 1 ? "s" : ""}`);
   }
 
   return L.join("\n");
 }
 
-interface Cluster {
-  members: string[];
-  count: number;
-}
+function formatModerate(data: ContextData): string {
+  const L: string[] = [];
+  const files = data.files.slice(0, 5);
+  const snippets = data.snippets ?? new Map();
+  const purposeMap = new Map<string, string>();
+  for (const m of data.metadata) {
+    if (m.purpose) purposeMap.set(m.path, m.purpose);
+  }
 
-function buildClusters(cochanges: CochangeRow[]): Cluster[] {
-  const clusters: Cluster[] = [];
+  L.push(`# ${data.goal}`);
+  L.push("");
 
-  for (const cc of cochanges) {
-    let merged = false;
-    for (const c of clusters) {
-      if (c.members.includes(cc.path) || c.members.includes(cc.partner)) {
-        if (!c.members.includes(cc.path)) c.members.push(cc.path);
-        if (!c.members.includes(cc.partner)) c.members.push(cc.partner);
-        c.count = Math.max(c.count, cc.count);
-        merged = true;
-        break;
+  const mostLikely = files.slice(0, 2);
+  const alsoRelevant = files.slice(2);
+
+  if (mostLikely.length > 0) {
+    L.push("## Most likely");
+    for (let i = 0; i < mostLikely.length; i++) {
+      const f = mostLikely[i];
+      const snip = snippets.get(f.path);
+      L.push(`${i + 1}. ${fileLabel(f.path, snip)} — ${f.reason}`);
+
+      // Inline chain + tests
+      const parts: string[] = [];
+      const rev = data.reverseImports.get(f.path);
+      const fwd = data.forwardImports.get(f.path);
+      if (rev?.length || fwd?.length) {
+        const deps = [...(fwd?.slice(0, 2).map(basename) ?? []), ...(rev?.slice(0, 2).map(basename) ?? [])];
+        parts.push(deps.join(", "));
       }
+      const tests = data.testFiles?.get(f.path);
+      if (tests?.length) parts.push(`tests: ${tests.map(basename).join(", ")}`);
+      if (parts.length > 0) L.push(`   ← ${parts.join(" | ")}`);
+
+      const purpose = purposeMap.get(f.path);
+      if (purpose) L.push(`   ${purpose}`);
     }
-    if (!merged) {
-      clusters.push({ members: [cc.path, cc.partner], count: cc.count });
+    L.push("");
+  }
+
+  if (alsoRelevant.length > 0) {
+    L.push("## Also relevant");
+    for (let i = 0; i < alsoRelevant.length; i++) {
+      const f = alsoRelevant[i];
+      const snip = snippets.get(f.path);
+      L.push(`${mostLikely.length + i + 1}. ${fileLabel(f.path, snip)} — ${f.reason}`);
     }
   }
 
-  return clusters
-    .filter((c) => c.count >= 2)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
+  return L.join("\n");
+}
+
+function formatLow(data: ContextData): string {
+  const L: string[] = [];
+  const files = data.files.slice(0, 7);
+  const snippets = data.snippets ?? new Map();
+
+  L.push(`# ${data.goal}`);
+  L.push("");
+  L.push("## Candidates (ranked)");
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const snip = snippets.get(f.path);
+    L.push(`${i + 1}. ${fileLabel(f.path, snip)} — ${f.reason}`);
+  }
+
+  return L.join("\n");
+}
+
+function progressiveStrip(output: string, _data: ContextData): string {
+  let result = output;
+
+  // Strip purpose lines first
+  if (estimateTokens(result) > TOKEN_CAP) {
+    result = result
+      .split("\n")
+      .filter((l) => {
+        const trimmed = l.trimStart();
+        // Remove purpose lines (indented non-header, non-numbered, non-arrow lines)
+        if (l.startsWith("   ") && !trimmed.startsWith("←") && !trimmed.match(/^\d+\./)) {
+          // Keep reason lines (directly after numbered items)
+          return false;
+        }
+        return true;
+      })
+      .join("\n");
+  }
+
+  // Strip chain section
+  if (estimateTokens(result) > TOKEN_CAP) {
+    const chainIdx = result.indexOf("## Chain");
+    if (chainIdx >= 0) {
+      const nextSection = result.indexOf("\n## ", chainIdx + 1);
+      result =
+        nextSection >= 0
+          ? result.substring(0, chainIdx) + result.substring(nextSection + 1)
+          : result.substring(0, chainIdx);
+    }
+  }
+
+  // Reduce to top 3 files
+  if (estimateTokens(result) > TOKEN_CAP) {
+    const lines = result.split("\n");
+    const reduced: string[] = [];
+    let fileCount = 0;
+    for (const line of lines) {
+      if (/^\d+\./.test(line.trimStart())) {
+        fileCount++;
+        if (fileCount > 3) continue;
+      }
+      reduced.push(line);
+    }
+    result = reduced.join("\n");
+  }
+
+  return result;
+}
+
+function filterByScoreRelevance(data: ContextData): ContextData {
+  if (!data.scores || data.scores.size === 0) return data;
+  const topScore = Math.max(...data.scores.values());
+  if (topScore <= 0) return data;
+  const threshold = topScore * 0.15;
+  const filtered = data.files.filter((f) => {
+    const score = data.scores?.get(f.path);
+    // Keep files without scores (co-change/semantic promoted) only if in top 5
+    if (score === undefined) return data.files.indexOf(f) < 5;
+    return score >= threshold;
+  });
+  return { ...data, files: filtered };
+}
+
+export function formatContextPack(data: ContextData): string {
+  const filtered = filterByScoreRelevance(data);
+  const confidence = detectConfidence(filtered.scores);
+
+  let output: string;
+  switch (confidence) {
+    case "high":
+      output = formatHigh(filtered);
+      break;
+    case "moderate":
+      output = formatModerate(filtered);
+      break;
+    default:
+      output = formatLow(filtered);
+      break;
+  }
+
+  if (estimateTokens(output) > TOKEN_CAP) {
+    output = progressiveStrip(output, data);
+  }
+
+  return output;
 }

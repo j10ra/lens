@@ -125,9 +125,28 @@ export interface VectorResult {
   score: number;
 }
 
+export type QueryKind = "stack_trace" | "error_message" | "symbol" | "natural";
+
+export interface ParsedQuery {
+  kind: QueryKind;
+  raw: string;
+  frames: Array<{ path: string; line: number }>;
+  symbol: string | null;
+  errorToken: string | null;
+  naturalTokens: string[];
+}
+
+export interface ResolvedSnippet {
+  path: string;
+  symbol: string | null;
+  line: number | null;
+  matchKind: "export" | "internal" | "section" | "frame" | null;
+}
+
 export interface InterpretedQuery {
   files: Array<{ path: string; reason: string }>;
   fileCap: number;
+  scores: Map<string, number>;
 }
 
 export interface ContextData {
@@ -139,6 +158,10 @@ export interface ContextData {
   hop2Deps: Map<string, string[]>;
   cochanges: CochangeRow[];
   fileStats: Map<string, FileStatRow>;
+  scores?: Map<string, number>;
+  snippets?: Map<string, ResolvedSnippet>;
+  testFiles?: Map<string, string[]>;
+  queryKind?: QueryKind;
 }
 
 export interface EmbedResult {

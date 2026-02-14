@@ -6,8 +6,11 @@ import { track } from "../telemetry";
 import type { RequestTrace } from "../trace";
 import type { ContextData, ContextResponse } from "../types";
 import { formatContextPack } from "./formatter";
+import { parseQuery } from "./input-parser";
 import { interpretQuery, isNoisePath } from "./query-interpreter";
+import { resolveSnippets } from "./snippet";
 import {
+  discoverTestFiles,
   get2HopReverseDeps,
   getAllFileStats,
   getCochangePartners,
@@ -85,6 +88,9 @@ export async function buildContext(
     }
     const embAvailable = useEmb && (await import("../db/queries")).chunkQueries.hasEmbeddings(db, repoId);
 
+    // Parse query intent
+    const parsed = parseQuery(goal);
+
     trace?.step("loadStructural");
     const metadata = loadFileMetadata(db, repoId);
     const allStats = getAllFileStats(db, repoId);
@@ -102,12 +108,20 @@ export async function buildContext(
       statsForInterpreter.set(path, { commit_count: stat.commit_count, recent_count: stat.recent_count });
     }
     trace?.step("interpretQuery");
-    const interpreted = interpretQuery(goal, metadata, statsForInterpreter, vocabClusters, indegreeMap, maxImportDepth);
-    trace?.end("interpretQuery", `${interpreted.files.length} files`);
+    const interpreted = interpretQuery(
+      goal,
+      metadata,
+      statsForInterpreter,
+      vocabClusters,
+      indegreeMap,
+      maxImportDepth,
+      parsed,
+    );
+    trace?.end("interpretQuery", `${interpreted.files.length} files (${parsed.kind})`);
 
     trace?.step("cochangePromotion");
     const topForCochange = interpreted.files.slice(0, 5).map((f) => f.path);
-    const cochangePartners = getCochangePartners(db, repoId, topForCochange, 3, 20);
+    const cochangePartners = getCochangePartners(db, repoId, topForCochange, 5, 15);
     const existingPathSet = new Set(interpreted.files.map((f) => f.path));
     let promoted = 0;
     for (const cp of cochangePartners) {
@@ -202,6 +216,18 @@ export async function buildContext(
 
     trace?.end("structuralEnrichment");
 
+    // Resolve snippets + test files (new v2 stages)
+    trace?.step("resolveSnippets");
+    const snippets = resolveSnippets(db, repoId, interpreted.files, metadata, parsed, 5);
+    const metadataPaths = new Set(metadata.map((m) => m.path));
+    const testFiles = discoverTestFiles(
+      reverseImports,
+      cochanges,
+      metadataPaths,
+      interpreted.files.slice(0, 5).map((f) => f.path),
+    );
+    trace?.end("resolveSnippets", `${snippets.size} snippets, ${testFiles.size} test maps`);
+
     trace?.step("formatContextPack");
     const data: ContextData = {
       goal,
@@ -212,6 +238,10 @@ export async function buildContext(
       hop2Deps,
       cochanges,
       fileStats: allStats,
+      scores: interpreted.scores,
+      snippets,
+      testFiles,
+      queryKind: parsed.kind,
     };
     const contextPack = formatContextPack(data);
     trace?.end("formatContextPack");

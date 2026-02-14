@@ -81,6 +81,54 @@ export function getCochangePartners(
   return cochangeQueries.getPartners(db, repoId, paths, minCount, limit);
 }
 
+const TEST_PATTERN = /\.(?:test|spec)\.|__tests__\/|_test\./;
+
+export function discoverTestFiles(
+  reverseImports: Map<string, string[]>,
+  cochanges: CochangeRow[],
+  metadataPaths: Set<string>,
+  sourcePaths: string[],
+): Map<string, string[]> {
+  const result = new Map<string, string[]>();
+
+  for (const src of sourcePaths) {
+    const tests = new Set<string>();
+
+    // 1. Reverse importers matching test pattern
+    const importers = reverseImports.get(src) ?? [];
+    for (const imp of importers) {
+      if (TEST_PATTERN.test(imp)) tests.add(imp);
+    }
+
+    // 2. Co-change partners matching test pattern
+    for (const cc of cochanges) {
+      const partner = cc.path === src ? cc.partner : cc.partner === src ? cc.path : null;
+      if (partner && TEST_PATTERN.test(partner)) tests.add(partner);
+    }
+
+    // 3. Path sibling heuristic
+    const ext = src.slice(src.lastIndexOf("."));
+    const base = src.slice(0, src.lastIndexOf("."));
+    const dir = src.slice(0, src.lastIndexOf("/"));
+    const name = src.slice(src.lastIndexOf("/") + 1, src.lastIndexOf("."));
+    const candidates = [
+      `${base}.test${ext}`,
+      `${base}.spec${ext}`,
+      `${dir}/__tests__/${name}${ext}`,
+      `${dir}/__tests__/${name}.test${ext}`,
+    ];
+    for (const c of candidates) {
+      if (metadataPaths.has(c)) tests.add(c);
+    }
+
+    if (tests.size > 0) {
+      result.set(src, [...tests].slice(0, 3));
+    }
+  }
+
+  return result;
+}
+
 export function loadVocabClusters(db: Db, repoId: string): VocabCluster[] | null {
   const repo = repoQueries.getById(db, repoId);
   if (!repo?.vocab_clusters) return null;

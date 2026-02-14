@@ -1,4 +1,4 @@
-import type { FileMetadataRow, InterpretedQuery, VocabCluster } from "../types";
+import type { FileMetadataRow, InterpretedQuery, ParsedQuery, VocabCluster } from "../types";
 
 const STOPWORDS = new Set([
   "the",
@@ -100,6 +100,38 @@ const STOPWORDS = new Set([
   "spec",
   "mock",
   "module",
+  "work",
+  "works",
+  "working",
+  "make",
+  "makes",
+  "use",
+  "uses",
+  "used",
+  "using",
+  "find",
+  "run",
+  "runs",
+  "call",
+  "calls",
+  "look",
+  "like",
+  "just",
+  "also",
+  "about",
+  "there",
+  "here",
+  "define",
+  "defined",
+  "handle",
+  "handles",
+  "add",
+  "adds",
+  "create",
+  "serve",
+  "does",
+  "file",
+  "files",
 ]);
 
 const NOISE_EXTENSIONS = new Set([
@@ -186,8 +218,9 @@ const CONCEPT_SYNONYMS: Record<string, string[]> = {
 function expandKeywords(
   words: string[],
   clusters: VocabCluster[] | null,
-): { exact: string[]; stemmed: string[]; clusterFiles: Set<string> } {
+): { exact: string[]; expanded: Set<string>; stemmed: string[]; clusterFiles: Set<string> } {
   const exact = new Set<string>();
+  const expanded = new Set<string>();
   const stemmed = new Set<string>();
   const clusterFiles = new Set<string>();
 
@@ -209,7 +242,9 @@ function expandKeywords(
   for (const w of words) {
     const synonyms = CONCEPT_SYNONYMS[w];
     if (synonyms) {
-      for (const syn of synonyms) exact.add(syn);
+      for (const syn of synonyms) {
+        if (!exact.has(syn)) expanded.add(syn);
+      }
     }
   }
 
@@ -217,7 +252,9 @@ function expandKeywords(
     for (const w of words) {
       for (const cluster of clusters) {
         if (cluster.terms.includes(w) || cluster.terms.some((t) => stem(t) === stem(w))) {
-          for (const t of cluster.terms) exact.add(t);
+          for (const t of cluster.terms) {
+            if (!exact.has(t)) expanded.add(t);
+          }
           for (const f of cluster.files) clusterFiles.add(f);
         }
       }
@@ -225,7 +262,8 @@ function expandKeywords(
   }
 
   for (const e of exact) stemmed.delete(e);
-  return { exact: [...exact], stemmed: [...stemmed], clusterFiles };
+  for (const e of expanded) stemmed.delete(e);
+  return { exact: [...exact], expanded, stemmed: [...stemmed], clusterFiles };
 }
 
 export function isNoisePath(path: string): boolean {
@@ -261,6 +299,7 @@ export function interpretQuery(
   vocabClusters?: VocabCluster[] | null,
   indegrees?: Map<string, number>,
   maxImportDepth?: number,
+  parsed?: ParsedQuery,
 ): InterpretedQuery {
   const rawWords = query
     .toLowerCase()
@@ -268,8 +307,8 @@ export function interpretQuery(
     .split(/\s+/)
     .filter((w) => w.length > 2 && !STOPWORDS.has(w));
 
-  const { exact, stemmed, clusterFiles } = expandKeywords(rawWords, vocabClusters ?? null);
-  const allTerms = [...exact, ...stemmed];
+  const { exact, expanded, stemmed, clusterFiles } = expandKeywords(rawWords, vocabClusters ?? null);
+  const allTerms = [...exact, ...expanded, ...stemmed];
   const termWeights = buildTermWeights(allTerms, metadata);
 
   // Pre-compute decomposed export tokens per file (camelCase/PascalCase → individual words)
@@ -312,6 +351,26 @@ export function interpretQuery(
     const pathTokenSet = new Set([...fileTokens, ...dirTokens]);
     const expTokens = exportTokensMap.get(f.path);
 
+    // Query-kind-specific boosts (applied before TF-IDF)
+    if (parsed) {
+      if (parsed.kind === "stack_trace") {
+        for (const frame of parsed.frames) {
+          if (f.path.endsWith(frame.path) || frame.path.endsWith(f.path)) {
+            score += 50;
+          }
+        }
+      } else if (parsed.kind === "symbol" && parsed.symbol) {
+        const sym = parsed.symbol;
+        if ((f.exports ?? []).includes(sym)) score += 100;
+        else if ((f.internals ?? []).includes(sym)) score += 80;
+      } else if (parsed.kind === "error_message" && parsed.errorToken) {
+        const token = parsed.errorToken.toLowerCase();
+        if (exportsLower.includes(token) || internalsLower.includes(token) || pathLower.includes(token)) {
+          score += 30;
+        }
+      }
+    }
+
     for (const w of exact) {
       const weight = termWeights.get(w) ?? 1;
       let termScore = 0;
@@ -322,6 +381,18 @@ export function interpretQuery(
       if (docLower.includes(w) || purposeLower.includes(w)) termScore += 1 * weight;
       if (sectionsLower.includes(w)) termScore += 1 * weight;
       if (internalsLower.includes(w)) termScore += 1.5 * weight;
+      if (termScore > 0) matchedTerms++;
+      score += termScore;
+    }
+
+    // Expanded terms (synonyms + vocab clusters) — no path boosts, reduced weight
+    for (const w of expanded) {
+      const weight = (termWeights.get(w) ?? 1) * 0.5;
+      let termScore = 0;
+      if (expTokens?.has(w)) termScore += 2 * weight;
+      else if (exportsLower.includes(w)) termScore += 1.5 * weight;
+      if (docLower.includes(w) || purposeLower.includes(w)) termScore += 1 * weight;
+      if (internalsLower.includes(w)) termScore += 1 * weight;
       if (termScore > 0) matchedTerms++;
       score += termScore;
     }
@@ -387,15 +458,29 @@ export function interpretQuery(
     if (deduped.length >= fileCap) break;
   }
 
+  const scores = new Map<string, number>();
+  for (const f of deduped) scores.set(f.path, f.score);
+
   return {
     fileCap,
+    scores,
     files: deduped.map((f) => {
-      const reason =
-        f.docstring?.slice(0, 80) ||
-        (f.exports?.length ? `exports: ${f.exports.slice(0, 4).join(", ")}` : "path match");
+      const reason = truncateAtWord(f.docstring, 80) || formatExports(f.exports) || f.path.split("/").pop() || "";
       return { path: f.path, reason };
     }),
   };
+}
+
+function truncateAtWord(s: string | undefined | null, max: number): string {
+  if (!s) return "";
+  if (s.length <= max) return s;
+  const cut = s.lastIndexOf(" ", max);
+  return cut > max * 0.5 ? `${s.slice(0, cut)}...` : `${s.slice(0, max)}...`;
+}
+
+function formatExports(exports: string[] | undefined): string {
+  if (!exports?.length) return "";
+  return `exports: ${exports.slice(0, 4).join(", ")}`;
 }
 
 function siblingKey(path: string): string {

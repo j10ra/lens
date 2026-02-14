@@ -317,6 +317,22 @@ export const chunkQueries = {
     return !!row;
   },
 
+  getByRepoPaths(db: Db, repoId: string, paths: string[]) {
+    if (!paths.length) return [];
+    return db
+      .select({
+        path: chunks.path,
+        chunk_index: chunks.chunk_index,
+        start_line: chunks.start_line,
+        end_line: chunks.end_line,
+        content: chunks.content,
+      })
+      .from(chunks)
+      .where(and(eq(chunks.repo_id, repoId), inArray(chunks.path, paths)))
+      .orderBy(chunks.path, chunks.chunk_index)
+      .all();
+  },
+
   getStats(db: Db, repoId: string) {
     const row = db
       .select({
