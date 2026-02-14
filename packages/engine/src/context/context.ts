@@ -264,6 +264,11 @@ export async function buildContext(
     );
     trace?.end("resolveSnippets", `${snippets.size} snippets, ${testFiles.size} test maps`);
 
+    trace?.step("sliceContext");
+    const { sliceContext: sliceCtx } = await import("./slicer");
+    const slices = sliceCtx(db, repoId, snippets, parsed.kind);
+    trace?.end("sliceContext", `${slices.size} slices`);
+
     trace?.step("formatContextPack");
     const data: ContextData = {
       goal,
@@ -276,6 +281,7 @@ export async function buildContext(
       fileStats: allStats,
       scores: interpreted.scores,
       snippets,
+      slices,
       testFiles,
       queryKind: parsed.kind,
     };

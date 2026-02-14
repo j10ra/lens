@@ -64,6 +64,7 @@ export { RequestTrace, type TraceStep } from "./trace";
 export type {
   Chunk,
   CochangeRow,
+  CodeSlice,
   ContextData,
   ContextResponse,
   EmbedResult,

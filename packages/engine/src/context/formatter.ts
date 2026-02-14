@@ -1,6 +1,6 @@
 import type { CochangeRow, ContextData, ResolvedSnippet } from "../types";
 
-const TOKEN_CAP = 1200;
+const TOKEN_CAP = 2000;
 
 function estimateTokens(s: string): number {
   return Math.ceil(s.length / 4);
@@ -12,6 +12,33 @@ function basename(p: string): string {
 }
 
 // --- Helpers ---
+
+const LANG_EXT: Record<string, string> = {
+  ts: "typescript",
+  tsx: "typescript",
+  js: "javascript",
+  jsx: "javascript",
+  py: "python",
+  rb: "ruby",
+  go: "go",
+  rs: "rust",
+  java: "java",
+  kt: "kotlin",
+  cs: "csharp",
+  cpp: "cpp",
+  c: "c",
+  h: "c",
+  swift: "swift",
+  php: "php",
+  sql: "sql",
+  sh: "shell",
+};
+
+function guessLang(path: string): string {
+  const dot = path.lastIndexOf(".");
+  if (dot < 0) return "";
+  return LANG_EXT[path.substring(dot + 1)] ?? "";
+}
 
 function getPurpose(path: string, data: ContextData): string {
   for (const m of data.metadata) {
@@ -54,6 +81,13 @@ function fileLabel(path: string, snippet?: ResolvedSnippet): string {
   return `${path}${line}`;
 }
 
+function renderSlice(path: string, data: ContextData): string | null {
+  const slice = data.slices?.get(path);
+  if (!slice) return null;
+  const lang = guessLang(path);
+  return `   \`\`\`${lang}\n${slice.code}\n   \`\`\``;
+}
+
 // --- Templates ---
 
 function formatNatural(data: ContextData): string {
@@ -80,6 +114,9 @@ function formatNatural(data: ContextData): string {
 
     const cochangeStr = renderCochanges(f.path, data.cochanges);
     if (cochangeStr) L.push(`   Co-changes: ${cochangeStr}`);
+
+    const sliceStr = renderSlice(f.path, data);
+    if (sliceStr) L.push(sliceStr);
   }
 
   // Test files
@@ -130,6 +167,9 @@ function formatSymbol(data: ContextData): string {
     const exports = getExports(top.path, data);
     if (exports.length) L.push(`  Exports: ${exports.slice(0, 5).join(", ")}`);
   }
+
+  const sliceStr = renderSlice(top.path, data);
+  if (sliceStr) L.push(sliceStr);
 
   // Dependents (reverse imports)
   const rev = data.reverseImports.get(top.path);
@@ -187,6 +227,9 @@ function formatError(data: ContextData): string {
   const imports = renderImports(top.path, data);
   if (imports) L.push(`   ${imports}`);
 
+  const sliceStr = renderSlice(top.path, data);
+  if (sliceStr) L.push(sliceStr);
+
   if (files.length > 1) {
     L.push("");
     L.push("## Also References");
@@ -225,6 +268,9 @@ function formatStackTrace(data: ContextData): string {
     L.push(`  \`${snip.symbol}\``);
   }
 
+  const sliceStr = renderSlice(top.path, data);
+  if (sliceStr) L.push(sliceStr);
+
   // Call chain from import graph
   const chain: string[] = [];
   const fwd = data.forwardImports.get(top.path);
@@ -243,7 +289,7 @@ function formatStackTrace(data: ContextData): string {
     for (const c of chain) L.push(c);
   }
 
-  // Related files
+  // Related files (with slices for stack_trace — up to 2 total)
   if (files.length > 1) {
     L.push("");
     L.push("## Related");
@@ -252,6 +298,8 @@ function formatStackTrace(data: ContextData): string {
       const p = getPurpose(f.path, data);
       const cochangeStr = renderCochanges(f.path, data.cochanges, 1);
       L.push(`- ${f.path}${p ? ` \u2014 ${p}` : ""}${cochangeStr ? ` (${cochangeStr})` : ""}`);
+      const relSlice = renderSlice(f.path, data);
+      if (relSlice) L.push(relSlice);
     }
   }
 
@@ -260,10 +308,32 @@ function formatStackTrace(data: ContextData): string {
 
 // --- Progressive Stripping ---
 
+function stripCodeSlices(lines: string[]): string[] {
+  const result: string[] = [];
+  let inFence = false;
+  for (const line of lines) {
+    if (line.trimStart().startsWith("```") && !inFence) {
+      inFence = true;
+      continue;
+    }
+    if (inFence && line.trimStart().startsWith("```")) {
+      inFence = false;
+      continue;
+    }
+    if (!inFence) result.push(line);
+  }
+  return result;
+}
+
 function progressiveStrip(output: string, _data: ContextData): string {
   let lines = output.split("\n");
 
-  // 1. Truncate co-change lines (keep top 1 per file)
+  // 1. Strip code slices (fenced blocks) — highest token cost
+  if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
+    lines = stripCodeSlices(lines);
+  }
+
+  // 2. Truncate co-change lines (keep top 1 per file)
   if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
     lines = lines.map((l) => {
       if (l.trimStart().startsWith("Co-changes:")) {
@@ -274,7 +344,7 @@ function progressiveStrip(output: string, _data: ContextData): string {
     });
   }
 
-  // 2. Drop test files section
+  // 3. Drop test files section
   if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
     const testIdx = lines.findIndex((l) => l.startsWith("## Tests"));
     if (testIdx >= 0) {
@@ -284,7 +354,7 @@ function progressiveStrip(output: string, _data: ContextData): string {
     }
   }
 
-  // 3. Truncate import arrows (keep top 2 per direction)
+  // 4. Truncate import arrows (keep top 2 per direction)
   if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
     lines = lines.filter((l) => {
       const trimmed = l.trimStart();
@@ -292,7 +362,7 @@ function progressiveStrip(output: string, _data: ContextData): string {
     });
   }
 
-  // 4. Reduce to top 5 files
+  // 5. Reduce to top 5 files
   if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
     const reduced: string[] = [];
     let fileCount = 0;
@@ -306,7 +376,7 @@ function progressiveStrip(output: string, _data: ContextData): string {
     lines = reduced;
   }
 
-  // 5. Drop purpose summaries (last resort)
+  // 6. Drop purpose summaries (last resort)
   if (estimateTokens(lines.join("\n")) > TOKEN_CAP) {
     lines = lines.map((l) => {
       const dashIdx = l.indexOf(" \u2014 ");

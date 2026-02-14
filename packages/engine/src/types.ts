@@ -145,6 +145,14 @@ export interface ResolvedSnippet {
   matchKind: "export" | "internal" | "section" | "frame" | null;
 }
 
+export interface CodeSlice {
+  path: string;
+  startLine: number;
+  endLine: number;
+  code: string;
+  symbol: string | null;
+}
+
 export interface InterpretedQuery {
   files: Array<{ path: string; reason: string }>;
   fileCap: number;
@@ -162,6 +170,7 @@ export interface ContextData {
   fileStats: Map<string, FileStatRow>;
   scores?: Map<string, number>;
   snippets?: Map<string, ResolvedSnippet>;
+  slices?: Map<string, CodeSlice>;
   testFiles?: Map<string, string[]>;
   queryKind?: QueryKind;
 }
