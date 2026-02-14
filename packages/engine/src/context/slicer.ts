@@ -3,7 +3,6 @@ import { chunkQueries } from "../db/queries";
 import type { CodeSlice, QueryKind, ResolvedSnippet } from "../types";
 
 const RADIUS = 10;
-const MAX_LINES = 25;
 
 const MAX_SLICES: Record<QueryKind, number> = {
   symbol: 1,
@@ -22,7 +21,7 @@ function extractSlice(
   const lines = chunk.content.split("\n");
   const offset = targetLine - chunk.start_line;
   const from = Math.max(0, offset - RADIUS);
-  const to = Math.min(lines.length, from + MAX_LINES);
+  const to = Math.min(lines.length, offset + RADIUS + 1);
   const sliced = lines.slice(from, to);
 
   if (!sliced.length) return null;

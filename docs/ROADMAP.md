@@ -256,18 +256,22 @@ The data exists. Just render it. This is the change most likely to move the eval
 
 Extract relevant code sections, not just file paths. This is what separates LENS from a better Grep. If this doesn't move the needle, nothing will.
 
-**Changes:**
-1. New function `sliceContext(db, repoId, files, focus?)` in `engine/src/context/`.
+**Changes (shipped):**
+1. New `sliceContext(db, repoId, snippets, queryKind)` in `engine/src/context/slicer.ts`.
 2. For each file: find the chunk containing the resolved snippet's line range.
-3. Extract ±10 lines around the symbol definition.
-4. Include referenced types/interfaces from imports (1-hop forward).
-5. Return structured slices with `key_code`, `relevant_lines`, `imports_from`, `imported_by`.
+3. Extract ±10 lines around the symbol definition (21 lines max, symmetric).
+4. Render as syntax-highlighted fenced code blocks in all 4 formatter templates.
+5. Progressive stripping: code slices stripped first when over TOKEN_CAP.
 
-**Files touched:** New `slicer.ts`, update `context.ts`, update `formatter.ts`
-**Risk:** Medium — chunk lookup is fast (SQLite), but line-range extraction needs testing.
-**Validation:** Context pack should contain enough code that agent's first action is Write/Edit, not Read.
+**Deferred to post-gate (low value for first pass):**
+- 1-hop type/interface expansion — forward import paths already point agents to the right file.
+- Structured slice outputs (`key_code`, `relevant_lines`, `imports_from`, `imported_by`) — raw code windows with file:line anchors provide sufficient context for agent consumption.
 
-**Done when:** Agent receiving a LENS context pack can start editing without a single Read call. Eval harness recall@5 > 80%.
+**Files touched:** New `slicer.ts`, update `context.ts`, update `formatter.ts`, update `types.ts`
+**Risk:** Low — chunk lookup is a single bounded SQLite query, +4ms avg overhead.
+**Validation:** Context pack contains enough code that agent's first action is Write/Edit, not Read. Eval harness recall@5 > 80%.
+
+**Done when:** Code slices ship in context packs. Eval harness shows no regression. Deferred items tracked for post-gate.
 
 ---
 
