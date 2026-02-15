@@ -1,0 +1,6 @@
+model_mapping,sonnet=glm-5,opus=glm-5
+model_mapping,sonnet=glm-5,opus=glm-5
+cse-exp-01,without,44,attempt=1
+cse-dbg-01,without,92,attempt=1
+cse-exp-01,with,54,attempt=1
+cse-dbg-01,with,40,attempt=1

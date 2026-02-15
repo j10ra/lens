@@ -47,28 +47,26 @@ export function RootLayout() {
   });
 
   useEffect(() => {
-    const es = new EventSource("/api/auth/events");
-    es.onmessage = () => {
-      // Daemon refreshes quota cache before emitting SSE, so data is fresh
-      qc.invalidateQueries({ queryKey: ["auth-status"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-usage"] });
-      qc.invalidateQueries({ queryKey: ["cloud-subscription"] });
-    };
-    return () => es.close();
-  }, [qc]);
-
-  useEffect(() => {
-    const es = new EventSource("/api/repo/events");
-    let timer: ReturnType<typeof setTimeout>;
-    es.onmessage = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        qc.invalidateQueries({ queryKey: ["dashboard-repos"] });
-        qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      }, 300);
+    const es = new EventSource("/api/events");
+    let repoTimer: ReturnType<typeof setTimeout>;
+    es.onmessage = (e) => {
+      try {
+        const { type } = JSON.parse(e.data) as { type: string };
+        if (type === "auth") {
+          qc.invalidateQueries({ queryKey: ["auth-status"] });
+          qc.invalidateQueries({ queryKey: ["dashboard-usage"] });
+          qc.invalidateQueries({ queryKey: ["cloud-subscription"] });
+        } else if (type === "repo") {
+          clearTimeout(repoTimer);
+          repoTimer = setTimeout(() => {
+            qc.invalidateQueries({ queryKey: ["dashboard-repos"] });
+            qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+          }, 300);
+        }
+      } catch {}
     };
     return () => {
-      clearTimeout(timer);
+      clearTimeout(repoTimer);
       es.close();
     };
   }, [qc]);

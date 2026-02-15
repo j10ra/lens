@@ -43,10 +43,9 @@ declare module "hono" {
 const TEMPLATE = `<!-- LENS — Repo Context Daemon -->
 ## LENS Context
 
-This repo is indexed by LENS. Use the MCP context tool or run:
-\`\`\`
-lens context "<your goal>"
-\`\`\``;
+This repo is indexed by LENS. When exploring architecture, tracing data flow, or assessing change impact, call \`mcp__lens__get_context\` — it returns ranked files with import chains and co-change clusters that keyword search alone won't surface.
+
+CLI alternative: \`lens context "<your goal>"\``;
 
 const startedAt = Date.now();
 
@@ -222,23 +221,6 @@ export function createApp(
       const trace = c.get("trace");
       const { root_path, name, remote_url } = await c.req.json();
       if (!root_path) return c.json({ error: "root_path required" }, 400);
-
-      // Registration limit check
-      trace.step("quotaCheck");
-      const currentRepos = listRepos(db).length;
-      const maxRepos = quotaCache?.quota?.maxRepos ?? 50;
-      trace.end("quotaCheck", `${currentRepos}/${maxRepos}`);
-      if (currentRepos >= maxRepos) {
-        return c.json(
-          {
-            error: "Repo limit reached",
-            current: currentRepos,
-            limit: maxRepos,
-            plan: quotaCache?.plan ?? "unknown",
-          },
-          429,
-        );
-      }
 
       trace.step("registerRepo");
       const result = registerRepo(db, root_path, name, remote_url);
@@ -702,28 +684,37 @@ export function createApp(
     };
   }
 
-  // SSE: repo mutation bus — notify dashboard on register/remove/index/watch changes
-  const repoClients = new Set<ReadableStreamDefaultController>();
+  // SSE: unified event bus — single connection for all dashboard events
+  const sseClients = new Set<ReadableStreamDefaultController>();
   const encoder = new TextEncoder();
 
-  function emitRepoEvent() {
-    for (const ctrl of repoClients) {
+  function emitSSE(type: string) {
+    const payload = encoder.encode(`data: ${JSON.stringify({ type })}\n\n`);
+    for (const ctrl of sseClients) {
       try {
-        ctrl.enqueue(encoder.encode("data: repo-changed\n\n"));
+        ctrl.enqueue(payload);
       } catch {
-        repoClients.delete(ctrl);
+        sseClients.delete(ctrl);
       }
     }
   }
 
-  trackRoute("GET", "/api/repo/events");
-  app.get("/api/repo/events", (_c) => {
+  function emitRepoEvent() {
+    emitSSE("repo");
+  }
+
+  function emitAuthEvent() {
+    emitSSE("auth");
+  }
+
+  trackRoute("GET", "/api/events");
+  app.get("/api/events", (_c) => {
     const stream = new ReadableStream({
       start(ctrl) {
-        repoClients.add(ctrl);
+        sseClients.add(ctrl);
       },
-      cancel() {
-        /* cleaned up on next failed enqueue */
+      cancel(ctrl) {
+        sseClients.delete(ctrl);
       },
     });
     return new Response(stream, {
@@ -735,19 +726,8 @@ export function createApp(
     });
   });
 
-  // SSE: watch ~/.lens/auth.json and push changes to connected clients
-  const authClients = new Set<ReadableStreamDefaultController>();
+  // Watch ~/.lens/auth.json and push changes to connected clients
   const authDir = join(homedir(), ".lens");
-
-  function emitAuthEvent() {
-    for (const ctrl of authClients) {
-      try {
-        ctrl.enqueue(encoder.encode("data: auth-changed\n\n"));
-      } catch {
-        authClients.delete(ctrl);
-      }
-    }
-  }
 
   try {
     watch(authDir, (_, filename) => {
@@ -759,25 +739,6 @@ export function createApp(
         .catch(() => emitAuthEvent());
     });
   } catch {}
-
-  trackRoute("GET", "/api/auth/events");
-  app.get("/api/auth/events", (_c) => {
-    const stream = new ReadableStream({
-      start(ctrl) {
-        authClients.add(ctrl);
-      },
-      cancel() {
-        /* cleaned up on next failed enqueue */
-      },
-    });
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
-  });
 
   trackRoute("POST", "/api/auth/notify");
   app.post("/api/auth/notify", async (c) => {

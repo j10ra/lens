@@ -18,5 +18,12 @@
 		"postinstall": "echo '\\n  Run \"lens start\" to launch the daemon (auto-starts on login).\\n'"
 	},
 	"license": "MIT",
-	"homepage": "https://lens-engine.com"
+	"homepage": "https://github.com/j10ra/lens",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/j10ra/lens.git"
+	},
+	"bugs": {
+		"url": "https://github.com/j10ra/lens/issues"
+	}
 }

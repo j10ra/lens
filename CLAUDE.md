@@ -6,7 +6,9 @@ Indexes codebases and serves context packs to AI agents.
 
 ### LENS MCP
 
-This repo is indexed by LENS. Use `mcp__lens__get_context` or `lens context "<goal>"` to find relevant files, imports, and co-change clusters — especially useful when unsure where to start or understanding cross-cutting concerns.
+This repo is indexed by LENS. When exploring architecture, tracing data flow, or assessing change impact, call `mcp__lens__get_context` — it returns ranked files with import chains and co-change clusters that keyword search alone won't surface.
+
+CLI alternative: `lens context "<your goal>"`
 
 ### Monorepo Structure (pnpm workspaces)
 

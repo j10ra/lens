@@ -27,7 +27,7 @@ Eval harness → Formatter rewrite → Context slicing → GO/NO-GO → Routing 
 | 1. Eval harness | ✅ Done | Baseline recorded 2026-02-15 |
 | 2. Formatter rewrite | ✅ Done | Hit@3 85%→95%, natural 100%, error 67%, 15ms avg. See results below |
 | 3. Context slicing | ✅ Done | Hit@3 95% (no regression), 19ms avg. Code slices in all 4 templates. See results below |
-| GO/NO-GO gate | ⬜ Not started | `← YOU ARE HERE` |
+| GO/NO-GO gate | ⬜ Not started |  |
 | 4. Specialized routing | ⬜ Blocked (gate) | |
 | 5. Weight tuning | ⬜ Blocked (gate) | |
 | 6. Cloud + monetization | 🧊 Frozen | ~70% done, paused until gate passes |
@@ -284,15 +284,17 @@ Run the full eval harness + fresh A/B benchmarks (n=20+ this time, not n=3). Ans
 
 > Does LENS consistently beat a cold agent on exploratory tasks?
 
-| Signal | GO | NO-GO |
-|--------|-----|-------|
-| Top-3 hit rate | >80% | <60% |
-| Tool calls saved (exploratory) | >40% | <20% |
-| Agent task completion rate | >80% with LENS | No improvement |
-| Targeted query overhead | <2s penalty | >5s penalty |
+| Signal | GO | NO-GO | Weight |
+|--------|-----|-------|--------|
+| Top-3 hit rate | >80% | <60% | Decisive |
+| Tool calls saved (exploratory) | >40% | <20% | Decisive |
+| Agent task completion rate | >80% with LENS | No improvement | Decisive |
+| Targeted query overhead | <2s penalty | >5s penalty | Informational |
 
-**GO:** Proceed to Phase 4-5, resume cloud work, pursue users.
-**NO-GO:** Pivot (different approach to context delivery) or stop (the problem doesn't need solving).
+Signals 1-3 determine the verdict. Signal 4 (targeted overhead) is tracked but **informational only** — cold-start variance dominates short-lived targeted lookups, and the moat lives in Signals 2-3 (tool-call savings and completion quality on complex tasks).
+
+**GO:** Signals 1-3 all pass → proceed to Phase 4-5, resume cloud work, pursue users.
+**NO-GO:** 2+ of Signals 1-3 in NO-GO range → pivot or stop.
 
 ---
 

@@ -63,7 +63,7 @@ export function createMcpServer(db: Db, caps?: Capabilities): McpServer {
     "get_context",
     {
       description:
-        "Prefer this tool over Grep/Glob when searching for files relevant to a task across the codebase. Returns ranked files, imports, and co-change clusters for a development goal. Skip for simple lookups where you already know the file path or location.",
+        "Returns ranked files with import dependency chains and git co-change clusters for a development goal. Surfaces structural relationships (imports, co-changes, exports) that keyword search alone won't find. Use when exploring architecture, tracing data flow, assessing change impact, or navigating an unfamiliar codebase. Skip for simple lookups where you already know the file path.",
       inputSchema: { repo_path: z.string(), goal: z.string() },
     },
     async ({ repo_path, goal }) => {

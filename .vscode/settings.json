@@ -12,5 +12,8 @@
   },
   "[jsonc]": {
     "editor.defaultFormatter": "biomejs.biome"
+  },
+   "workbench.editorAssociations": {   
+    "*.md": "vscode.markdown.preview.editor",
   }
 }

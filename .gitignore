@@ -31,6 +31,11 @@ supabase/.temp
 
 # Misc
 temp.md
+notes.md
+
+# Private skills (contain API tokens)
+.claude/skills/benchmark/
+.claude/skills/zlm/
 
 # OS
 .DS_Store

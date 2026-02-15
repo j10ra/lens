@@ -1,0 +1,3 @@
+model_mapping,sonnet=glm-5,opus=glm-5
+pinn-exp-01,without,126,attempt=1
+pinn-exp-01,with,119,attempt=1
