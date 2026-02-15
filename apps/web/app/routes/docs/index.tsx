@@ -364,6 +364,122 @@ Context pack: 12 files, 3.2KB
       </section>
 
       <section
+        id="benchmarks"
+        className="scroll-mt-28 border-b border-border/70 pb-10"
+      >
+        <h2 className="text-xl font-semibold tracking-tight">
+          Benchmarks &amp; Findings
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          We ran controlled A/B benchmarks across multiple repos (32-2000+
+          files) to measure what LENS actually does for AI agents. Here's what
+          we found — the good and the honest.
+        </p>
+
+        <h3 className="mt-7 text-sm font-semibold text-foreground">
+          What works
+        </h3>
+        <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-0.5 shrink-0 text-success">+</span>
+            <span>
+              <strong className="text-foreground">
+                +15.8pp on unfamiliar repos
+              </strong>{" "}
+              — when agents explore a codebase they've never seen, pre-injected
+              LENS context packs improved answer accuracy by 15.8 percentage
+              points vs baseline.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-0.5 shrink-0 text-success">+</span>
+            <span>
+              <strong className="text-foreground">Sub-second queries</strong> —
+              context packs return in ~10ms cached, under 1s cold. The
+              7-stage pipeline (TF-IDF, import graph, co-change, concept
+              expansion) runs entirely local.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-0.5 shrink-0 text-success">+</span>
+            <span>
+              <strong className="text-foreground">
+                Co-change catches what grep misses
+              </strong>{" "}
+              — git history analysis surfaces files that always change together
+              (e.g. a service + its test + its migration). No keyword overlap
+              needed.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-0.5 shrink-0 text-success">+</span>
+            <span>
+              <strong className="text-foreground">Import chain traversal</strong>{" "}
+              — 2-hop dependency walking finds structural relationships that
+              flat file search can't.
+            </span>
+          </li>
+        </ul>
+
+        <h3 className="mt-7 text-sm font-semibold text-foreground">
+          What we learned
+        </h3>
+        <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-muted-foreground">
+          <li className="flex gap-2">
+            <span className="mt-0.5 shrink-0 text-muted-foreground/60">~</span>
+            <span>
+              <strong className="text-foreground">
+                Agents are good at grep
+              </strong>{" "}
+              — on tasks with obvious search keywords, agents score equally
+              well with or without LENS. Grep + Glob is already an effective
+              search strategy for keyword-rich tasks.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-0.5 shrink-0 text-muted-foreground/60">~</span>
+            <span>
+              <strong className="text-foreground">
+                MCP tool adoption is hard
+              </strong>{" "}
+              — across 9 benchmark runs with LENS MCP tools available, agents
+              called them 0 times. They default to built-in tools (Grep, Glob,
+              Read) regardless of tool descriptions or CLAUDE.md instructions.
+              This is a known limitation of current agent tool selection behavior.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="mt-0.5 shrink-0 text-muted-foreground/60">~</span>
+            <span>
+              <strong className="text-foreground">
+                Value scales with unfamiliarity
+              </strong>{" "}
+              — LENS helps most when the agent (or developer) doesn't know
+              where to start. On repos you work in daily, you already know the
+              right files. On new codebases, LENS's structural ranking provides
+              real signal.
+            </span>
+          </li>
+        </ul>
+
+        <div className="mt-7 rounded-lg border border-border/70 bg-muted/30 px-4 py-3">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Full benchmark data, raw outputs, and scoring methodology are
+            published in the{" "}
+            <a
+              href="https://github.com/j10ra/lens/tree/main/bench"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              bench/
+            </a>{" "}
+            directory on GitHub.
+          </p>
+        </div>
+      </section>
+
+      <section
         id="mcp-integration"
         className="scroll-mt-28 border-b border-border/70 pb-10"
       >
