@@ -26,8 +26,8 @@ Controlled A/B benchmarks across multiple repos (32-2000+ files) measuring what 
 
 | Repo | Files | n | Score WITH | Score WITHOUT | Delta |
 |------|-------|---|-----------|---------------|-------|
-| Pinnacle (unfamiliar, C#) | 2000+ | 12 | 74.2% | 58.3% | **+15.8pp** |
-| RLM (own repo, TS) | 200+ | 12 | 69.2% | 77.1% | -7.9pp |
+| Enterprise app (unfamiliar, C#) | 2000+ | 12 | 74.2% | 58.3% | **+15.8pp** |
+| Own repo (daily-driver, TS) | 200+ | 12 | 69.2% | 77.1% | -7.9pp |
 
 **Finding**: LENS helps most on unfamiliar repos where the agent doesn't know the codebase structure. On repos you work in daily, the overhead can hurt.
 
@@ -35,11 +35,11 @@ Controlled A/B benchmarks across multiple repos (32-2000+ files) measuring what 
 
 | Run | Repo | n | LENS Adopted | Score Delta |
 |-----|------|---|-------------|-------------|
-| 2026-02-15-1924 | copilot-survey-engine (32 files) | 2 | 0/2 | 0pp |
-| 2026-02-15-2104 | Pinnacle (wrong path) | 1 | 0/1 | 0pp |
-| 2026-02-15-2115 | Pinnacle (wrong path) | 2 | 0/2 | 0pp |
-| 2026-02-15-2209 | Pinnacle (correct path) | 2 | 0/2 | 0pp |
-| 2026-02-15-2330 | Pinnacle (updated desc) | 2 | 0/2 | 0pp |
+| 2026-02-15-1924 | Small OSS project (32 files) | 2 | 0/2 | 0pp |
+| 2026-02-15-2104 | Enterprise app (misc. config) | 1 | 0/1 | 0pp |
+| 2026-02-15-2115 | Enterprise app (2 scenarios) | 2 | 0/2 | 0pp |
+| 2026-02-15-2209 | Enterprise app (correct path) | 2 | 0/2 | 0pp |
+| 2026-02-15-2330 | Enterprise app (updated desc) | 2 | 0/2 | 0pp |
 | **Total** | | **9** | **0/9 (0%)** | **0pp** |
 
 **Finding**: Agents never called LENS MCP tools despite them being available and CLAUDE.md instructions being present. They default to Grep/Glob regardless of tool descriptions.
