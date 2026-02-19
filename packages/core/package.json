@@ -1,0 +1,35 @@
+{
+  "name": "@lens/core",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "drizzle"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.1",
+    "better-sqlite3": "^12.6.2"
+  },
+  "peerDependencies": {
+    "hono": "^4.11.10"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "drizzle-kit": "^0.31.9",
+    "hono": "^4.11.10",
+    "tsup": "^8.5.0",
+    "typescript": "^5.7.0"
+  }
+}
