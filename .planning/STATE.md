@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 3 of 4 (CLI + Dashboard)
-Plan: 4/7 done — Phase 3 in progress
-Status: Dashboard layout shell + Overview page + daemon API routes complete. 03-01 CLI, 03-02 @lens/ui, 03-03 dashboard scaffold, 03-04 layout/overview/routes done.
-Last activity: 2026-02-20 — Plan 03-04 complete (RootLayout, Overview page, daemon traces/files/stats routes)
+Plan: 5/7 done — Phase 3 in progress
+Status: Trace waterfall viewer complete. 03-01 CLI, 03-02 @lens/ui, 03-03 dashboard scaffold, 03-04 layout/overview/routes, 03-05 traces page done.
+Last activity: 2026-02-20 — Plan 03-05 complete (TraceWaterfall component, Traces page with Sheet detail)
 
-Progress: [█████████░] 71% (Phase 3 in progress, 4/7 plans done)
+Progress: [█████████░] 75% (Phase 3 in progress, 5/7 plans done)
 
 ## Performance Metrics
 
@@ -41,6 +41,7 @@ Progress: [█████████░] 71% (Phase 3 in progress, 4/7 plans d
 | Phase 03-cli-dashboard P02 | 6 | 2 tasks | 21 files |
 | Phase 03-cli-dashboard P03 | 3 | 2 tasks | 11 files |
 | Phase 03-cli-dashboard P04 | 4 | 2 tasks | 12 files |
+| Phase 03-cli-dashboard P05 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,7 @@ Recent decisions affecting current work:
 - [03-04]: lucide-react as direct dashboard dep — @lens/ui is source-only, Vite can't resolve transitive deps at bundle time
 - [03-04]: getRawDb() added to engine — drizzle Db type doesn't expose prepare(); needed for complex JOIN queries in files routes
 - [03-04]: filesRoutes mounted on /repos prefix alongside reposRoutes — two Hono sub-apps on same prefix, clean separation
+- [Phase 03-05]: TraceWaterfall uses index-based color cycling — preserves visual order, simpler than hash-based
 
 ### Pending Todos
 
@@ -103,5 +105,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 03-04-PLAN.md — RootLayout, Overview page, daemon routes (4/7 plans done)
-Resume file: .planning/phases/03-cli-dashboard/03-05-PLAN.md
+Stopped at: Completed 03-05-PLAN.md — Trace waterfall viewer, Traces page with Sheet detail (5/7 plans done)
+Resume file: .planning/phases/03-cli-dashboard/03-06-PLAN.md
