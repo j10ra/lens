@@ -1,24 +1,29 @@
+import "@lens/ui/globals.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import { router } from "./router";
-import "./globals.css";
+import ReactDOM from "react-dom/client";
+import { RouterProvider } from "react-router";
+import { router } from "./router.js";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: true,
       staleTime: 5_000,
-      retry: 1,
+      refetchOnWindowFocus: true,
+      retry: 2,
     },
   },
 });
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (!root) throw new Error("Root element #root not found");
+
+ReactDOM.createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
+      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   </StrictMode>,
 );
