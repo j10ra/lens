@@ -1,15 +1,33 @@
-const TS_IMPORT_RE = /(?:import\s+.*?from\s+|import\s+|export\s+.*?from\s+|require\s*\()['"]([^'"]+)['"]/g;
-const PY_IMPORT_RE = /^(?:from\s+(\.[\w.]*)\s+import|import\s+([\w.]+))/gm;
-const GO_IMPORT_RE = /import\s+(?:\(\s*)?(?:[\w.]*\s+)?"([^"]+)"/g;
-const RUST_USE_RE = /use\s+((?:crate|super|self)::[\w:]+)/g;
+import * as path from "node:path";
 
-const TS_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.js"];
+// TypeScript/JavaScript import patterns
+const TS_STATIC_RE = /import\s+(?:.*?\s+from\s+)?['"]([^'"]+)['"]/g;
+const TS_DYNAMIC_RE = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+const TS_REQUIRE_RE = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+const TS_EXPORT_RE = /export\s+(?:.*?\s+from\s+)['"]([^'"]+)['"]/g;
+
+// Python import patterns
+const PY_FROM_RE = /^from\s+(\S+)\s+import/gm;
+const PY_IMPORT_RE = /^import\s+(\S+)/gm;
+
+// Go import patterns (inside import blocks or single imports)
+const GO_IMPORT_RE = /"([^"]+)"/g;
+
+// Rust use/mod patterns
+const RUST_USE_RE = /use\s+((?:crate|super|self)::[\w:]+)/g;
+const RUST_MOD_RE = /\bmod\s+(\w+)\s*;/g;
+
+const TS_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"];
 const PY_EXTENSIONS = [".py", "/__init__.py"];
 
-export function extractImportSpecifiers(content: string, language: string): string[] {
+/** Returns raw import specifiers from source content. Internal helper — not lensFn-wrapped. */
+export function extractImportSpecifiers(content: string, language: string | null): string[] {
   switch (language) {
     case "typescript":
+    case "typescriptreact":
     case "javascript":
+    case "javascriptreact":
+    // v1 compat aliases
     case "tsx":
     case "jsx":
       return extractTS(content);
@@ -20,125 +38,98 @@ export function extractImportSpecifiers(content: string, language: string): stri
     case "rust":
       return extractRust(content);
     default:
-      return [];
+      // Unknown language — try TS/JS patterns (most common in target repos)
+      return extractTS(content);
   }
 }
 
 function extractTS(content: string): string[] {
-  const specs: string[] = [];
-  for (const m of content.matchAll(TS_IMPORT_RE)) {
-    const spec = m[1];
-    if (spec.startsWith(".")) specs.push(spec);
+  const specs = new Set<string>();
+  for (const re of [TS_STATIC_RE, TS_DYNAMIC_RE, TS_REQUIRE_RE, TS_EXPORT_RE]) {
+    re.lastIndex = 0;
+    for (const m of content.matchAll(re)) {
+      const spec = m[1];
+      // Keep only relative imports (starting with . or ..)
+      if (spec.startsWith(".")) specs.add(spec);
+    }
   }
-  return specs;
+  return [...specs];
 }
 
 function extractPython(content: string): string[] {
-  const specs: string[] = [];
-  for (const m of content.matchAll(PY_IMPORT_RE)) {
-    const spec = m[1] ?? m[2];
-    if (spec?.startsWith(".")) specs.push(spec);
+  const specs = new Set<string>();
+  PY_FROM_RE.lastIndex = 0;
+  PY_IMPORT_RE.lastIndex = 0;
+  for (const m of content.matchAll(PY_FROM_RE)) {
+    const spec = m[1];
+    if (spec?.startsWith(".")) specs.add(spec);
   }
-  return specs;
+  for (const m of content.matchAll(PY_IMPORT_RE)) {
+    const spec = m[1];
+    if (spec?.startsWith(".")) specs.add(spec);
+  }
+  return [...specs];
 }
 
 function extractGo(content: string): string[] {
+  // Go imports are module paths, not relative — skip for now (no relative imports in Go)
   const specs: string[] = [];
+  GO_IMPORT_RE.lastIndex = 0;
   for (const m of content.matchAll(GO_IMPORT_RE)) {
+    // Only include if it contains "/" (module path) — relative ./ not used in Go
     if (m[1].includes("/")) specs.push(m[1]);
   }
   return specs;
 }
 
 function extractRust(content: string): string[] {
-  const specs: string[] = [];
+  const specs = new Set<string>();
+  RUST_USE_RE.lastIndex = 0;
+  RUST_MOD_RE.lastIndex = 0;
   for (const m of content.matchAll(RUST_USE_RE)) {
-    specs.push(m[1]);
+    specs.add(m[1]);
   }
-  return specs;
+  for (const m of content.matchAll(RUST_MOD_RE)) {
+    specs.add(`self::${m[1]}`);
+  }
+  return [...specs];
 }
 
-export function resolveImport(
-  importerPath: string,
-  specifier: string,
-  language: string,
-  knownPaths: Set<string>,
-): string | null {
-  const dir = importerPath.substring(0, importerPath.lastIndexOf("/"));
-
-  switch (language) {
-    case "typescript":
-    case "javascript":
-    case "tsx":
-    case "jsx":
-      return resolveTS(dir, specifier, knownPaths);
-    case "python":
-      return resolvePython(dir, specifier, knownPaths);
-    case "go":
-      return resolveGo(specifier, knownPaths);
-    case "rust":
-      return resolveRust(dir, specifier, knownPaths);
-    default:
-      return null;
-  }
-}
-
-function resolveTS(dir: string, spec: string, known: Set<string>): string | null {
-  const base = normalizePath(`${dir}/${spec}`);
-  for (const ext of TS_EXTENSIONS) {
-    const candidate = base + ext;
-    if (known.has(candidate)) return candidate;
-  }
-  if (known.has(base)) return base;
-  return null;
-}
-
-function resolvePython(dir: string, spec: string, known: Set<string>): string | null {
-  const dots = spec.match(/^\.+/)?.[0].length ?? 0;
-  const modulePart = spec.slice(dots).replace(/\./g, "/");
-  let base = dir;
-  for (let i = 1; i < dots; i++) {
-    base = base.substring(0, base.lastIndexOf("/"));
-  }
-  const target = modulePart ? `${base}/${modulePart}` : base;
-  for (const ext of PY_EXTENSIONS) {
-    const candidate = normalizePath(target + ext);
-    if (known.has(candidate)) return candidate;
-  }
-  return null;
-}
-
-function resolveGo(spec: string, known: Set<string>): string | null {
-  for (const p of known) {
-    if (p.endsWith(".go") && spec.endsWith(p.substring(0, p.lastIndexOf("/")))) {
-      return p;
-    }
-  }
-  return null;
-}
-
-function resolveRust(dir: string, spec: string, known: Set<string>): string | null {
-  let base: string;
-  if (spec.startsWith("crate::")) {
-    base = spec.replace("crate::", "src/").replace(/::/g, "/");
-  } else if (spec.startsWith("super::")) {
-    const parent = dir.substring(0, dir.lastIndexOf("/"));
-    base = `${parent}/${spec.replace("super::", "").replace(/::/g, "/")}`;
-  } else {
-    base = `${dir}/${spec.replace("self::", "").replace(/::/g, "/")}`;
-  }
-  const candidate = `${normalizePath(base)}.rs`;
-  if (known.has(candidate)) return candidate;
-  const modCandidate = `${normalizePath(base)}/mod.rs`;
-  if (known.has(modCandidate)) return modCandidate;
-  return null;
-}
-
-function normalizePath(p: string): string {
+function normalizePosix(p: string): string {
   const parts: string[] = [];
   for (const seg of p.split("/")) {
     if (seg === "..") parts.pop();
     else if (seg !== "." && seg !== "") parts.push(seg);
   }
   return parts.join("/");
+}
+
+/**
+ * Resolves a relative import specifier to a repo-relative file path.
+ * Tries multiple extensions in order. Returns null if unresolvable.
+ * Internal helper — not lensFn-wrapped.
+ */
+export function resolveImport(specifier: string, sourceFilePath: string, knownPaths: Set<string>): string | null {
+  // Go and Rust use module paths, not relative specifiers resolvable by path
+  // Relative specifiers start with . or ..
+  if (!specifier.startsWith(".")) return null;
+
+  const dir = path.posix.dirname(sourceFilePath);
+  const base = normalizePosix(`${dir}/${specifier}`);
+
+  // Try exact match first
+  if (knownPaths.has(base)) return base;
+
+  // Try with extensions
+  for (const ext of TS_EXTENSIONS) {
+    const candidate = base + ext;
+    if (knownPaths.has(candidate)) return candidate;
+  }
+
+  for (const ext of PY_EXTENSIONS) {
+    const candidate = base + ext;
+    if (knownPaths.has(candidate)) return candidate;
+  }
+
+  return null;
 }

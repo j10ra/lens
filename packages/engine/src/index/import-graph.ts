@@ -1,39 +1,64 @@
-import type { Db } from "../db/connection";
-import { chunkQueries, importQueries } from "../db/queries";
-import { detectLanguage } from "./discovery";
-import { extractImportSpecifiers, resolveImport } from "./imports";
+import type { Db } from "../db/connection.js";
+import { chunkQueries, importQueries } from "../db/queries.js";
+import { extractImportSpecifiers, resolveImport } from "./imports.js";
 
-export function buildAndPersistImportGraph(db: Db, repoId: string): number {
+const SUPPORTED_LANGUAGES = new Set([
+  "typescript",
+  "typescriptreact",
+  "javascript",
+  "javascriptreact",
+  "python",
+  "go",
+  "rust",
+]);
+
+/**
+ * Builds the import graph for a repo: merges chunks per file, extracts imports,
+ * resolves paths, deduplicates, and persists edges to fileImports table.
+ * Synchronous — called from lensFn-wrapped orchestrators.
+ */
+export function buildAndPersistImportGraph(db: Db, repoId: string): void {
+  // Clear existing edges before rebuild
+  importQueries.clearForRepo(db, repoId);
+
+  // Get all chunks ordered by path + chunk_index (getAllByRepo guarantees order)
   const rows = chunkQueries.getAllByRepo(db, repoId);
 
-  const files = new Map<string, { content: string; language: string }>();
+  // Merge chunks per file — NEVER extract per-chunk (imports may span chunk boundaries)
+  const files = new Map<string, { content: string; language: string | null }>();
   for (const row of rows) {
     const existing = files.get(row.path);
     if (existing) {
       existing.content += `\n${row.content}`;
     } else {
-      files.set(row.path, {
-        content: row.content,
-        language: row.language ?? detectLanguage(row.path) ?? "text",
-      });
+      files.set(row.path, { content: row.content, language: row.language });
     }
   }
 
+  // Build known paths set for resolution
   const knownPaths = new Set(files.keys());
 
-  importQueries.deleteByRepo(db, repoId);
+  // Build edges
+  const edges: Array<{ sourcePath: string; targetPath: string }> = [];
+  const seen = new Set<string>();
 
-  let edgeCount = 0;
   for (const [sourcePath, { content, language }] of files) {
-    const specs = extractImportSpecifiers(content, language);
-    for (const spec of specs) {
-      const targetPath = resolveImport(sourcePath, spec, language, knownPaths);
-      if (targetPath && targetPath !== sourcePath) {
-        importQueries.insert(db, repoId, sourcePath, targetPath);
-        edgeCount++;
+    if (!SUPPORTED_LANGUAGES.has(language ?? "")) continue;
+
+    const specifiers = extractImportSpecifiers(content, language);
+    for (const spec of specifiers) {
+      const targetPath = resolveImport(spec, sourcePath, knownPaths);
+      if (!targetPath || targetPath === sourcePath) continue;
+
+      const edgeKey = `${sourcePath}\0${targetPath}`;
+      if (!seen.has(edgeKey)) {
+        seen.add(edgeKey);
+        edges.push({ sourcePath, targetPath });
       }
     }
   }
 
-  return edgeCount;
+  if (edges.length > 0) {
+    importQueries.insertEdges(db, repoId, edges);
+  }
 }
