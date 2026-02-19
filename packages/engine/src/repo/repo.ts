@@ -1,64 +1,56 @@
-import type { Db } from "../db/connection";
-import { chunkQueries, metadataQueries, repoQueries } from "../db/queries";
-import { getHeadCommit } from "../index/discovery";
-import type { RegisterResponse, StatusResponse, VocabCluster } from "../types";
-import { deriveIdentityKey } from "./identity";
+import { basename } from "node:path";
+import { lensFn } from "@lens/core";
+import type { Db } from "../db/connection.js";
+import { repoQueries } from "../db/queries.js";
+import { getHeadCommit } from "../index/discovery.js";
+import { deriveIdentityKey } from "./identity.js";
 
-export function registerRepo(db: Db, rootPath: string, name?: string, remoteUrl?: string): RegisterResponse {
-  const identityKey = deriveIdentityKey(rootPath, remoteUrl);
-  const repoName = name ?? rootPath.split("/").pop() ?? "unknown";
-  const { id, created } = repoQueries.upsert(db, identityKey, repoName, rootPath, remoteUrl ?? null);
-  return { repo_id: id, identity_key: identityKey, name: repoName, created };
+export interface RepoRecord {
+  id: string;
+  identity_key: string;
+  name: string;
+  root_path: string;
+  remote_url: string | null;
+  last_indexed_commit: string | null;
+  index_status: string;
+  last_indexed_at: string | null;
+  last_git_analysis_commit: string | null;
+  max_import_depth: number | null;
+  created_at: string;
 }
 
-export function getRepo(db: Db, id: string) {
-  const repo = repoQueries.getById(db, id);
-  if (!repo) throw new Error("repo not found");
-  return repo;
+// Validates path is a git repo, derives identity key, idempotent if already registered
+export const registerRepo = lensFn(
+  "engine.registerRepo",
+  async (db: Db, rootPath: string, name?: string, remoteUrl?: string | null): Promise<RepoRecord> => {
+    // Validate it's a git repo (throws if not)
+    await getHeadCommit(rootPath);
+
+    const identityKey = deriveIdentityKey(rootPath, remoteUrl);
+    const existing = repoQueries.getByIdentityKey(db, identityKey);
+    if (existing) return existing as RepoRecord;
+
+    const repoName = name ?? (basename(rootPath) || "unknown");
+    return repoQueries.insert(db, {
+      identity_key: identityKey,
+      name: repoName,
+      root_path: rootPath,
+      remote_url: remoteUrl ?? null,
+    }) as RepoRecord;
+  },
+);
+
+export function removeRepo(db: Db, repoId: string): { removed: boolean } {
+  const existing = repoQueries.getById(db, repoId);
+  if (!existing) return { removed: false };
+  repoQueries.remove(db, repoId);
+  return { removed: true };
 }
 
-export function listRepos(db: Db) {
-  return repoQueries.list(db);
+export function listRepos(db: Db): RepoRecord[] {
+  return repoQueries.getAll(db) as RepoRecord[];
 }
 
-export function removeRepo(db: Db, id: string): { deleted: boolean; chunks_removed: number } {
-  const chunkCount = chunkQueries.countByRepo(db, id);
-  const deleted = repoQueries.remove(db, id);
-  if (!deleted) throw new Error("repo not found");
-  return { deleted: true, chunks_removed: chunkCount };
-}
-
-export async function getRepoStatus(db: Db, id: string): Promise<StatusResponse> {
-  const repo = repoQueries.getById(db, id);
-  if (!repo) throw new Error("repo not found");
-
-  let currentHead: string | null = null;
-  try {
-    currentHead = await getHeadCommit(repo.root_path);
-  } catch {}
-
-  const isStale = !!(currentHead && repo.last_indexed_commit !== currentHead);
-  const stats = chunkQueries.getStats(db, id);
-  const structural = metadataQueries.getStructuralStats(db, id);
-  const vocabRaw = repo.vocab_clusters;
-  const vocabClusters: VocabCluster[] = vocabRaw ? JSON.parse(vocabRaw) : [];
-
-  return {
-    index_status: repo.index_status,
-    indexed_commit: repo.last_indexed_commit,
-    current_head: currentHead,
-    is_stale: isStale,
-    chunk_count: stats.chunk_count,
-    files_indexed: stats.files_indexed,
-    embedded_count: stats.embedded_count,
-    embeddable_count: stats.embeddable_count,
-    embedded_pct: stats.embeddable_count > 0 ? Math.round((stats.embedded_count / stats.embeddable_count) * 100) : 0,
-    metadata_count: structural.metadata_count,
-    import_edge_count: structural.import_edge_count,
-    git_commits_analyzed: structural.git_file_count,
-    cochange_pairs: structural.cochange_pairs,
-    purpose_count: structural.purpose_count,
-    purpose_total: structural.purpose_total,
-    vocab_cluster_count: Array.isArray(vocabClusters) ? vocabClusters.length : 0,
-  };
+export function getRepoStatus(db: Db, repoId: string): RepoRecord | null {
+  return repoQueries.getById(db, repoId) as RepoRecord | null;
 }

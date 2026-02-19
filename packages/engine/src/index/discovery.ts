@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const MAX_FILE_SIZE = 2 * 1024 * 1024;
+export const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 
 const BINARY_EXTENSIONS = new Set([
   ".png",
@@ -51,12 +51,6 @@ const BINARY_EXTENSIONS = new Set([
   ".sqlite",
 ]);
 
-const DOCS_EXTENSIONS = new Set([".md", ".json", ".yaml", ".yml", ".toml", ".txt", ".rst", ".adoc", ".sql"]);
-
-export function isDocFile(filePath: string): boolean {
-  return DOCS_EXTENSIONS.has(extname(filePath).toLowerCase());
-}
-
 export const LANG_MAP: Record<string, string> = {
   ".ts": "typescript",
   ".tsx": "typescript",
@@ -90,7 +84,7 @@ export const LANG_MAP: Record<string, string> = {
 
 export interface DiscoveredFile {
   path: string;
-  absolute_path: string;
+  absolutePath: string;
   language: string | null;
   status: "added" | "modified" | "deleted";
 }
@@ -104,10 +98,14 @@ export function isBinaryExt(filePath: string): boolean {
 }
 
 export async function fullScan(repoRoot: string): Promise<DiscoveredFile[]> {
-  const { stdout } = await execFileAsync("git", ["ls-files", "-z"], { cwd: repoRoot, maxBuffer: 50 * 1024 * 1024 });
-  const paths = stdout.split("\0").filter(Boolean);
+  const { stdout } = await execFileAsync("git", ["ls-files", "-z"], {
+    cwd: repoRoot,
+    maxBuffer: 50 * 1024 * 1024,
+  });
 
+  const paths = stdout.split("\0").filter(Boolean);
   const results: DiscoveredFile[] = [];
+
   for (const p of paths) {
     if (isBinaryExt(p)) continue;
     const abs = resolve(repoRoot, p);
@@ -117,8 +115,9 @@ export async function fullScan(repoRoot: string): Promise<DiscoveredFile[]> {
     } catch {
       continue;
     }
-    results.push({ path: p, absolute_path: abs, language: detectLanguage(p), status: "added" });
+    results.push({ path: p, absolutePath: abs, language: detectLanguage(p), status: "added" });
   }
+
   return results;
 }
 
@@ -157,7 +156,7 @@ export async function diffScan(repoRoot: string, fromCommit: string, toCommit: s
       }
     }
 
-    results.push({ path: p, absolute_path: abs, language: detectLanguage(p), status });
+    results.push({ path: p, absolutePath: abs, language: detectLanguage(p), status });
   }
 
   return results;

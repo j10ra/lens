@@ -1,7 +1,8 @@
-import type { Db } from "../db/connection";
-import { chunkQueries, metadataQueries } from "../db/queries";
-import { detectLanguage } from "./discovery";
-import { extractImportSpecifiers } from "./imports";
+import type { Db } from "../db/connection.js";
+import { chunkQueries, metadataQueries } from "../db/queries.js";
+import { detectLanguage } from "./discovery.js";
+
+// ── Export extraction ─────────────────────────────────────────────────────────
 
 const TS_EXPORT_RE =
   /^export\s+(?:default\s+)?(?:async\s+)?(?:function|class|interface|type|const|let|enum|namespace)\s+(\w+)/gm;
@@ -15,55 +16,95 @@ const CSHARP_EXPORT_METHOD_RE =
 const JAVA_EXPORT_RE =
   /^\s*(?:public)\s+(?:static\s+)?(?:abstract\s+|final\s+)?(?:class|interface|enum|record)\s+(\w+)/gm;
 
-const JSDOC_RE = /^\/\*\*\s*([\s\S]*?)\*\//m;
-const PY_DOCSTRING_RE = /^(?:["']{3})([\s\S]*?)(?:["']{3})/m;
-const CSHARP_DOC_RE = /^(?:\s*\/\/\/\s*(.*))+/m;
-const GO_PKG_RE = /^\/\/\s*Package\s+\w+\s+(.*)/m;
-const RUST_DOC_RE = /^(?:\s*\/\/!\s*(.*)(?:\n\s*\/\/!\s*(.*))*)/m;
-
 function extractExports(content: string, language: string): string[] {
-  const exports: string[] = [];
-  let re: RegExp;
-
   switch (language) {
     case "typescript":
     case "javascript":
     case "tsx":
-    case "jsx":
-      re = new RegExp(TS_EXPORT_RE.source, "gm");
-      break;
-    case "python":
-      re = new RegExp(PY_EXPORT_RE.source, "gm");
-      break;
-    case "go":
-      re = new RegExp(GO_EXPORT_RE.source, "gm");
-      break;
-    case "rust":
-      re = new RegExp(RUST_EXPORT_RE.source, "gm");
-      break;
+    case "jsx": {
+      const result: string[] = [];
+      for (const m of content.matchAll(new RegExp(TS_EXPORT_RE.source, "gm"))) {
+        if (m[1] && !result.includes(m[1])) result.push(m[1]);
+      }
+      return result.slice(0, 30);
+    }
+    case "python": {
+      const result: string[] = [];
+      for (const m of content.matchAll(new RegExp(PY_EXPORT_RE.source, "gm"))) {
+        if (m[1] && !result.includes(m[1])) result.push(m[1]);
+      }
+      return result.slice(0, 30);
+    }
+    case "go": {
+      const result: string[] = [];
+      for (const m of content.matchAll(new RegExp(GO_EXPORT_RE.source, "gm"))) {
+        if (m[1] && !result.includes(m[1])) result.push(m[1]);
+      }
+      return result.slice(0, 30);
+    }
+    case "rust": {
+      const result: string[] = [];
+      for (const m of content.matchAll(new RegExp(RUST_EXPORT_RE.source, "gm"))) {
+        if (m[1] && !result.includes(m[1])) result.push(m[1]);
+      }
+      return result.slice(0, 30);
+    }
     case "csharp": {
-      const exports: string[] = [];
+      const result: string[] = [];
       for (const pattern of [CSHARP_EXPORT_RE, CSHARP_EXPORT_METHOD_RE]) {
         for (const m of content.matchAll(new RegExp(pattern.source, "gm"))) {
-          if (m[1] && !exports.includes(m[1])) exports.push(m[1]);
+          if (m[1] && !result.includes(m[1])) result.push(m[1]);
         }
       }
-      return exports.slice(0, 30);
+      return result.slice(0, 30);
     }
     case "java":
-    case "kotlin":
-      re = new RegExp(JAVA_EXPORT_RE.source, "gm");
-      break;
+    case "kotlin": {
+      const result: string[] = [];
+      for (const m of content.matchAll(new RegExp(JAVA_EXPORT_RE.source, "gm"))) {
+        if (m[1] && !result.includes(m[1])) result.push(m[1]);
+      }
+      return result.slice(0, 30);
+    }
     default:
       return [];
   }
-
-  for (const m of content.matchAll(re)) {
-    if (m[1] && !exports.includes(m[1])) exports.push(m[1]);
-  }
-
-  return exports.slice(0, 30);
 }
+
+// ── Import extraction ─────────────────────────────────────────────────────────
+
+const TS_IMPORT_RE = /(?:import\s+.*?from\s+|import\s+|export\s+.*?from\s+|require\s*\()['"]([^'"]+)['"]/g;
+const PY_IMPORT_RE = /^(?:from\s+(\.[\w.]*)\s+import|import\s+([\w.]+))/gm;
+
+function extractImports(content: string, language: string): string[] {
+  switch (language) {
+    case "typescript":
+    case "javascript":
+    case "tsx":
+    case "jsx": {
+      const specs: string[] = [];
+      for (const m of content.matchAll(TS_IMPORT_RE)) {
+        if (m[1]?.startsWith(".")) specs.push(m[1]);
+      }
+      return specs;
+    }
+    case "python": {
+      const specs: string[] = [];
+      for (const m of content.matchAll(PY_IMPORT_RE)) {
+        const spec = m[1] ?? m[2];
+        if (spec?.startsWith(".")) specs.push(spec);
+      }
+      return specs;
+    }
+    default:
+      return [];
+  }
+}
+
+// ── Docstring extraction ──────────────────────────────────────────────────────
+
+const JSDOC_RE = /^\/\*\*\s*([\s\S]*?)\*\//m;
+const PY_DOCSTRING_RE = /^(?:["']{3})([\s\S]*?)(?:["']{3})/m;
 
 function extractDocstring(content: string, language: string): string {
   let m: RegExpMatchArray | null;
@@ -73,29 +114,12 @@ function extractDocstring(content: string, language: string): string {
     case "javascript":
     case "tsx":
     case "jsx":
+    case "java":
+    case "kotlin":
       m = content.match(JSDOC_RE);
       break;
     case "python":
       m = content.match(PY_DOCSTRING_RE);
-      break;
-    case "csharp":
-      m = content.match(CSHARP_DOC_RE);
-      break;
-    case "go":
-      m = content.match(GO_PKG_RE);
-      break;
-    case "rust": {
-      const rustMatch = content.match(RUST_DOC_RE);
-      if (!rustMatch) return "";
-      return rustMatch[0]
-        .replace(/^\s*\/\/!\s?/gm, "")
-        .replace(/\n/g, " ")
-        .trim()
-        .slice(0, 200);
-    }
-    case "java":
-    case "kotlin":
-      m = content.match(JSDOC_RE);
       break;
     default:
       return "";
@@ -110,15 +134,7 @@ function extractDocstring(content: string, language: string): string {
   );
 }
 
-export interface FileMetadataExtracted {
-  path: string;
-  language: string;
-  exports: string[];
-  imports: string[];
-  docstring: string;
-  sections: string[];
-  internals: string[];
-}
+// ── Section extraction ────────────────────────────────────────────────────────
 
 const SECTION_SINGLE_RE = /^(?:\/\/|#)\s*[-=]{3,}\s*(.+?)\s*[-=]{3,}\s*$/gm;
 const SECTION_BLOCK_RE = /^\/\*\s*[-=]{3,}\s*(.+?)\s*[-=]{3,}\s*\*\/$/gm;
@@ -141,23 +157,16 @@ function extractSections(content: string): string[] {
   return sections.slice(0, 15);
 }
 
+// ── Internals extraction ──────────────────────────────────────────────────────
+
 const UNIVERSAL_DECL_RES: RegExp[] = [
-  /^\s*(?:async\s+|suspend\s+)?(?:function|def|fn|func|fun)\s+(?:\([^)]+\)\s+)?(\w+)/gm,
+  /^\s*(?:async\s+)?(?:function|def|fn|func|fun)\s+(\w+)/gm,
   /^\s*(?:const|let|var|val)\s+(\w+)\s*[=:]/gm,
   /^\s*(?:abstract\s+|sealed\s+|partial\s+|data\s+)?(?:class|struct|enum|trait|interface|record|object|mod)\s+(\w+)/gm,
   /^\s*type\s+(\w+)\s*[=<{]/gm,
-  /^\s*(?:private|protected|internal)\s+(?:static\s+)?(?:async\s+)?(?:suspend\s+)?(?:override\s+)?[\w<>[\]?.]+\s+(\w+)\s*\(/gm,
 ];
 
 const EXPORT_LINE_RE = /^(?:export|pub\s|public\s)/;
-
-function universalSkipLine(line: string): boolean {
-  const trimmed = line.trimStart();
-  if (trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) return true;
-  if (trimmed.startsWith("#") && !trimmed.startsWith("#!")) return true;
-  return EXPORT_LINE_RE.test(trimmed);
-}
-
 const SKIP_NAMES = new Set([
   "if",
   "for",
@@ -185,27 +194,30 @@ const SKIP_NAMES = new Set([
   "package",
 ]);
 
-function universalSkipName(name: string): boolean {
-  return SKIP_NAMES.has(name) || name.startsWith("_");
-}
-
-function collectMatches(
-  content: string,
-  regexes: RegExp[],
-  exportSet: Set<string>,
-  skipLine?: (line: string) => boolean,
-  skipName?: (name: string) => boolean,
-): string[] {
+function extractInternals(content: string, exports: string[]): string[] {
+  const exportSet = new Set(exports);
   const seen = new Set<string>();
   const results: string[] = [];
 
   for (const line of content.split("\n")) {
-    if (skipLine?.(line)) continue;
-    for (const re of regexes) {
+    const trimmed = line.trimStart();
+    // Skip comment lines and export lines
+    if (trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) continue;
+    if (trimmed.startsWith("#") && !trimmed.startsWith("#!")) continue;
+    if (EXPORT_LINE_RE.test(trimmed)) continue;
+
+    for (const re of UNIVERSAL_DECL_RES) {
       const pattern = new RegExp(re.source, re.flags);
       for (const m of line.matchAll(pattern)) {
         const name = m[1];
-        if (name && name.length >= 6 && !exportSet.has(name) && !seen.has(name) && !skipName?.(name)) {
+        if (
+          name &&
+          name.length >= 3 &&
+          !exportSet.has(name) &&
+          !seen.has(name) &&
+          !SKIP_NAMES.has(name) &&
+          !name.startsWith("_")
+        ) {
           seen.add(name);
           results.push(name);
         }
@@ -216,27 +228,39 @@ function collectMatches(
   return results.slice(0, 20);
 }
 
-function extractInternals(content: string, _language: string, exports: string[]): string[] {
-  return collectMatches(content, UNIVERSAL_DECL_RES, new Set(exports), universalSkipLine, universalSkipName);
+// ── Public interface ──────────────────────────────────────────────────────────
+
+export interface FileMetadata {
+  path: string;
+  language: string | null;
+  exports: string[];
+  imports: string[];
+  docstring: string;
+  sections: string[];
+  internals: string[];
 }
 
-export function extractFileMetadata(path: string, content: string, language: string): FileMetadataExtracted {
-  const exports = extractExports(content, language);
+// Synchronous — internal helper, not wrapped in lensFn
+export function extractFileMetadata(content: string, path: string, language: string | null): FileMetadata {
+  const lang = language ?? "text";
+  const exports = extractExports(content, lang);
   return {
     path,
     language,
     exports,
-    imports: extractImportSpecifiers(content, language),
-    docstring: extractDocstring(content, language),
+    imports: extractImports(content, lang),
+    docstring: extractDocstring(content, lang),
     sections: extractSections(content),
-    internals: extractInternals(content, language, exports),
+    internals: extractInternals(content, exports),
   };
 }
 
+// Synchronous — called from runIndex which is already lensFn-wrapped
 export function extractAndPersistMetadata(db: Db, repoId: string): number {
   const rows = chunkQueries.getAllByRepo(db, repoId);
 
-  const files = new Map<string, { content: string; language: string }>();
+  // Merge chunks per file path
+  const files = new Map<string, { content: string; language: string | null }>();
   for (const row of rows) {
     const existing = files.get(row.path);
     if (existing) {
@@ -244,25 +268,22 @@ export function extractAndPersistMetadata(db: Db, repoId: string): number {
     } else {
       files.set(row.path, {
         content: row.content,
-        language: row.language ?? detectLanguage(row.path) ?? "text",
+        language: row.language ?? detectLanguage(row.path),
       });
     }
   }
 
   let count = 0;
   for (const [path, { content, language }] of files) {
-    const meta = extractFileMetadata(path, content, language);
-    metadataQueries.upsert(
-      db,
-      repoId,
-      path,
-      language,
-      meta.exports,
-      meta.imports,
-      meta.docstring,
-      meta.sections,
-      meta.internals,
-    );
+    const meta = extractFileMetadata(content, path, language);
+    metadataQueries.upsert(db, repoId, path, {
+      language: meta.language,
+      exports: meta.exports,
+      imports: meta.imports,
+      docstring: meta.docstring,
+      sections: meta.sections,
+      internals: meta.internals,
+    });
     count++;
   }
 

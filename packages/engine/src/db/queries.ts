@@ -120,6 +120,20 @@ export const chunkQueries = {
     const rows = db.selectDistinct({ path: chunks.path }).from(chunks).where(eq(chunks.repo_id, repoId)).all();
     return rows.map((r) => r.path);
   },
+
+  getAllByRepo(db: Db, repoId: string) {
+    return db
+      .select({
+        path: chunks.path,
+        content: chunks.content,
+        language: chunks.language,
+        chunk_index: chunks.chunk_index,
+      })
+      .from(chunks)
+      .where(eq(chunks.repo_id, repoId))
+      .orderBy(chunks.path, chunks.chunk_index)
+      .all();
+  },
 };
 
 // ── Metadata queries ──────────────────────────────────────────────────────────
