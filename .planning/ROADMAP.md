@@ -62,18 +62,19 @@ Plans:
 **Requirements**: CLI-02, CLI-03, DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, DASH-06, DAEM-03
 **Success Criteria** (what must be TRUE):
   1. `lens grep`, `lens register`, `lens remove`, `lens list`, and `lens status` all work from the terminal with human-readable formatted output
-  2. Opening `localhost:4111` in a browser shows the dashboard SPA; the trace waterfall displays route → spans → sub-spans with timing for any daemon request
+  2. Opening `localhost:4111` in a browser shows the dashboard SPA; the trace waterfall displays route -> spans -> sub-spans with timing for any daemon request
   3. The repo explorer in the dashboard shows indexed files with metadata (co-change score, hub status, import count); clicking a file shows its structural context
   4. All daemon API calls in the dashboard use TanStack Query with caching and background refetch; UI state (selections, filters) uses TanStack Store
-**Plans**: 6 plans
+**Plans**: 7 plans
 
 Plans:
 - [ ] 03-01-PLAN.md — CLI commands: register, remove, list, status, grep with formatted terminal output (CLI-02, CLI-03)
-- [ ] 03-02-PLAN.md — Dashboard infrastructure: Vite config, shadcn/ui from v1-archive, TanStack Query + Store, API client, router (DASH-04, DASH-05)
-- [ ] 03-03-PLAN.md — Layout components + Overview page + daemon trace/file/stats routes (DASH-01, DASH-06)
-- [ ] 03-04-PLAN.md — Trace waterfall viewer: request log table, span waterfall in Sheet with cycled color bars (DASH-02)
-- [ ] 03-05-PLAN.md — Repo explorer: repos list with register form, repo detail two-panel layout, file table, file detail Sheet with structural context (DASH-03)
-- [ ] 03-06-PLAN.md — Daemon static file serving: serveStatic for dashboard SPA from :4111 with SPA fallback + E2E checkpoint (DAEM-03)
+- [ ] 03-02-PLAN.md — @lens/ui shared package: port all shadcn primitives + layout components from v1-archive (DASH-05)
+- [ ] 03-03-PLAN.md — Dashboard scaffold: Vite config, TanStack Query + Store, API client, router, imports from @lens/ui (DASH-04)
+- [ ] 03-04-PLAN.md — Layout (RootLayout + AppSidebar from @lens/ui) + Overview page + daemon trace/file/stats routes (DASH-01, DASH-06)
+- [ ] 03-05-PLAN.md — Trace waterfall viewer: request log table, span waterfall in Sheet with cycled color bars (DASH-02)
+- [ ] 03-06-PLAN.md — Repo explorer: repos list with register form, repo detail two-panel layout, file table, file detail Sheet (DASH-03)
+- [ ] 03-07-PLAN.md — Daemon static file serving: serveStatic for dashboard SPA from :4111 with SPA fallback + E2E checkpoint (DAEM-03)
 
 ### Phase 4: Hardening
 **Goal**: The system holds up under real usage — large repos index without timing out, traces don't grow unbounded, and multi-repo setups perform acceptably
@@ -95,11 +96,11 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core + Daemon + MCP | 4/4 | Complete | 2026-02-19 |
 | 2. Intelligence Engine | 5/5 | Complete   | 2026-02-19 |
-| 3. CLI + Dashboard | 0/6 | Not started | - |
+| 3. CLI + Dashboard | 0/7 | Not started | - |
 | 4. Hardening | 0/4 | Not started | - |
