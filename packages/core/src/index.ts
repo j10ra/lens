@@ -4,4 +4,4 @@ export { configureLensFn, lensFn } from "./lens-fn.js";
 export { configureLensRoute, lensRoute } from "./lens-route.js";
 export { configureLogger, Logger } from "./logger.js";
 export type { LogRecord, SpanRecord } from "./trace-store.js";
-export { createTraceStore, TraceStore } from "./trace-store.js";
+export { createTraceStore, getTraceStore, TraceStore } from "./trace-store.js";

@@ -141,9 +141,40 @@ export class TraceStore {
     this.flush();
     this.sqlite.close();
   }
+
+  queryTraces(limit = 50): Array<{
+    trace_id: string;
+    root_span_name: string;
+    started_at: number;
+    ended_at: number;
+    duration_ms: number;
+  }> {
+    return this.sqlite.prepare("SELECT * FROM traces ORDER BY started_at DESC LIMIT ?").all(limit) as Array<{
+      trace_id: string;
+      root_span_name: string;
+      started_at: number;
+      ended_at: number;
+      duration_ms: number;
+    }>;
+  }
+
+  querySpans(traceId: string): SpanRecord[] {
+    return this.sqlite
+      .prepare("SELECT * FROM spans WHERE trace_id = ? ORDER BY started_at ASC")
+      .all(traceId) as SpanRecord[];
+  }
 }
 
-/** Factory — creates and returns a singleton-friendly TraceStore instance. */
+let _instance: TraceStore | undefined;
+
+/** Factory — creates, stores, and returns the TraceStore singleton. */
 export function createTraceStore(dbPath: string, retentionMs?: number): TraceStore {
-  return new TraceStore(dbPath, retentionMs);
+  _instance = new TraceStore(dbPath, retentionMs);
+  return _instance;
+}
+
+/** Returns the TraceStore singleton. Throws if createTraceStore() has not been called. */
+export function getTraceStore(): TraceStore {
+  if (!_instance) throw new Error("TraceStore not initialized — call createTraceStore() first");
+  return _instance;
 }

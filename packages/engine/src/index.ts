@@ -6,7 +6,7 @@ import { getRepoStatus as _getRepoStatus, listRepos as _listRepos, removeRepo as
 // ── DB infrastructure (not lensFn-wrapped — configure/get are infra, not engine operations) ──
 
 export type { Db } from "./db/connection.js";
-export { configureEngineDb, getEngineDb } from "./db/connection.js";
+export { configureEngineDb, getEngineDb, getRawDb } from "./db/connection.js";
 
 // ── Already lensFn-wrapped exports (re-export as-is) ──────────────────────────
 
