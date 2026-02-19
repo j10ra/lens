@@ -30,16 +30,16 @@ app.onError((err, c) => {
   return c.json({ error: "Internal server error" }, 500);
 });
 
-// API routes MUST come before serveStatic — wildcard intercepts all requests
-app.route("/health", healthRoutes);
-app.route("/grep", grepRoutes);
-app.route("/repos", reposRoutes);
-app.route("/repos", filesRoutes);
-app.route("/traces", tracesRoutes);
+// API routes under /api — prevents collision with SPA client-side routes
+app.route("/api/health", healthRoutes);
+app.route("/api/grep", grepRoutes);
+app.route("/api/repos", reposRoutes);
+app.route("/api/repos", filesRoutes);
+app.route("/api/traces", tracesRoutes);
 
-// GET /stats — system metrics for the dashboard Overview page
+// GET /api/stats — system metrics for the dashboard Overview page
 app.get(
-  "/stats",
+  "/api/stats",
   lensRoute("stats.get", async (c) => {
     const db = getRawDb();
     const reposCount = (db.prepare("SELECT COUNT(*) AS n FROM repos").get() as { n: number }).n;

@@ -14,7 +14,7 @@ export const remove = defineCommand({
   },
   async run({ args }) {
     try {
-      await daemonFetch(`/repos/${args.id}`, { method: "DELETE" });
+      await daemonFetch(`/api/repos/${args.id}`, { method: "DELETE" });
       console.log(`Removed repo ${args.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

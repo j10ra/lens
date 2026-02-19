@@ -25,7 +25,7 @@ export const register = defineCommand({
     },
   },
   async run({ args }) {
-    const res = await daemonFetch("/repos", {
+    const res = await daemonFetch("/api/repos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: args.path, name: args.name }),

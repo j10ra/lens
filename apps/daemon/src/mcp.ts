@@ -35,7 +35,7 @@ export async function startMcpServer(): Promise<void> {
     },
     async ({ repoPath, query, limit }) => {
       // MCP is a gate — calls daemon HTTP, same as CLI
-      const res = await fetch(`${DAEMON_URL}/grep`, {
+      const res = await fetch(`${DAEMON_URL}/api/grep`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ repoPath, query, limit }),

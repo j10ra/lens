@@ -6,7 +6,7 @@ export const status = defineCommand({
     description: "Show daemon status. Exits 0 if running, 1 if not reachable.",
   },
   async run() {
-    const res = await daemonFetch("/health");
+    const res = await daemonFetch("/api/health");
     const data = (await res.json()) as { status: string; uptime: number; version: string };
     console.log(`lens daemon ${data.version}`);
     console.log(`  status : ${data.status}`);
