@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 3 of 4 (CLI + Dashboard)
-Plan: 2/7 done — Phase 3 in progress
-Status: @lens/ui shared package complete with 10 shadcn primitives and 5 layout components. CLI subcommands implemented (03-01).
-Last activity: 2026-02-19 — Plan 03-02 complete (@lens/ui workspace package with OKLCH theme)
+Plan: 3/7 done — Phase 3 in progress
+Status: Dashboard SPA scaffold complete — Vite build, TanStack Query/Store, typed API client, react-router v7. 03-01 CLI, 03-02 @lens/ui, 03-03 dashboard scaffold done.
+Last activity: 2026-02-19 — Plan 03-03 complete (dashboard SPA scaffold)
 
-Progress: [████████░░] 65% (Phase 3 in progress, 2/7 plans done)
+Progress: [████████░░] 67% (Phase 3 in progress, 3/7 plans done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10 (01-01, 01-02, 01-03, 01-04, 02-01, 02-02, 02-03, 02-04, 02-05, 03-01)
+- Total plans completed: 11 (01-01, 01-02, 01-03, 01-04, 02-01, 02-02, 02-03, 02-04, 02-05, 03-01, 03-02, 03-03)
 - Average duration: ~2.2 min
-- Total execution time: ~27 min
+- Total execution time: ~30 min
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [████████░░] 65% (Phase 3 in progress, 2/7 plans d
 |-------|-------|-------|----------|
 | 01-core-daemon-mcp | 4/4 | ~11 min | ~2.8 min |
 | 02-intelligence-engine | 5/5 | ~16 min | ~3.2 min |
-| 03-cli-dashboard | 1/7 | ~2 min | ~2 min |
+| 03-cli-dashboard | 3/7 | ~11 min | ~3.7 min |
 
 **Recent Trend:**
 - Last 5 plans: 02-02 (2 min), 02-03 (2 min), 02-04 (2 min), 02-05 (3 min), 03-01 (2 min)
@@ -39,6 +39,7 @@ Progress: [████████░░] 65% (Phase 3 in progress, 2/7 plans d
 | Phase 02-intelligence-engine P05 | 3 | 2 tasks | 6 files |
 | Phase 03-cli-dashboard P01 | 2 | 2 tasks | 8 files |
 | Phase 03-cli-dashboard P02 | 6 | 2 tasks | 21 files |
+| Phase 03-cli-dashboard P03 | 3 | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - [03-02]: @lens/ui is private source-only package (no tsup build) — apps import TypeScript directly via workspace resolution
 - [03-02]: globals.css omits @import "tailwindcss" — consumer app owns CSS entry point and handles tailwind import
 - [03-02]: sidebar.tsx and tabs.tsx are custom primitives (no Radix) — simpler API, fewer dependencies
+- [Phase 03-cli-dashboard]: workspace:* for @lens/ui — pnpm add fails for private workspace packages; must be added directly in package.json
+- [Phase 03-cli-dashboard]: No local globals.css in dashboard — @tailwindcss/vite plugin processes @lens/ui/globals.css Tailwind directives on import
 
 ### Pending Todos
 
@@ -96,5 +99,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 03-02-PLAN.md — @lens/ui shared package complete (2/7 plans done)
-Resume file: .planning/phases/03-cli-dashboard/03-03-PLAN.md
+Stopped at: Completed 03-03-PLAN.md — Dashboard SPA scaffold complete (3/7 plans done)
+Resume file: .planning/phases/03-cli-dashboard/03-04-PLAN.md
