@@ -55,7 +55,7 @@ LENS v2 targets AI agents as first-class consumers — a 2025-native insight nei
 - **Database**: SQLite via better-sqlite3 + Drizzle ORM (local-first, no external DB)
 - **Dashboard**: Vite + React SPA, shadcn/ui, TanStack Query (server state), TanStack Store (client micro stores)
 - **Observability**: Every function via `lensFn()`, every route via `lensRoute()` — no naked exports
-- **Daemon**: Hono HTTP on :4111, MCP stdio transport
+- **Daemon**: Hono HTTP on :4111, MCP stdio transport. MCP and CLI are gates — both call daemon HTTP routes, never engine directly.
 - **Lint/Format**: Biome v2
 - **Type check**: `tsc --noEmit` after changes
 
@@ -69,6 +69,7 @@ LENS v2 targets AI agents as first-class consumers — a 2025-native insight nei
 | No call graph in v1 | High complexity (dynamic dispatch, HOFs, events). Import graph + co-change sufficient. | — Pending |
 | New repo structure over v1 retrofit | `lensFn` touches every function signature — easier to port logic into new shape | — Pending |
 | shadcn/ui exclusively | Consistent, accessible, composable. No custom components when shadcn has one. | — Pending |
+| MCP & CLI as HTTP gates | All entry points funnel through daemon routes — unified observability, single code path | Confirmed |
 
 ---
 *Last updated: 2026-02-19 after initialization*

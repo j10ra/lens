@@ -56,6 +56,7 @@ Recent decisions affecting current work:
 - [01-02]: @types/node required in daemon devDependencies — same pattern as CLI; process/node:* fail tsc without it
 - [01-02]: LENS_MCP env flag for HTTP-only mode — allows curl testing without MCP stdio takeover
 - [01-02]: mkdirSync before createTraceStore — ~/.lens/ may not exist on first run; plan explicitly flagged this
+- [Post Phase 1]: **MCP and CLI are gates, not logic holders** — both call daemon HTTP routes (`fetch(:4111/...)`), never call engine directly. All logic flows through daemon routes (lensRoute) for unified observability.
 
 ### Pending Todos
 

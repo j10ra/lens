@@ -54,7 +54,7 @@ Plans:
 - [ ] 02-02: Import graph construction with ts-morph — extract import/export edges, store as adjacency table, reverse lookup
 - [ ] 02-03: Co-change analysis with simple-git — parse git log, compute pair frequencies, persist to co-change table
 - [ ] 02-04: Hub detection and composite scoring — TF-IDF + import graph indegree + co-change frequency → normalized composite score
-- [ ] 02-05: Context builder and grep endpoint — `lens grep` query execution, result enrichment with structural metadata, daemon routes for repo management
+- [ ] 02-05: Grep engine + repo management routes — wire real engine behind `/grep` route (stub exists), result enrichment with structural metadata, `/repos` CRUD routes
 
 ### Phase 3: CLI + Dashboard
 **Goal**: Both human interfaces work — terminal shows formatted structural context, dashboard shows live trace waterfall and browsable repo data
@@ -98,7 +98,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core + Daemon + MCP | 3/4 | In progress | - |
+| 1. Core + Daemon + MCP | 4/4 | Complete | 2026-02-19 |
 | 2. Intelligence Engine | 0/5 | Not started | - |
 | 3. CLI + Dashboard | 0/5 | Not started | - |
 | 4. Hardening | 0/4 | Not started | - |
