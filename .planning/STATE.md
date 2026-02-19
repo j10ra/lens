@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 
 ## Current Position
 
-Phase: 2 of 4 (Intelligence Engine) — COMPLETE
-Plan: 5/5 done — Phase 2 complete
-Status: Daemon routes wired (DAEM-05, DAEM-06). Full engine-to-HTTP-to-MCP pipeline operational. Phase 3 (CLI) next.
-Last activity: 2026-02-19 — Plan 02-05 complete (daemon route wiring, real grep, repo CRUD)
+Phase: 3 of 4 (CLI + Dashboard)
+Plan: 1/7 done — Phase 3 in progress
+Status: CLI subcommands implemented (register, remove, list, grep, status). All 5 commands call daemon HTTP via shared daemonFetch helper.
+Last activity: 2026-02-19 — Plan 03-01 complete (CLI subcommands with formatted terminal output)
 
-Progress: [██████░░░░] 55% (Phase 2 complete, starting Phase 3)
+Progress: [███████░░░] 60% (Phase 3 started, 1/7 plans done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9 (01-01, 01-02, 01-03, 01-04, 02-01, 02-02, 02-03, 02-04, 02-05)
-- Average duration: ~2.3 min
-- Total execution time: ~25 min
+- Total plans completed: 10 (01-01, 01-02, 01-03, 01-04, 02-01, 02-02, 02-03, 02-04, 02-05, 03-01)
+- Average duration: ~2.2 min
+- Total execution time: ~27 min
 
 **By Phase:**
 
@@ -29,13 +29,15 @@ Progress: [██████░░░░] 55% (Phase 2 complete, starting Phase
 |-------|-------|-------|----------|
 | 01-core-daemon-mcp | 4/4 | ~11 min | ~2.8 min |
 | 02-intelligence-engine | 5/5 | ~16 min | ~3.2 min |
+| 03-cli-dashboard | 1/7 | ~2 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (7 min), 02-02 (2 min), 02-03 (2 min), 02-04 (2 min), 02-05 (3 min)
+- Last 5 plans: 02-02 (2 min), 02-03 (2 min), 02-04 (2 min), 02-05 (3 min), 03-01 (2 min)
 - Trend: stable
 
 *Updated after each plan completion*
 | Phase 02-intelligence-engine P05 | 3 | 2 tasks | 6 files |
+| Phase 03-cli-dashboard P01 | 2 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -74,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 02-05]: Repo path resolution in grep route via listRepos() then find() — avoids adding getRepoByPath() query to engine package; O(repos) negligible at Phase 2 scale
 - [Phase 02-05]: @lens/engine externalized in daemon tsup config — workspace packages ship their own dist, must not be rebundled
 - [Phase 02-05]: configureEngineDb() called after configure*() but before startHttpServer() — engine DB ready before any route handler runs
+- [03-01]: daemonFetch centralizes connection-refused error — one place for "daemon not running" message
+- [03-01]: grep defaults repoPath to process.cwd() — zero-config for in-repo use
+- [03-01]: list uses unicode status icons (checkmark/dots/circle/x) — readable without color support
 
 ### Pending Todos
 
@@ -87,5 +92,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 02-05-PLAN.md — Phase 2 complete (all 5/5 plans done)
-Resume file: .planning/phases/03-cli/ (Phase 3 plans TBD)
+Stopped at: Completed 03-01-PLAN.md — Phase 3 started (1/7 plans done, CLI subcommands complete)
+Resume file: .planning/phases/03-cli-dashboard/03-02-PLAN.md
