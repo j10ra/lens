@@ -1,203 +1,60 @@
-import { randomUUID } from "node:crypto";
-import type { Capabilities, Db } from "@lens/engine";
-import {
-  buildContext,
-  getRawDb,
-  getRepoStatus,
-  listRepos,
-  RequestTrace,
-  registerRepo,
-  repoQueries,
-  runIndex,
-} from "@lens/engine";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const LOG_SQL = `INSERT INTO request_logs (id, method, path, status, duration_ms, source, request_body, response_size, response_body, trace, created_at)
-  VALUES (?, ?, ?, ?, ?, 'mcp', ?, ?, ?, ?, datetime('now'))`;
-
-function logMcp(
-  method: string,
-  path: string,
-  status: number,
-  duration: number,
-  reqBody?: string,
-  resSize?: number,
-  resBody?: string,
-  trace?: string,
-) {
-  getRawDb()
-    .prepare(LOG_SQL)
-    .run(
-      randomUUID(),
-      method,
-      path,
-      status,
-      duration,
-      reqBody ?? null,
-      resSize ?? null,
-      resBody ?? null,
-      trace ?? null,
-    );
-}
-
-function text(s: string) {
-  return { content: [{ type: "text" as const, text: s }] };
-}
-
-function error(msg: string) {
-  return { isError: true as const, content: [{ type: "text" as const, text: `Error: ${msg}` }] };
-}
-
-function findOrRegisterRepo(db: Db, repoPath: string) {
-  const existing = repoQueries.getByPath(db, repoPath);
-  if (existing) return existing.id;
-  const result = registerRepo(db, repoPath);
-  return result.repo_id;
-}
-
-export function createMcpServer(db: Db, caps?: Capabilities): McpServer {
-  const server = new McpServer({ name: "lens", version: "0.1.0" }, { capabilities: { tools: {} } });
+export async function startMcpServer(): Promise<void> {
+  const server = new McpServer({
+    name: "lens",
+    version: "2.0.0",
+  });
 
   server.registerTool(
-    "get_context",
+    "lens_context_query",
     {
+      title: "LENS Context Query",
+      // Verb-first, 1-2 sentences. Operational detail in parameter .describe() — not here.
       description:
-        "Returns ranked files with import dependency chains and git co-change clusters for a development goal. Surfaces structural relationships (imports, co-changes, exports) that keyword search alone won't find. Use when exploring architecture, tracing data flow, assessing change impact, or navigating an unfamiliar codebase. Skip for simple lookups where you already know the file path.",
-      inputSchema: { repo_path: z.string(), goal: z.string() },
+        "Query a codebase by keyword and get structural context: which files match, their importers, co-change partners, and hub scores. Use this when you need to understand where a symbol or concept lives in the repo graph.",
+      inputSchema: {
+        repoPath: z.string().describe("Absolute path to the repository root (e.g. /Users/dev/myproject)"),
+        query: z
+          .string()
+          .describe(
+            'Search terms space-separated. All terms matched with AND logic. Example: "authMiddleware validate token"',
+          ),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .optional()
+          .default(20)
+          .describe("Max results to return. Default 20, max 50."),
+      },
     },
-    async ({ repo_path, goal }) => {
-      const trace = new RequestTrace();
-      const start = performance.now();
-      try {
-        trace.step("findRepo");
-        const repoId = findOrRegisterRepo(db, repo_path);
-        trace.end("findRepo");
-        const repo = repoQueries.getById(db, repoId);
-        const useEmbeddings = repo?.enable_embeddings === 1;
-        const result = await buildContext(db, repoId, goal, caps, trace, { useEmbeddings });
-        const duration = Math.round(performance.now() - start);
-        const reqBody = JSON.stringify({ repo_path, goal });
-        logMcp(
-          "MCP",
-          "/tool/get_context",
-          200,
-          duration,
-          reqBody,
-          result.context_pack.length,
-          result.context_pack,
-          trace.serialize(),
-        );
-        return text(result.context_pack);
-      } catch (e: any) {
-        const duration = Math.round(performance.now() - start);
-        logMcp(
-          "MCP",
-          "/tool/get_context",
-          500,
-          duration,
-          JSON.stringify({ repo_path, goal }),
-          undefined,
-          e.message,
-          trace.serialize(),
-        );
-        return error(e.message);
-      }
+    async ({ repoPath, query, limit }) => {
+      // Phase 1 stub — Phase 2 replaces this with real engine query
+      // Daemon is not running an engine yet; return structured placeholder
+      const response = {
+        repoPath,
+        query,
+        limit,
+        results: [],
+        note: "LENS engine not yet indexed. Run `lens register <path>` then `lens index` to populate.",
+      };
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(response, null, 2),
+          },
+        ],
+      };
     },
   );
 
-  server.registerTool(
-    "list_repos",
-    {
-      description: "List all indexed repositories.",
-      inputSchema: {},
-    },
-    async () => {
-      const start = performance.now();
-      try {
-        const repos = listRepos(db);
-        const body = JSON.stringify(repos, null, 2);
-        const duration = Math.round(performance.now() - start);
-        logMcp("MCP", "/tool/list_repos", 200, duration, undefined, body.length, body);
-        return text(body);
-      } catch (e: any) {
-        const duration = Math.round(performance.now() - start);
-        logMcp("MCP", "/tool/list_repos", 500, duration, undefined, undefined, e.message);
-        return error(e.message);
-      }
-    },
-  );
-
-  server.registerTool(
-    "get_status",
-    {
-      description: "Get indexing status for a repository.",
-      inputSchema: { repo_path: z.string() },
-    },
-    async ({ repo_path }) => {
-      const start = performance.now();
-      try {
-        const repo = repoQueries.getByPath(db, repo_path);
-        if (!repo) {
-          logMcp("MCP", "/tool/get_status", 404, Math.round(performance.now() - start), JSON.stringify({ repo_path }));
-          return error(`repo not found at ${repo_path}`);
-        }
-        const status = await getRepoStatus(db, repo.id);
-        const body = JSON.stringify(status, null, 2);
-        const duration = Math.round(performance.now() - start);
-        logMcp("MCP", "/tool/get_status", 200, duration, JSON.stringify({ repo_path }), body.length, body);
-        return text(body);
-      } catch (e: any) {
-        const duration = Math.round(performance.now() - start);
-        logMcp("MCP", "/tool/get_status", 500, duration, JSON.stringify({ repo_path }), undefined, e.message);
-        return error(e.message);
-      }
-    },
-  );
-
-  server.registerTool(
-    "index_repo",
-    {
-      description: "Index or re-index a repository. Set force=true to rebuild from scratch.",
-      inputSchema: { repo_path: z.string(), force: z.boolean().optional() },
-    },
-    async ({ repo_path, force }) => {
-      const trace = new RequestTrace();
-      const start = performance.now();
-      try {
-        trace.step("findRepo");
-        const repoId = findOrRegisterRepo(db, repo_path);
-        trace.end("findRepo");
-        const result = await runIndex(db, repoId, caps, force ?? false, undefined, trace);
-        const body = JSON.stringify(result, null, 2);
-        const duration = Math.round(performance.now() - start);
-        logMcp(
-          "MCP",
-          "/tool/index_repo",
-          200,
-          duration,
-          JSON.stringify({ repo_path, force }),
-          body.length,
-          body,
-          trace.serialize(),
-        );
-        return text(body);
-      } catch (e: any) {
-        const duration = Math.round(performance.now() - start);
-        logMcp(
-          "MCP",
-          "/tool/index_repo",
-          500,
-          duration,
-          JSON.stringify({ repo_path, force }),
-          undefined,
-          e.message,
-          trace.serialize(),
-        );
-        return error(e.message);
-      }
-    },
-  );
-
-  return server;
+  const transport = new StdioServerTransport();
+  // connect() takes over stdin/stdout for JSON-RPC — must be last thing called
+  await server.connect(transport);
 }
