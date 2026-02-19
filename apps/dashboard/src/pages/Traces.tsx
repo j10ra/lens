@@ -56,7 +56,9 @@ export function Traces() {
                   <td className="border-b border-r border-border px-3 py-1.5 font-mono tabular-nums text-xs text-muted-foreground">
                     {formatTime(trace.started_at)}
                   </td>
-                  <td className="border-b border-r border-border px-3 py-1.5 font-mono text-xs">{trace.name}</td>
+                  <td className="border-b border-r border-border px-3 py-1.5 font-mono text-xs">
+                    {trace.root_span_name}
+                  </td>
                   <td className="border-b border-border px-3 py-1.5 text-right font-mono tabular-nums text-xs text-muted-foreground">
                     {trace.duration_ms}ms
                   </td>
@@ -75,7 +77,7 @@ export function Traces() {
       >
         <SheetContent side="right" className="overflow-y-auto sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle className="font-mono text-sm">{selected?.name ?? ""}</SheetTitle>
+            <SheetTitle className="font-mono text-sm">{selected?.root_span_name ?? ""}</SheetTitle>
             <SheetDescription>{selected ? `${selected.duration_ms}ms` : ""}</SheetDescription>
           </SheetHeader>
           <Separator className="my-4" />

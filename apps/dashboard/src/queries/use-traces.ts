@@ -3,11 +3,10 @@ import { api } from "../lib/api.js";
 
 export type TraceRow = {
   trace_id: string;
-  name: string;
+  root_span_name: string;
   started_at: number;
+  ended_at: number;
   duration_ms: number;
-  span_count: number;
-  error_count: number;
 };
 
 export type SpanRow = {
