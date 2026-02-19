@@ -29,13 +29,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Claude Code (or Cursor) auto-discovers the MCP server and the context tool is invoked at least once in a benchmark against an unfamiliar repo — adoption rate above 0/N
   4. TraceStore auto-prunes traces beyond the retention window; unbounded growth cannot occur
   5. The CLI binary starts and calls daemon HTTP endpoints (returns errors gracefully if daemon not running)
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01: `@lens/core` package — lensFn, lensRoute, Logger, TraceStore with Drizzle schema, batch writes, retention policy
-- [ ] 01-02: `@lens/daemon` skeleton — Hono HTTP :4111, MCP stdio server, repo context tool (minimal), all routes via lensRoute
-- [ ] 01-03: `@lens/cli` skeleton — citty argument parser, daemon HTTP client, `lens status` command
-- [ ] 01-04: MCP adoption benchmark — run against 3+ unfamiliar repos, validate tool is called, iterate tool design until adoption confirmed
+- [ ] 01-01-PLAN.md — `@lens/core` package: lensFn, lensRoute, Logger, TraceStore (Drizzle schema, batch writes, retention prune)
+- [ ] 01-02-PLAN.md — `@lens/daemon` skeleton: Hono HTTP :4111, MCP stdio, lens_context_query stub, all routes via lensRoute
+- [ ] 01-03-PLAN.md — `@lens/cli` skeleton: citty, lens status command, daemon HTTP client with graceful error handling
+- [ ] 01-04-PLAN.md — MCP adoption benchmark: 3+ unfamiliar repos, validate tool invoked, iterate until adopted (GATE)
 
 ### Phase 2: Intelligence Engine
 **Goal**: A repo can be indexed and queried — structural context (callers, importers, co-change partners, hub score) returned for any search term
