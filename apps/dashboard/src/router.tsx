@@ -21,7 +21,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "traces",
-        element: <div className="p-4 text-lg font-semibold">Traces</div>,
+        element: <Traces />,
       },
     ],
   },
