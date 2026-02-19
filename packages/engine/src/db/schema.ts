@@ -1,12 +1,11 @@
 import { sql } from "drizzle-orm";
-import { blob, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const uuid = () =>
   text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID());
 const now = () => text("created_at").notNull().default(sql`(datetime('now'))`);
-const updatedAt = () => text("updated_at").notNull().default(sql`(datetime('now'))`);
 
 export const repos = sqliteTable(
   "repos",
@@ -21,13 +20,7 @@ export const repos = sqliteTable(
     last_indexed_at: text("last_indexed_at"),
     last_git_analysis_commit: text("last_git_analysis_commit"),
     max_import_depth: integer("max_import_depth").default(0),
-    vocab_clusters: text("vocab_clusters"),
-    last_vocab_cluster_commit: text("last_vocab_cluster_commit"),
-    enable_embeddings: integer("enable_embeddings").notNull().default(1),
-    enable_summaries: integer("enable_summaries").notNull().default(1),
-    enable_vocab_clusters: integer("enable_vocab_clusters").notNull().default(1),
     created_at: now(),
-    updated_at: updatedAt(),
   },
   (t) => [index("idx_repos_identity").on(t.identity_key)],
 );
@@ -47,15 +40,10 @@ export const chunks = sqliteTable(
     chunk_hash: text("chunk_hash").notNull(),
     last_seen_commit: text("last_seen_commit").notNull(),
     language: text("language"),
-    embedding: blob("embedding"),
-    created_at: now(),
-    updated_at: updatedAt(),
   },
   (t) => [
     uniqueIndex("idx_chunks_unique").on(t.repo_id, t.path, t.chunk_index, t.chunk_hash),
     index("idx_chunks_repo_path").on(t.repo_id, t.path),
-    index("idx_chunks_repo").on(t.repo_id),
-    index("idx_chunks_hash").on(t.repo_id, t.chunk_hash),
   ],
 );
 
@@ -73,11 +61,8 @@ export const fileMetadata = sqliteTable(
     docstring: text("docstring").default(""),
     sections: text("sections").default("[]"),
     internals: text("internals").default("[]"),
-    purpose: text("purpose").default(""),
-    purpose_hash: text("purpose_hash").default(""),
-    updated_at: updatedAt(),
   },
-  (t) => [uniqueIndex("idx_file_metadata_unique").on(t.repo_id, t.path), index("idx_file_metadata_repo").on(t.repo_id)],
+  (t) => [uniqueIndex("idx_file_metadata_unique").on(t.repo_id, t.path)],
 );
 
 export const fileImports = sqliteTable(
@@ -93,6 +78,7 @@ export const fileImports = sqliteTable(
   (t) => [
     uniqueIndex("idx_file_imports_unique").on(t.repo_id, t.source_path, t.target_path),
     index("idx_file_imports_target").on(t.repo_id, t.target_path),
+    index("idx_file_imports_source").on(t.repo_id, t.source_path),
   ],
 );
 
@@ -126,57 +112,4 @@ export const fileCochanges = sqliteTable(
     uniqueIndex("idx_file_cochanges_unique").on(t.repo_id, t.path_a, t.path_b),
     index("idx_cochanges_lookup").on(t.repo_id, t.path_a),
   ],
-);
-
-export const usageCounters = sqliteTable(
-  "usage_counters",
-  {
-    id: uuid(),
-    date: text("date").notNull().unique(),
-    context_queries: integer("context_queries").notNull().default(0),
-    embedding_requests: integer("embedding_requests").notNull().default(0),
-    embedding_chunks: integer("embedding_chunks").notNull().default(0),
-    purpose_requests: integer("purpose_requests").notNull().default(0),
-    repos_indexed: integer("repos_indexed").notNull().default(0),
-    synced_at: text("synced_at"),
-    created_at: now(),
-    updated_at: updatedAt(),
-  },
-  (t) => [index("idx_usage_counters_date").on(t.date)],
-);
-
-export const requestLogs = sqliteTable(
-  "request_logs",
-  {
-    id: uuid(),
-    method: text("method").notNull(),
-    path: text("path").notNull(),
-    status: integer("status").notNull(),
-    duration_ms: integer("duration_ms").notNull(),
-    source: text("source").notNull().default("api"),
-    request_body: text("request_body"),
-    response_size: integer("response_size"),
-    response_body: text("response_body"),
-    trace: text("trace"),
-    created_at: now(),
-  },
-  (t) => [index("idx_request_logs_created").on(t.created_at), index("idx_request_logs_source").on(t.source)],
-);
-
-export const settings = sqliteTable("settings", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-  updated_at: updatedAt(),
-});
-
-export const telemetryEvents = sqliteTable(
-  "telemetry_events",
-  {
-    id: uuid(),
-    event_type: text("event_type").notNull(),
-    event_data: text("event_data"),
-    created_at: now(),
-    synced_at: text("synced_at"),
-  },
-  (t) => [index("idx_telemetry_events_type").on(t.event_type), index("idx_telemetry_events_synced").on(t.synced_at)],
 );

@@ -36,6 +36,9 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
     devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(typescript@5.9.3)
@@ -91,6 +94,28 @@ importers:
       '@lens/core':
         specifier: workspace:*
         version: link:../core
+      better-sqlite3:
+        specifier: ^12.6.2
+        version: 12.6.2
+      drizzle-orm:
+        specifier: ^0.45.1
+        version: 0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@12.6.2)
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.12
+        version: 7.6.13
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      drizzle-kit:
+        specifier: ^0.31.9
+        version: 0.31.9
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.1(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
 packages:
 

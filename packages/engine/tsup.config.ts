@@ -1,12 +1,19 @@
-import { defineConfig } from "tsup";
+import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: ["src/index.ts"],
-  format: ["esm", "cjs"],
+  entry: ['src/index.ts'],
+  format: ['esm'],
   dts: true,
   splitting: false,
-  sourcemap: true,
   clean: true,
-  target: "node20",
-  external: ["better-sqlite3"],
-});
+  external: ['@lens/core'],
+  banner(ctx) {
+    // better-sqlite3 is a native CJS addon — needs createRequire in ESM context
+    if (ctx.format === 'esm') {
+      return {
+        js: `import {createRequire as __createRequire} from 'module';var require=__createRequire(import.meta.url);`
+      }
+    }
+    return {}
+  },
+})
