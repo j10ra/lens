@@ -32,9 +32,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — `@lens/core` package: lensFn, lensRoute, Logger, TraceStore (Drizzle schema, batch writes, retention prune)
+- [x] 01-01-PLAN.md — `@lens/core` package: lensFn, lensRoute, Logger, TraceStore (Drizzle schema, batch writes, retention prune)
 - [ ] 01-02-PLAN.md — `@lens/daemon` skeleton: Hono HTTP :4111, MCP stdio, lens_context_query stub, all routes via lensRoute
-- [ ] 01-03-PLAN.md — `@lens/cli` skeleton: citty, lens status command, daemon HTTP client with graceful error handling
+- [x] 01-03-PLAN.md — `@lens/cli` skeleton: citty, lens status command, daemon HTTP client with graceful error handling
 - [ ] 01-04-PLAN.md — MCP adoption benchmark: 3+ unfamiliar repos, validate tool invoked, iterate until adopted (GATE)
 
 ### Phase 2: Intelligence Engine
@@ -98,7 +98,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core + Daemon + MCP | 0/4 | Not started | - |
+| 1. Core + Daemon + MCP | 2/4 | In progress | - |
 | 2. Intelligence Engine | 0/5 | Not started | - |
 | 3. CLI + Dashboard | 0/5 | Not started | - |
 | 4. Hardening | 0/4 | Not started | - |

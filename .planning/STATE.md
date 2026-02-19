@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 1 of 4 (Core + Daemon + MCP)
-Plan: 1 of 4 in current phase
-Status: In progress — plan 01 complete, plans 02-04 remaining
-Last activity: 2026-02-19 — Plan 01 complete (@lens/core package built)
+Plan: 3 of 4 in current phase
+Status: In progress — plans 01, 03 complete, plans 02, 04 remaining
+Last activity: 2026-02-19 — Plan 03 complete (@lens/cli skeleton built)
 
-Progress: [█░░░░░░░░░] 6%
+Progress: [███░░░░░░░] 18%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: ~4 min
-- Total execution time: ~4 min
+- Total plans completed: 2 (01-01, 01-03)
+- Average duration: ~3.5 min
+- Total execution time: ~7 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-core-daemon-mcp | 1/4 | ~4 min | ~4 min |
+| 01-core-daemon-mcp | 2/4 | ~7 min | ~3.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min)
-- Trend: —
+- Last 5 plans: 01-01 (4 min), 01-03 (3 min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -50,6 +50,9 @@ Recent decisions affecting current work:
 - [01-01]: skipLibCheck required — drizzle-orm 0.45.1 ships broken .d.ts files for gel/mysql2/singlestore
 - [01-01]: CJS __dirname compat via typeof __filename guard — import.meta is {} in tsup CJS builds
 - [01-01]: configure*() pattern — global singletons set once at daemon startup, not constructor injection
+- [01-03]: @types/node required in CLI devDependencies — process.exit() fails typecheck without Node.js types
+- [01-03]: console.log in CLI is correct — CLI is terminal binary, stdout reserved for MCP only in daemon
+- [01-03]: ESM-only tsup output for CLI — Node.js 18+ binary, no CJS dual build needed
 
 ### Pending Todos
 
@@ -63,5 +66,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 01-01-PLAN.md (@lens/core package)
+Stopped at: Completed 01-03-PLAN.md (@lens/cli skeleton)
 Resume file: .planning/phases/01-core-daemon-mcp/01-02-PLAN.md

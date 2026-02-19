@@ -38,7 +38,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### CLI
 
-- [ ] **CLI-01**: Thin CLI shell that calls daemon HTTP API
+- [x] **CLI-01**: Thin CLI shell that calls daemon HTTP API
 - [ ] **CLI-02**: Commands: register, remove, list, status, grep
 - [ ] **CLI-03**: Formatted terminal output for human readability
 
@@ -109,7 +109,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DAEM-04 | Phase 1 | Pending |
 | DAEM-05 | Phase 2 | Pending |
 | DAEM-06 | Phase 2 | Pending |
-| CLI-01 | Phase 1 | Pending |
+| CLI-01 | Phase 1 | Complete |
 | CLI-02 | Phase 3 | Pending |
 | CLI-03 | Phase 3 | Pending |
 | DASH-01 | Phase 3 | Pending |
