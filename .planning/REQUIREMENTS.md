@@ -19,11 +19,11 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Code Intelligence
 
 - [x] **ENGN-01**: File discovery scans repo, respects .gitignore, detects file types
-- [ ] **ENGN-02**: TF-IDF scoring computes term relevance across indexed files
-- [ ] **ENGN-03**: Import graph construction extracts import/export edges from TypeScript files
-- [ ] **ENGN-04**: Co-change analysis parses git log to identify files that change together
-- [ ] **ENGN-05**: Hub file detection identifies high-connectivity files via import graph + co-change signals
-- [ ] **ENGN-06**: Composite scoring combines TF-IDF, import graph, co-change, and hub signals
+- [x] **ENGN-02**: TF-IDF scoring computes term relevance across indexed files
+- [x] **ENGN-03**: Import graph construction extracts import/export edges from TypeScript files
+- [x] **ENGN-04**: Co-change analysis parses git log to identify files that change together
+- [x] **ENGN-05**: Hub file detection identifies high-connectivity files via import graph + co-change signals
+- [x] **ENGN-06**: Composite scoring combines TF-IDF, import graph, co-change, and hub signals
 - [ ] **ENGN-07**: `lens grep "foo|bar|baz"` returns matches per term, ranked by composite score (hub, import graph, co-change, hotness), each match enriched with structural metadata
 - [ ] **ENGN-08**: Every engine function wrapped in `lensFn()` — no naked exports
 
@@ -96,11 +96,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CORE-05 | Phase 1 | Complete |
 | CORE-06 | Phase 1 | Complete |
 | ENGN-01 | Phase 2 | Complete |
-| ENGN-02 | Phase 2 | Pending |
-| ENGN-03 | Phase 2 | Pending |
-| ENGN-04 | Phase 2 | Pending |
-| ENGN-05 | Phase 2 | Pending |
-| ENGN-06 | Phase 2 | Pending |
+| ENGN-02 | Phase 2 | Complete |
+| ENGN-03 | Phase 2 | Complete |
+| ENGN-04 | Phase 2 | Complete |
+| ENGN-05 | Phase 2 | Complete |
+| ENGN-06 | Phase 2 | Complete |
 | ENGN-07 | Phase 2 | Pending |
 | ENGN-08 | Phase 2 | Pending |
 | DAEM-01 | Phase 1 | Complete |

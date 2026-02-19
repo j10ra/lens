@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every code query returns structural context — not just matches, but who calls it, what it imports, how hot it is, where it sits in the graph.
-**Current focus:** Phase 2 — Intelligence Engine (2/5 plans complete)
+**Current focus:** Phase 2 — Intelligence Engine (3/5 plans complete)
 
 ## Current Position
 
 Phase: 2 of 4 (Intelligence Engine)
-Plan: 2 of 5 in current phase — 02-02 DONE
-Status: Import graph + git co-change analysis complete. Ready for Plan 02-03 (composite scorer).
-Last activity: 2026-02-19 — Plan 02-02 complete (import specifier extraction, import graph builder, git co-change analysis)
+Plan: 3 of 5 in current phase — 02-03 DONE
+Status: Index orchestrator + composite scorer complete. Ready for Plan 02-04 (grep route).
+Last activity: 2026-02-19 — Plan 02-03 complete (runIndex orchestrator, interpretQuery TF-IDF scorer, structural query helpers)
 
-Progress: [███░░░░░░░] 30% (Phase 2, 2/5 plans)
+Progress: [████░░░░░░] 35% (Phase 2, 3/5 plans)
 
 ## Performance Metrics
 
@@ -28,10 +28,10 @@ Progress: [███░░░░░░░] 30% (Phase 2, 2/5 plans)
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-core-daemon-mcp | 4/4 | ~11 min | ~2.8 min |
-| 02-intelligence-engine | 2/5 | ~9 min | ~4.5 min |
+| 02-intelligence-engine | 3/5 | ~11 min | ~3.7 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (3 min), 01-02 (3 min), 01-04 (1 min), 02-01 (7 min), 02-02 (2 min)
+- Last 5 plans: 01-04 (1 min), 02-01 (7 min), 02-02 (2 min), 02-03 (2 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -64,6 +64,9 @@ Recent decisions affecting current work:
 - [02-02]: resolveImport signature (specifier, sourceFilePath, knownPaths) — language not needed, resolution is extension-based
 - [02-02]: Go import resolution skipped — Go uses module paths not relative ./ paths; extractGo() returns module paths but resolveImport() returns null for non-relative specifiers
 - [02-02]: parseGitLog() exported — enables testing git commit parsing independently of execFile
+- [02-03]: interpretQuery() not lensFn-wrapped — called from grepRepo() which will be the lensFn boundary in 02-04
+- [02-03]: getCochangePartners() queries both directions (path_a OR path_b) — fileCochanges uses lex-ordered pairs
+- [02-03]: Hub dampening: exports > 5 → logarithmic dampening — prevents barrel files from dominating results
 
 ### Pending Todos
 
@@ -77,5 +80,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Phase 2, Plan 02 complete — import graph, git co-change analysis
-Resume file: .planning/phases/02-intelligence-engine/02-03-PLAN.md
+Stopped at: Phase 2, Plan 03 complete — index orchestrator, composite scorer, structural queries
+Resume file: .planning/phases/02-intelligence-engine/02-04-PLAN.md

@@ -51,8 +51,8 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Engine DB schema + file discovery + chunker + metadata extraction + repo management (ENGN-01, DAEM-05)
-- [ ] 02-02-PLAN.md — Import graph construction (regex) + git co-change analysis (execFile) (ENGN-03, ENGN-04)
-- [ ] 02-03-PLAN.md — Index orchestrator with mutex + TF-IDF scorer + structural queries + hub detection (ENGN-02, ENGN-05, ENGN-06)
+- [x] 02-02-PLAN.md — Import graph construction (regex) + git co-change analysis (execFile) (ENGN-03, ENGN-04)
+- [x] 02-03-PLAN.md — Index orchestrator with mutex + TF-IDF scorer + structural queries + hub detection (ENGN-02, ENGN-05, ENGN-06)
 - [ ] 02-04-PLAN.md — Grep engine with result enrichment + public barrel exports with lensFn wrapping (ENGN-07, ENGN-08)
 - [ ] 02-05-PLAN.md — Daemon routes: repo CRUD, index trigger, real grep wiring, engine DB startup (DAEM-05, DAEM-06)
 
@@ -99,6 +99,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core + Daemon + MCP | 4/4 | Complete | 2026-02-19 |
-| 2. Intelligence Engine | 1/5 | In progress | - |
+| 2. Intelligence Engine | 3/5 | In progress | - |
 | 3. CLI + Dashboard | 0/5 | Not started | - |
 | 4. Hardening | 0/4 | Not started | - |
