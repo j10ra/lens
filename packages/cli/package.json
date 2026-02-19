@@ -1,20 +1,21 @@
 {
   "name": "@lens/cli",
-  "version": "0.1.0",
-  "description": "LENS CLI",
+  "version": "2.0.0",
+  "private": true,
   "type": "module",
   "bin": {
     "lens": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "commander": "^13.1.0"
+    "citty": "^0.2.1"
   },
   "devDependencies": {
-    "@types/node": "^20.5.7",
-    "typescript": "^5.2.2"
+    "@types/node": "^22.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.7.0"
   }
 }
