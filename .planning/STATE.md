@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 3 of 4 (CLI + Dashboard)
-Plan: 3/7 done — Phase 3 in progress
-Status: Dashboard SPA scaffold complete — Vite build, TanStack Query/Store, typed API client, react-router v7. 03-01 CLI, 03-02 @lens/ui, 03-03 dashboard scaffold done.
-Last activity: 2026-02-19 — Plan 03-03 complete (dashboard SPA scaffold)
+Plan: 4/7 done — Phase 3 in progress
+Status: Dashboard layout shell + Overview page + daemon API routes complete. 03-01 CLI, 03-02 @lens/ui, 03-03 dashboard scaffold, 03-04 layout/overview/routes done.
+Last activity: 2026-02-20 — Plan 03-04 complete (RootLayout, Overview page, daemon traces/files/stats routes)
 
-Progress: [████████░░] 67% (Phase 3 in progress, 3/7 plans done)
+Progress: [█████████░] 71% (Phase 3 in progress, 4/7 plans done)
 
 ## Performance Metrics
 
@@ -40,6 +40,7 @@ Progress: [████████░░] 67% (Phase 3 in progress, 3/7 plans d
 | Phase 03-cli-dashboard P01 | 2 | 2 tasks | 8 files |
 | Phase 03-cli-dashboard P02 | 6 | 2 tasks | 21 files |
 | Phase 03-cli-dashboard P03 | 3 | 2 tasks | 11 files |
+| Phase 03-cli-dashboard P04 | 4 | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Recent decisions affecting current work:
 - [03-02]: sidebar.tsx and tabs.tsx are custom primitives (no Radix) — simpler API, fewer dependencies
 - [Phase 03-cli-dashboard]: workspace:* for @lens/ui — pnpm add fails for private workspace packages; must be added directly in package.json
 - [Phase 03-cli-dashboard]: No local globals.css in dashboard — @tailwindcss/vite plugin processes @lens/ui/globals.css Tailwind directives on import
+- [03-04]: lucide-react as direct dashboard dep — @lens/ui is source-only, Vite can't resolve transitive deps at bundle time
+- [03-04]: getRawDb() added to engine — drizzle Db type doesn't expose prepare(); needed for complex JOIN queries in files routes
+- [03-04]: filesRoutes mounted on /repos prefix alongside reposRoutes — two Hono sub-apps on same prefix, clean separation
 
 ### Pending Todos
 
@@ -98,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-19
-Stopped at: Completed 03-03-PLAN.md — Dashboard SPA scaffold complete (3/7 plans done)
-Resume file: .planning/phases/03-cli-dashboard/03-04-PLAN.md
+Last session: 2026-02-20
+Stopped at: Completed 03-04-PLAN.md — RootLayout, Overview page, daemon routes (4/7 plans done)
+Resume file: .planning/phases/03-cli-dashboard/03-05-PLAN.md
