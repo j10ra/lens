@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Core + Daemon + MCP** - Observable framework infrastructure, Hono daemon, MCP server with adoption-validated tool design
 - [x] **Phase 2: Intelligence Engine** - Full indexing pipeline, import graph, co-change analysis, hub detection, composite scoring, context-aware grep (completed 2026-02-19)
-- [ ] **Phase 3: CLI + Dashboard** - All CLI commands with formatted output, React SPA with trace waterfall and repo explorer
+- [x] **Phase 3: CLI + Dashboard** - All CLI commands with formatted output, React SPA with trace waterfall and repo explorer (completed 2026-02-19)
 - [ ] **Phase 4: Hardening** - Retention tuning, query cache, multi-repo scaling, performance validation at scale
 
 ## Phase Details
@@ -102,5 +102,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Core + Daemon + MCP | 4/4 | Complete | 2026-02-19 |
 | 2. Intelligence Engine | 5/5 | Complete   | 2026-02-19 |
-| 3. CLI + Dashboard | 5/7 | In Progress|  |
+| 3. CLI + Dashboard | 7/7 | Complete   | 2026-02-19 |
 | 4. Hardening | 0/4 | Not started | - |

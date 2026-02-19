@@ -31,7 +31,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **DAEM-01**: Hono HTTP server on :4111 with JSON API
 - [x] **DAEM-02**: MCP stdio server exposing engine capabilities as tools
-- [ ] **DAEM-03**: Serves dashboard static files from built SPA
+- [x] **DAEM-03**: Serves dashboard static files from built SPA
 - [x] **DAEM-04**: All routes wrapped in `lensRoute()` — no naked handlers
 - [x] **DAEM-05**: Repo registration and management (add/remove/list repos)
 - [x] **DAEM-06**: Index trigger endpoint (manual reindex)
@@ -44,12 +44,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Dashboard
 
-- [ ] **DASH-01**: Vite + React SPA with shadcn/ui components
-- [ ] **DASH-02**: Trace waterfall viewer showing route → spans → sub-spans with timing
-- [ ] **DASH-03**: Repo file explorer with indexed file list and metadata
-- [ ] **DASH-04**: TanStack Query for all daemon API calls (caching, refetching)
+- [x] **DASH-01**: Vite + React SPA with shadcn/ui components
+- [x] **DASH-02**: Trace waterfall viewer showing route → spans → sub-spans with timing
+- [x] **DASH-03**: Repo file explorer with indexed file list and metadata
+- [x] **DASH-04**: TanStack Query for all daemon API calls (caching, refetching)
 - [x] **DASH-05**: TanStack Store for client-side UI state (selections, filters)
-- [ ] **DASH-06**: Connects to daemon API on localhost:4111
+- [x] **DASH-06**: Connects to daemon API on localhost:4111
 
 ## v2 Requirements
 
@@ -105,19 +105,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENGN-08 | Phase 2 | Complete |
 | DAEM-01 | Phase 1 | Complete |
 | DAEM-02 | Phase 1 | Complete |
-| DAEM-03 | Phase 3 | Pending |
+| DAEM-03 | Phase 3 | Complete |
 | DAEM-04 | Phase 1 | Complete |
 | DAEM-05 | Phase 2 | Complete |
 | DAEM-06 | Phase 2 | Complete |
 | CLI-01 | Phase 1 | Complete |
 | CLI-02 | Phase 3 | Complete |
 | CLI-03 | Phase 3 | Complete |
-| DASH-01 | Phase 3 | Pending |
-| DASH-02 | Phase 3 | Pending |
-| DASH-03 | Phase 3 | Pending |
-| DASH-04 | Phase 3 | Pending |
+| DASH-01 | Phase 3 | Complete |
+| DASH-02 | Phase 3 | Complete |
+| DASH-03 | Phase 3 | Complete |
+| DASH-04 | Phase 3 | Complete |
 | DASH-05 | Phase 3 | Complete |
-| DASH-06 | Phase 3 | Pending |
+| DASH-06 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 29 total

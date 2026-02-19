@@ -43,6 +43,7 @@ Progress: [█████████░] 86% (Phase 3 in progress, 6/7 plans d
 | Phase 03-cli-dashboard P04 | 4 | 2 tasks | 12 files |
 | Phase 03-cli-dashboard P05 | 2 | 2 tasks | 3 files |
 | Phase 03-cli-dashboard P06 | 4 | 2 tasks | 4 files |
+| Phase 03-cli-dashboard P07 | 4 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,7 @@ Recent decisions affecting current work:
 - [Phase 03-05]: TraceWaterfall uses index-based color cycling — preserves visual order, simpler than hash-based
 - [03-06]: Local useState for selectedFilePath (Sheet-local, no global store) — avoids over-engineering for Sheet navigation
 - [03-06]: useRepoFiles({ limit: 1 }) in overview tab gets total file count for sidebar badge without loading all files
+- [Phase 03-cli-dashboard]: serveStatic after all API routes — wildcard order matters; CORS unconditional for dev workflow; rewriteRequestPath strips leading slash for absolute root path compatibility
 
 ### Pending Todos
 
