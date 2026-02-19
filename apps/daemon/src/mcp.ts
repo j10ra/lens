@@ -12,9 +12,9 @@ export async function startMcpServer(): Promise<void> {
     "lens_context_query",
     {
       title: "LENS Context Query",
-      // Verb-first, 1-2 sentences. Operational detail in parameter .describe() — not here.
+      // Verb-first, under 200 chars. Operational detail in parameter .describe() — not here.
       description:
-        "Query a codebase by keyword and get structural context: which files match, their importers, co-change partners, and hub scores. Use this when you need to understand where a symbol or concept lives in the repo graph.",
+        "Query a codebase by keyword and get structural context: which files match, their importers, co-change partners, and hub scores. Use when you need to find where a symbol or concept lives in the repo.",
       inputSchema: {
         repoPath: z.string().describe("Absolute path to the repository root (e.g. /Users/dev/myproject)"),
         query: z
