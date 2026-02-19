@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import { RootLayout } from "./components/RootLayout.js";
 import { Overview } from "./pages/Overview.js";
+import { RepoDetail } from "./pages/RepoDetail.js";
 import { Repos } from "./pages/Repos.js";
 import { Traces } from "./pages/Traces.js";
 
@@ -19,7 +20,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "repos/:repoId",
-        element: <div className="p-4 text-lg font-semibold">RepoDetail</div>,
+        element: <RepoDetail />,
       },
       {
         path: "traces",
