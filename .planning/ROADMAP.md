@@ -65,14 +65,15 @@ Plans:
   2. Opening `localhost:4111` in a browser shows the dashboard SPA; the trace waterfall displays route → spans → sub-spans with timing for any daemon request
   3. The repo explorer in the dashboard shows indexed files with metadata (co-change score, hub status, import count); clicking a file shows its structural context
   4. All daemon API calls in the dashboard use TanStack Query with caching and background refetch; UI state (selections, filters) uses TanStack Store
-**Plans**: 5 plans
+**Plans**: 6 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — `@lens/cli` full commands: register, remove, list, status, grep with formatted terminal output (CLI-02, CLI-03)
-- [ ] 03-02-PLAN.md — Dashboard scaffold: Vite + React SPA, shadcn/ui, TanStack Query + Store, daemon API client, Overview page, daemon trace/file routes (DASH-01, DASH-04, DASH-05, DASH-06)
-- [ ] 03-03-PLAN.md — Trace waterfall viewer: request log table, span waterfall in Sheet with cycled color bars (DASH-02)
-- [ ] 03-04-PLAN.md — Repo explorer: repos list with register form, repo detail two-panel layout, file table, file detail Sheet with structural context (DASH-03)
-- [ ] 03-05-PLAN.md — Daemon static file serving: serveStatic for dashboard SPA from :4111 with SPA fallback (DAEM-03)
+- [ ] 03-01-PLAN.md — CLI commands: register, remove, list, status, grep with formatted terminal output (CLI-02, CLI-03)
+- [ ] 03-02-PLAN.md — Dashboard infrastructure: Vite config, shadcn/ui from v1-archive, TanStack Query + Store, API client, router (DASH-04, DASH-05)
+- [ ] 03-03-PLAN.md — Layout components + Overview page + daemon trace/file/stats routes (DASH-01, DASH-06)
+- [ ] 03-04-PLAN.md — Trace waterfall viewer: request log table, span waterfall in Sheet with cycled color bars (DASH-02)
+- [ ] 03-05-PLAN.md — Repo explorer: repos list with register form, repo detail two-panel layout, file table, file detail Sheet with structural context (DASH-03)
+- [ ] 03-06-PLAN.md — Daemon static file serving: serveStatic for dashboard SPA from :4111 with SPA fallback + E2E checkpoint (DAEM-03)
 
 ### Phase 4: Hardening
 **Goal**: The system holds up under real usage — large repos index without timing out, traces don't grow unbounded, and multi-repo setups perform acceptably
@@ -100,5 +101,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Core + Daemon + MCP | 4/4 | Complete | 2026-02-19 |
 | 2. Intelligence Engine | 5/5 | Complete   | 2026-02-19 |
-| 3. CLI + Dashboard | 0/5 | Not started | - |
+| 3. CLI + Dashboard | 0/6 | Not started | - |
 | 4. Hardening | 0/4 | Not started | - |
