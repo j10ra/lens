@@ -53,8 +53,8 @@ Plans:
 - [x] 02-01-PLAN.md — Engine DB schema + file discovery + chunker + metadata extraction + repo management (ENGN-01, DAEM-05)
 - [x] 02-02-PLAN.md — Import graph construction (regex) + git co-change analysis (execFile) (ENGN-03, ENGN-04)
 - [x] 02-03-PLAN.md — Index orchestrator with mutex + TF-IDF scorer + structural queries + hub detection (ENGN-02, ENGN-05, ENGN-06)
-- [ ] 02-04-PLAN.md — Grep engine with result enrichment + public barrel exports with lensFn wrapping (ENGN-07, ENGN-08)
-- [ ] 02-05-PLAN.md — Daemon routes: repo CRUD, index trigger, real grep wiring, engine DB startup (DAEM-05, DAEM-06)
+- [x] 02-04-PLAN.md — Grep engine with result enrichment + public barrel exports with lensFn wrapping (ENGN-07, ENGN-08)
+- [x] 02-05-PLAN.md — Daemon routes: repo CRUD, index trigger, real grep wiring, engine DB startup (DAEM-05, DAEM-06)
 
 ### Phase 3: CLI + Dashboard
 **Goal**: Both human interfaces work — terminal shows formatted structural context, dashboard shows live trace waterfall and browsable repo data
@@ -65,14 +65,14 @@ Plans:
   2. Opening `localhost:4111` in a browser shows the dashboard SPA; the trace waterfall displays route → spans → sub-spans with timing for any daemon request
   3. The repo explorer in the dashboard shows indexed files with metadata (co-change score, hub status, import count); clicking a file shows its structural context
   4. All daemon API calls in the dashboard use TanStack Query with caching and background refetch; UI state (selections, filters) uses TanStack Store
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 03-01: `@lens/cli` full commands — register, remove, list, status, grep with formatted terminal output
-- [ ] 03-02: `apps/dashboard` scaffold — Vite + React SPA, shadcn/ui setup, TanStack Query + Store, daemon API client, routing
-- [ ] 03-03: Trace waterfall viewer — route → spans → sub-spans timeline with duration bars, error highlighting
-- [ ] 03-04: Repo explorer — indexed file list with metadata columns, file detail panel with structural context
-- [ ] 03-05: Daemon static file serving — build integration, `apps/dashboard` served from :4111
+- [ ] 03-01-PLAN.md — `@lens/cli` full commands: register, remove, list, status, grep with formatted terminal output (CLI-02, CLI-03)
+- [ ] 03-02-PLAN.md — Dashboard scaffold: Vite + React SPA, shadcn/ui, TanStack Query + Store, daemon API client, Overview page, daemon trace/file routes (DASH-01, DASH-04, DASH-05, DASH-06)
+- [ ] 03-03-PLAN.md — Trace waterfall viewer: request log table, span waterfall in Sheet with cycled color bars (DASH-02)
+- [ ] 03-04-PLAN.md — Repo explorer: repos list with register form, repo detail two-panel layout, file table, file detail Sheet with structural context (DASH-03)
+- [ ] 03-05-PLAN.md — Daemon static file serving: serveStatic for dashboard SPA from :4111 with SPA fallback (DAEM-03)
 
 ### Phase 4: Hardening
 **Goal**: The system holds up under real usage — large repos index without timing out, traces don't grow unbounded, and multi-repo setups perform acceptably
