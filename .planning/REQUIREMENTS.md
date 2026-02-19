@@ -18,7 +18,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Code Intelligence
 
-- [ ] **ENGN-01**: File discovery scans repo, respects .gitignore, detects file types
+- [x] **ENGN-01**: File discovery scans repo, respects .gitignore, detects file types
 - [ ] **ENGN-02**: TF-IDF scoring computes term relevance across indexed files
 - [ ] **ENGN-03**: Import graph construction extracts import/export edges from TypeScript files
 - [ ] **ENGN-04**: Co-change analysis parses git log to identify files that change together
@@ -33,7 +33,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **DAEM-02**: MCP stdio server exposing engine capabilities as tools
 - [ ] **DAEM-03**: Serves dashboard static files from built SPA
 - [x] **DAEM-04**: All routes wrapped in `lensRoute()` — no naked handlers
-- [ ] **DAEM-05**: Repo registration and management (add/remove/list repos)
+- [x] **DAEM-05**: Repo registration and management (add/remove/list repos)
 - [ ] **DAEM-06**: Index trigger endpoint (manual reindex)
 
 ### CLI
@@ -95,7 +95,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CORE-04 | Phase 1 | Complete |
 | CORE-05 | Phase 1 | Complete |
 | CORE-06 | Phase 1 | Complete |
-| ENGN-01 | Phase 2 | Pending |
+| ENGN-01 | Phase 2 | Complete |
 | ENGN-02 | Phase 2 | Pending |
 | ENGN-03 | Phase 2 | Pending |
 | ENGN-04 | Phase 2 | Pending |
@@ -107,7 +107,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DAEM-02 | Phase 1 | Complete |
 | DAEM-03 | Phase 3 | Pending |
 | DAEM-04 | Phase 1 | Complete |
-| DAEM-05 | Phase 2 | Pending |
+| DAEM-05 | Phase 2 | Complete |
 | DAEM-06 | Phase 2 | Pending |
 | CLI-01 | Phase 1 | Complete |
 | CLI-02 | Phase 3 | Pending |
