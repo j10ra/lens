@@ -44,11 +44,9 @@ app.get(
     const db = getRawDb();
     const reposCount = (db.prepare("SELECT COUNT(*) AS n FROM repos").get() as { n: number }).n;
     const totalFiles = (db.prepare("SELECT COUNT(*) AS n FROM file_metadata").get() as { n: number }).n;
-    const totalChunks = (db.prepare("SELECT COUNT(*) AS n FROM chunks").get() as { n: number }).n;
     return c.json({
       repos_count: reposCount,
       total_files: totalFiles,
-      total_chunks: totalChunks,
       uptime_seconds: Math.floor(process.uptime()),
     });
   }),

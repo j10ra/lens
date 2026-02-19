@@ -5,15 +5,12 @@ export type RepoFile = {
   path: string;
   language: string | null;
   exports: string[] | null;
-  chunk_count: number;
-  row: number;
+  import_count: number;
 };
 
 export type RepoFilesResult = {
   files: RepoFile[];
   total: number;
-  offset: number;
-  limit: number;
 };
 
 export type FileDetail = {
@@ -22,14 +19,12 @@ export type FileDetail = {
   exports: string[] | null;
   sections: string[] | null;
   internals: string[] | null;
-  imports: string[] | null;
+  import_edges: string[] | null;
   imported_by: string[] | null;
-  chunk_count: number;
   git_stats: {
     commits: number;
     recent_90d: number;
     last_modified: string | null;
-    last_commit: string | null;
   } | null;
   cochanges: { path: string; count: number }[] | null;
 };

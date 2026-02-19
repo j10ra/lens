@@ -20,7 +20,6 @@ function timeAgo(ts: string | null): string {
 
 type RepoWithStats = Repo & {
   file_count?: number;
-  chunk_count?: number;
 };
 
 function RepoCard({ repo }: { repo: RepoWithStats }) {
@@ -57,14 +56,10 @@ function RepoCard({ repo }: { repo: RepoWithStats }) {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="grid grid-cols-2 gap-2 text-center">
           <div>
             <p className="font-mono text-xs font-semibold tabular-nums">{(repo.file_count ?? 0).toLocaleString()}</p>
             <p className="text-[10px] text-muted-foreground">Files</p>
-          </div>
-          <div>
-            <p className="font-mono text-xs font-semibold tabular-nums">{(repo.chunk_count ?? 0).toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground">Chunks</p>
           </div>
           <div>
             <p className="font-mono text-xs font-semibold tabular-nums">{timeAgo(repo.last_indexed_at)}</p>

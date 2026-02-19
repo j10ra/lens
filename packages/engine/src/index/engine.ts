@@ -2,8 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { lensFn } from "@lens/core";
 import type { Db } from "../db/connection.js";
-import { chunkQueries, repoQueries } from "../db/queries.js";
-import { chunkFile } from "./chunker.js";
+import { repoQueries } from "../db/queries.js";
 import { diffScan, fullScan, getHeadCommit } from "./discovery.js";
 import { extractAndPersistMetadata } from "./extract-metadata.js";
 import { analyzeGitHistory } from "./git-analysis.js";
@@ -33,7 +32,6 @@ async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
 
 export interface IndexResult {
   files_scanned: number;
-  chunks_created: number;
   duration_ms: number;
   skipped: boolean;
 }
@@ -55,7 +53,7 @@ export const runIndex = lensFn(
 
       // 3. Early exit if HEAD unchanged (unless force)
       if (!force && repo.last_indexed_commit === headCommit) {
-        return { files_scanned: 0, chunks_created: 0, duration_ms: Date.now() - start, skipped: true };
+        return { files_scanned: 0, duration_ms: Date.now() - start, skipped: true };
       }
 
       // 4. Transition to indexing state
@@ -67,39 +65,20 @@ export const runIndex = lensFn(
         ? await fullScan(repo.root_path)
         : await diffScan(repo.root_path, repo.last_indexed_commit!, headCommit);
 
-      // 6. Chunking + storage — skip deleted files
-      let chunksCreated = 0;
+      // 6. Read files + metadata extraction — skip deleted files
+      const fileContents = new Map<string, { content: string; language: string | null }>();
       for (const file of files) {
         if (file.status === "deleted") continue;
-
-        let content: string;
         try {
-          content = await readFile(join(repo.root_path, file.path), "utf-8");
+          const content = await readFile(join(repo.root_path, file.path), "utf-8");
+          fileContents.set(file.path, { content, language: file.language });
         } catch {
           // File removed between discovery and read — skip
-          continue;
         }
-
-        const chunks = chunkFile(content, file.path);
-        chunkQueries.upsertChunks(
-          db,
-          repoId,
-          file.path,
-          chunks.map((c) => ({
-            chunkIndex: c.chunkIndex,
-            startLine: c.startLine,
-            endLine: c.endLine,
-            content: c.content,
-            chunkHash: c.chunkHash,
-            lastSeenCommit: headCommit,
-            language: file.language,
-          })),
-        );
-        chunksCreated += chunks.length;
       }
 
-      // 7. Metadata extraction
-      extractAndPersistMetadata(db, repoId);
+      // 7. Extract and persist metadata directly from file contents
+      extractAndPersistMetadata(db, repoId, fileContents);
 
       // 8. Import graph
       buildAndPersistImportGraph(db, repoId);
@@ -112,7 +91,6 @@ export const runIndex = lensFn(
 
       return {
         files_scanned: files.length,
-        chunks_created: chunksCreated,
         duration_ms: Date.now() - start,
         skipped: false,
       };

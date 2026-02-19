@@ -108,8 +108,7 @@ function FilesTab({ repoId, onSelectFile }: FilesTabProps) {
                 </th>
                 <th className="border-b border-r border-border px-3 py-1.5 text-left font-medium">Path</th>
                 <th className="w-16 border-b border-r border-border px-3 py-1.5 text-left font-medium">Lang</th>
-                <th className="w-16 border-b border-r border-border px-3 py-1.5 text-right font-medium">Exports</th>
-                <th className="w-16 border-b border-border px-3 py-1.5 text-right font-medium">Chunks</th>
+                <th className="w-16 border-b border-border px-3 py-1.5 text-right font-medium">Exports</th>
               </tr>
             </thead>
             <tbody>
@@ -130,15 +129,14 @@ function FilesTab({ repoId, onSelectFile }: FilesTabProps) {
                   <td className="border-b border-r border-border px-3 py-1.5 text-muted-foreground">
                     {file.language ?? "—"}
                   </td>
-                  <td className="border-b border-r border-border px-3 py-1.5 text-right tabular-nums">
+                  <td className="border-b border-border px-3 py-1.5 text-right tabular-nums">
                     {file.exports?.length ?? 0}
                   </td>
-                  <td className="border-b border-border px-3 py-1.5 text-right tabular-nums">{file.chunk_count}</td>
                 </tr>
               ))}
               {files.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                  <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
                     No files found.
                   </td>
                 </tr>
@@ -198,9 +196,7 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
           <>
             <SheetHeader>
               <SheetTitle className="break-all select-all font-mono text-sm">{detail.path}</SheetTitle>
-              <SheetDescription>
-                {detail.language ?? "unknown"} &middot; {detail.chunk_count} chunks
-              </SheetDescription>
+              <SheetDescription>{detail.language ?? "unknown"}</SheetDescription>
             </SheetHeader>
 
             <div className="mt-4 space-y-4">
@@ -258,8 +254,8 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                 </>
               )}
 
-              {/* Imports */}
-              {detail.imports && detail.imports.length > 0 && (
+              {/* Imports (resolved edges) */}
+              {detail.import_edges && detail.import_edges.length > 0 && (
                 <>
                   <Separator />
                   <section>
@@ -268,7 +264,7 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                       Imports
                     </p>
                     <div className="flex flex-col gap-0.5">
-                      {detail.imports.map((imp) => (
+                      {detail.import_edges.map((imp) => (
                         <button
                           key={imp}
                           type="button"

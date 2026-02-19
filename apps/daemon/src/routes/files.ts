@@ -21,10 +21,8 @@ filesRoutes.get(
     const files = db
       .prepare(
         `SELECT fm.path, fm.language, fm.exports,
-                COUNT(DISTINCT c.id) AS chunk_count,
                 COUNT(DISTINCT fi.id) AS import_count
          FROM file_metadata fm
-         LEFT JOIN chunks c ON c.repo_id = fm.repo_id AND c.path = fm.path
          LEFT JOIN file_imports fi ON fi.repo_id = fm.repo_id AND fi.source_path = fm.path
          WHERE fm.repo_id = ? ${searchClause}
          GROUP BY fm.path
@@ -35,7 +33,6 @@ filesRoutes.get(
       path: string;
       language: string | null;
       exports: string;
-      chunk_count: number;
       import_count: number;
     }>;
 

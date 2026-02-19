@@ -1,6 +1,5 @@
 import type { Db } from "../db/connection.js";
-import { chunkQueries, metadataQueries } from "../db/queries.js";
-import { detectLanguage } from "./discovery.js";
+import { metadataQueries } from "../db/queries.js";
 
 // ── Export extraction ─────────────────────────────────────────────────────────
 
@@ -256,25 +255,13 @@ export function extractFileMetadata(content: string, path: string, language: str
 }
 
 // Synchronous — called from runIndex which is already lensFn-wrapped
-export function extractAndPersistMetadata(db: Db, repoId: string): number {
-  const rows = chunkQueries.getAllByRepo(db, repoId);
-
-  // Merge chunks per file path
-  const files = new Map<string, { content: string; language: string | null }>();
-  for (const row of rows) {
-    const existing = files.get(row.path);
-    if (existing) {
-      existing.content += `\n${row.content}`;
-    } else {
-      files.set(row.path, {
-        content: row.content,
-        language: row.language ?? detectLanguage(row.path),
-      });
-    }
-  }
-
+export function extractAndPersistMetadata(
+  db: Db,
+  repoId: string,
+  fileContents: Map<string, { content: string; language: string | null }>,
+): number {
   let count = 0;
-  for (const [path, { content, language }] of files) {
+  for (const [path, { content, language }] of fileContents) {
     const meta = extractFileMetadata(content, path, language);
     metadataQueries.upsert(db, repoId, path, {
       language: meta.language,

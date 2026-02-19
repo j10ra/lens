@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, PageHeader } from "@lens/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Activity, FolderGit2, type LucideIcon, Shapes } from "lucide-react";
+import { Activity, FolderGit2, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import { StatusBadge } from "../components/StatusBadge.js";
 import { api } from "../lib/api.js";
@@ -59,12 +59,6 @@ export function Overview() {
       value: (stats?.total_files ?? 0).toLocaleString(),
       description: "Indexed source files",
       icon: FolderGit2,
-    },
-    {
-      label: "Chunks",
-      value: (stats?.total_chunks ?? 0).toLocaleString(),
-      description: "Code segments across all repos",
-      icon: Shapes,
     },
     {
       label: "Uptime",
