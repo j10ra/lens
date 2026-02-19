@@ -11,14 +11,14 @@ requires:
 provides:
   - "Hono HTTP server on :4111 with /health route — GET returns status/uptime/version JSON"
   - "lensRoute() wrapping all HTTP handlers — spans recorded in TraceStore on every request"
-  - "MCP stdio server with lens_context_query stub tool — discoverable by agents, returns structured placeholder"
+  - "MCP stdio server with lens_grep stub tool — discoverable by agents, returns structured placeholder"
   - "Single-process HTTP + MCP on separate I/O channels (HTTP on TCP, MCP on stdin/stdout)"
   - "DATA_DIR (~/.lens/) created at startup with mkdirSync — DB always available"
   - "apps/daemon/dist/index.js — ESM Node.js process entry point"
 
 affects:
   - "01-03 (engine routes plug into this HTTP server)"
-  - "01-04 (MCP adoption benchmark tests lens_context_query)"
+  - "01-04 (MCP adoption benchmark tests lens_grep)"
   - "02-engine"
 
 tech-stack:
@@ -38,7 +38,7 @@ key-files:
   created:
     - "apps/daemon/src/routes/health.ts — GET /health via lensRoute(), returns status/uptime/version"
     - "apps/daemon/src/http.ts — Hono app, error handler, /health mount, startHttpServer()"
-    - "apps/daemon/src/mcp.ts — McpServer with lens_context_query stub, StdioServerTransport"
+    - "apps/daemon/src/mcp.ts — McpServer with lens_grep stub, StdioServerTransport"
     - "apps/daemon/src/index.ts — mkdirSync, createTraceStore, configure*, startHttpServer + startMcpServer"
     - "apps/daemon/tsconfig.json — NodeNext, ES2022, strict, skipLibCheck"
     - "apps/daemon/tsup.config.ts — ESM-only, externalize @lens/core"
@@ -65,7 +65,7 @@ completed: 2026-02-19
 
 # Phase 1 Plan 02: @lens/daemon Skeleton Summary
 
-**Hono HTTP server on :4111 with lensRoute()-wrapped health route + MCP stdio server with lens_context_query stub — single process, TraceStore spans confirmed, no stdout writes**
+**Hono HTTP server on :4111 with lensRoute()-wrapped health route + MCP stdio server with lens_grep stub — single process, TraceStore spans confirmed, no stdout writes**
 
 ## Performance
 
@@ -79,7 +79,7 @@ completed: 2026-02-19
 
 - Daemon starts HTTP on :4111 and MCP on stdio in the same process — `LENS_MCP=false` for HTTP-only testing
 - `/health` returns `{"status":"ok","uptime":N,"version":"2.0.0"}` — lensRoute() span recorded in TraceStore
-- MCP `lens_context_query` tool registered with verb-first description and zod-typed parameters — discoverable by agents
+- MCP `lens_grep` tool registered with verb-first description and zod-typed parameters — discoverable by agents
 - `~/.lens/` created at startup via `mkdirSync` — `traces.db` WAL mode, spans confirmed via sqlite3 query
 
 ## Task Commits
@@ -93,7 +93,7 @@ completed: 2026-02-19
 
 - `apps/daemon/src/routes/health.ts` — GET /health, `lensRoute('health.get', ...)`, status/uptime/version
 - `apps/daemon/src/http.ts` — Hono app, `onError` handler (stderr), `/health` mount, `startHttpServer()`
-- `apps/daemon/src/mcp.ts` — `McpServer` with `lens_context_query` tool stub, `StdioServerTransport`
+- `apps/daemon/src/mcp.ts` — `McpServer` with `lens_grep` tool stub, `StdioServerTransport`
 - `apps/daemon/src/index.ts` — mkdirSync DATA_DIR, createTraceStore, configure*, startHttpServer, startMcpServer
 - `apps/daemon/tsconfig.json` — NodeNext module, ES2022 target, strict, skipLibCheck
 - `apps/daemon/tsup.config.ts` — ESM-only format, externalize `@lens/core`, clean output
@@ -131,9 +131,9 @@ app.route('/myroute', myRoutes)
 
 Every handler MUST use `lensRoute()` — naked Hono handlers are not permitted (plan must_have).
 
-## MCP Tool: lens_context_query
+## MCP Tool: lens_grep
 
-- **Tool name:** `lens_context_query`
+- **Tool name:** `lens_grep`
 - **Phase 1 behavior:** Returns structured placeholder with `results: []` and a note to run `lens register + lens index`
 - **Phase 2 behavior:** Replaced with real engine query (import graph, co-change, hub scores)
 - **Parameters:** `repoPath` (string), `query` (string), `limit` (int 1-50, default 20)
@@ -173,7 +173,7 @@ None — no external service configuration required. Data directory (`~/.lens/`)
 ## Next Phase Readiness
 
 - Daemon HTTP shape established — Plan 03 (engine routes) mounts additional routes via `app.route()` in `http.ts`
-- MCP stub registered — Plan 04 (adoption benchmark) can call `lens_context_query` tool and verify agent discovery
+- MCP stub registered — Plan 04 (adoption benchmark) can call `lens_grep` tool and verify agent discovery
 - `lensRoute()` tracing confirmed working — every HTTP request produces a `spans` row in `~/.lens/traces.db`
 - Build: `pnpm --filter @lens/daemon build` → `dist/index.js` (ESM, 3.34 KB)
 

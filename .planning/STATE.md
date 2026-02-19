@@ -5,32 +5,32 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every code query returns structural context — not just matches, but who calls it, what it imports, how hot it is, where it sits in the graph.
-**Current focus:** Phase 1 — Core + Daemon + MCP
+**Current focus:** Phase 1 COMPLETE — ready for Phase 2
 
 ## Current Position
 
-Phase: 1 of 4 (Core + Daemon + MCP)
-Plan: 4 of 4 in current phase
-Status: In progress — plans 01, 02, 03 complete, plan 04 remaining
-Last activity: 2026-02-19 — Plan 02 complete (@lens/daemon skeleton built)
+Phase: 1 of 4 (Core + Daemon + MCP) — COMPLETE
+Plan: 4 of 4 in current phase — ALL DONE
+Status: Phase 1 complete. MCP adoption gate PASSED. Ready for Phase 2.
+Last activity: 2026-02-19 — Plan 04 complete (MCP adoption benchmark passed)
 
-Progress: [████░░░░░░] 25%
+Progress: [██████████] 100% (Phase 1)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3 (01-01, 01-02, 01-03)
+- Total plans completed: 4 (01-01, 01-02, 01-03, 01-04)
 - Average duration: ~3 min
-- Total execution time: ~10 min
+- Total execution time: ~11 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-core-daemon-mcp | 3/4 | ~10 min | ~3.3 min |
+| 01-core-daemon-mcp | 4/4 | ~11 min | ~2.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min), 01-03 (3 min), 01-02 (3 min)
+- Last 5 plans: 01-01 (4 min), 01-03 (3 min), 01-02 (3 min), 01-04 (1 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -63,11 +63,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- **MCP adoption risk**: v1 had 0/9 tool adoption. Phase 1 plan 04 is a benchmark gate — do not start Phase 2 until adoption confirmed on unfamiliar repos.
+- ~~**MCP adoption risk**: v1 had 0/9 tool adoption.~~ RESOLVED — lens_grep adopted 1/1, gate passed.
 - **Phase 4 has no unmapped v1 requirements**: Hardening applies across all requirements. Phase 4 success criteria are performance/stability properties, not feature additions. This is intentional.
 
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 01-02-PLAN.md (@lens/daemon skeleton)
-Resume file: .planning/phases/01-core-daemon-mcp/01-04-PLAN.md
+Stopped at: Phase 1 complete — ready for Phase 2 planning
+Resume file: .planning/ROADMAP.md

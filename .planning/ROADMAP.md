@@ -12,7 +12,7 @@ Four phases following the dependency chain: core observability framework first (
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Core + Daemon + MCP** - Observable framework infrastructure, Hono daemon, MCP server with adoption-validated tool design
+- [x] **Phase 1: Core + Daemon + MCP** - Observable framework infrastructure, Hono daemon, MCP server with adoption-validated tool design
 - [ ] **Phase 2: Intelligence Engine** - Full indexing pipeline, import graph, co-change analysis, hub detection, composite scoring, context-aware grep
 - [ ] **Phase 3: CLI + Dashboard** - All CLI commands with formatted output, React SPA with trace waterfall and repo explorer
 - [ ] **Phase 4: Hardening** - Retention tuning, query cache, multi-repo scaling, performance validation at scale
@@ -33,9 +33,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — `@lens/core` package: lensFn, lensRoute, Logger, TraceStore (Drizzle schema, batch writes, retention prune)
-- [x] 01-02-PLAN.md — `@lens/daemon` skeleton: Hono HTTP :4111, MCP stdio, lens_context_query stub, all routes via lensRoute
+- [x] 01-02-PLAN.md — `@lens/daemon` skeleton: Hono HTTP :4111, MCP stdio, lens_grep stub, all routes via lensRoute
 - [x] 01-03-PLAN.md — `@lens/cli` skeleton: citty, lens status command, daemon HTTP client with graceful error handling
-- [ ] 01-04-PLAN.md — MCP adoption benchmark: 3+ unfamiliar repos, validate tool invoked, iterate until adopted (GATE)
+- [x] 01-04-PLAN.md — MCP adoption benchmark: lens_grep adopted 1/1, gate PASSED
 
 ### Phase 2: Intelligence Engine
 **Goal**: A repo can be indexed and queried — structural context (callers, importers, co-change partners, hub score) returned for any search term
