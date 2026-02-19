@@ -5,36 +5,37 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every code query returns structural context — not just matches, but who calls it, what it imports, how hot it is, where it sits in the graph.
-**Current focus:** Phase 2 — Intelligence Engine (3/5 plans complete)
+**Current focus:** Phase 3 — CLI (ready to start)
 
 ## Current Position
 
-Phase: 2 of 4 (Intelligence Engine)
-Plan: 4 of 5 in current phase — 02-04 DONE
-Status: grepRepo() + public barrel complete (ENGN-07, ENGN-08). Ready for Plan 02-05 (hardening).
-Last activity: 2026-02-19 — Plan 02-04 complete (grepRepo structural grep, lensFn public barrel)
+Phase: 2 of 4 (Intelligence Engine) — COMPLETE
+Plan: 5/5 done — Phase 2 complete
+Status: Daemon routes wired (DAEM-05, DAEM-06). Full engine-to-HTTP-to-MCP pipeline operational. Phase 3 (CLI) next.
+Last activity: 2026-02-19 — Plan 02-05 complete (daemon route wiring, real grep, repo CRUD)
 
-Progress: [█████░░░░░] 45% (Phase 2, 4/5 plans)
+Progress: [██████░░░░] 55% (Phase 2 complete, starting Phase 3)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7 (01-01, 01-02, 01-03, 01-04, 02-01, 02-02, 02-03, 02-04)
-- Average duration: ~2.4 min
-- Total execution time: ~22 min
+- Total plans completed: 9 (01-01, 01-02, 01-03, 01-04, 02-01, 02-02, 02-03, 02-04, 02-05)
+- Average duration: ~2.3 min
+- Total execution time: ~25 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-core-daemon-mcp | 4/4 | ~11 min | ~2.8 min |
-| 02-intelligence-engine | 4/5 | ~13 min | ~3.3 min |
+| 02-intelligence-engine | 5/5 | ~16 min | ~3.2 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (7 min), 02-02 (2 min), 02-03 (2 min), 02-04 (2 min)
+- Last 5 plans: 02-01 (7 min), 02-02 (2 min), 02-03 (2 min), 02-04 (2 min), 02-05 (3 min)
 - Trend: stable
 
 *Updated after each plan completion*
+| Phase 02-intelligence-engine P05 | 3 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,9 @@ Recent decisions affecting current work:
 - [02-04]: Option 1 barrel wrapping — re-export already-wrapped runIndex/registerRepo as-is, wrap sync repo fns inline in barrel with async lambda
 - [02-04]: configureEngineDb/getEngineDb not lensFn-wrapped — infra functions, not engine operations
 - [02-04]: grepRepo result grouping uses matchedTerms from scorer — no second DB pass, just filter scored results
+- [Phase 02-05]: Repo path resolution in grep route via listRepos() then find() — avoids adding getRepoByPath() query to engine package; O(repos) negligible at Phase 2 scale
+- [Phase 02-05]: @lens/engine externalized in daemon tsup config — workspace packages ship their own dist, must not be rebundled
+- [Phase 02-05]: configureEngineDb() called after configure*() but before startHttpServer() — engine DB ready before any route handler runs
 
 ### Pending Todos
 
@@ -83,5 +87,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Phase 2, Plan 04 complete — grepRepo structural grep, lensFn public barrel
-Resume file: .planning/phases/02-intelligence-engine/02-05-PLAN.md
+Stopped at: Completed 02-05-PLAN.md — Phase 2 complete (all 5/5 plans done)
+Resume file: .planning/phases/03-cli/ (Phase 3 plans TBD)

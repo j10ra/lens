@@ -13,7 +13,7 @@ Four phases following the dependency chain: core observability framework first (
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Core + Daemon + MCP** - Observable framework infrastructure, Hono daemon, MCP server with adoption-validated tool design
-- [ ] **Phase 2: Intelligence Engine** - Full indexing pipeline, import graph, co-change analysis, hub detection, composite scoring, context-aware grep
+- [x] **Phase 2: Intelligence Engine** - Full indexing pipeline, import graph, co-change analysis, hub detection, composite scoring, context-aware grep (completed 2026-02-19)
 - [ ] **Phase 3: CLI + Dashboard** - All CLI commands with formatted output, React SPA with trace waterfall and repo explorer
 - [ ] **Phase 4: Hardening** - Retention tuning, query cache, multi-repo scaling, performance validation at scale
 
@@ -99,6 +99,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core + Daemon + MCP | 4/4 | Complete | 2026-02-19 |
-| 2. Intelligence Engine | 3/5 | In progress | - |
+| 2. Intelligence Engine | 5/5 | Complete   | 2026-02-19 |
 | 3. CLI + Dashboard | 0/5 | Not started | - |
 | 4. Hardening | 0/4 | Not started | - |
