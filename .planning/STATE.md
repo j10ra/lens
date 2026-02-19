@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 2 of 4 (Intelligence Engine)
-Plan: 3 of 5 in current phase — 02-03 DONE
-Status: Index orchestrator + composite scorer complete. Ready for Plan 02-04 (grep route).
-Last activity: 2026-02-19 — Plan 02-03 complete (runIndex orchestrator, interpretQuery TF-IDF scorer, structural query helpers)
+Plan: 4 of 5 in current phase — 02-04 DONE
+Status: grepRepo() + public barrel complete (ENGN-07, ENGN-08). Ready for Plan 02-05 (hardening).
+Last activity: 2026-02-19 — Plan 02-04 complete (grepRepo structural grep, lensFn public barrel)
 
-Progress: [████░░░░░░] 35% (Phase 2, 3/5 plans)
+Progress: [█████░░░░░] 45% (Phase 2, 4/5 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6 (01-01, 01-02, 01-03, 01-04, 02-01, 02-02)
-- Average duration: ~2.7 min
-- Total execution time: ~20 min
+- Total plans completed: 7 (01-01, 01-02, 01-03, 01-04, 02-01, 02-02, 02-03, 02-04)
+- Average duration: ~2.4 min
+- Total execution time: ~22 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-core-daemon-mcp | 4/4 | ~11 min | ~2.8 min |
-| 02-intelligence-engine | 3/5 | ~11 min | ~3.7 min |
+| 02-intelligence-engine | 4/5 | ~13 min | ~3.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-04 (1 min), 02-01 (7 min), 02-02 (2 min), 02-03 (2 min)
+- Last 5 plans: 02-01 (7 min), 02-02 (2 min), 02-03 (2 min), 02-04 (2 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -67,6 +67,9 @@ Recent decisions affecting current work:
 - [02-03]: interpretQuery() not lensFn-wrapped — called from grepRepo() which will be the lensFn boundary in 02-04
 - [02-03]: getCochangePartners() queries both directions (path_a OR path_b) — fileCochanges uses lex-ordered pairs
 - [02-03]: Hub dampening: exports > 5 → logarithmic dampening — prevents barrel files from dominating results
+- [02-04]: Option 1 barrel wrapping — re-export already-wrapped runIndex/registerRepo as-is, wrap sync repo fns inline in barrel with async lambda
+- [02-04]: configureEngineDb/getEngineDb not lensFn-wrapped — infra functions, not engine operations
+- [02-04]: grepRepo result grouping uses matchedTerms from scorer — no second DB pass, just filter scored results
 
 ### Pending Todos
 
@@ -80,5 +83,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Phase 2, Plan 03 complete — index orchestrator, composite scorer, structural queries
-Resume file: .planning/phases/02-intelligence-engine/02-04-PLAN.md
+Stopped at: Phase 2, Plan 04 complete — grepRepo structural grep, lensFn public barrel
+Resume file: .planning/phases/02-intelligence-engine/02-05-PLAN.md
