@@ -47,14 +47,14 @@ Plans:
   3. Hub files (high-connectivity, high-churn nodes) are identified and surfaced in grep results
   4. Every engine export is wrapped in `lensFn()` — no naked exported functions — confirmed by grep for export patterns
   5. Repo registration, removal, and listing work via daemon API; manual reindex can be triggered and completes without error
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 02-01: `@lens/engine` DB schema and indexing pipeline — file discovery, chunker, metadata extraction, Drizzle schema for engine index
-- [ ] 02-02: Import graph construction with ts-morph — extract import/export edges, store as adjacency table, reverse lookup
-- [ ] 02-03: Co-change analysis with simple-git — parse git log, compute pair frequencies, persist to co-change table
-- [ ] 02-04: Hub detection and composite scoring — TF-IDF + import graph indegree + co-change frequency → normalized composite score
-- [ ] 02-05: Grep engine + repo management routes — wire real engine behind `/grep` route (stub exists), result enrichment with structural metadata, `/repos` CRUD routes
+- [ ] 02-01-PLAN.md — Engine DB schema + file discovery + chunker + metadata extraction + repo management (ENGN-01, DAEM-05)
+- [ ] 02-02-PLAN.md — Import graph construction (regex) + git co-change analysis (execFile) (ENGN-03, ENGN-04)
+- [ ] 02-03-PLAN.md — Index orchestrator with mutex + TF-IDF scorer + structural queries + hub detection (ENGN-02, ENGN-05, ENGN-06)
+- [ ] 02-04-PLAN.md — Grep engine with result enrichment + public barrel exports with lensFn wrapping (ENGN-07, ENGN-08)
+- [ ] 02-05-PLAN.md — Daemon routes: repo CRUD, index trigger, real grep wiring, engine DB startup (DAEM-05, DAEM-06)
 
 ### Phase 3: CLI + Dashboard
 **Goal**: Both human interfaces work — terminal shows formatted structural context, dashboard shows live trace waterfall and browsable repo data
