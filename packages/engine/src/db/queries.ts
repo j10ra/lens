@@ -59,6 +59,10 @@ export const repoQueries = {
       .where(eq(repos.id, id))
       .run();
   },
+
+  updateGitAnalysisCommit(db: Db, id: string, commit: string) {
+    db.update(repos).set({ last_git_analysis_commit: commit }).where(eq(repos.id, id)).run();
+  },
 };
 
 // ── Chunk queries ─────────────────────────────────────────────────────────────
