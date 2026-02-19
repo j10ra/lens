@@ -9,5 +9,5 @@ export default defineConfig({
   splitting: false,
   clean: true,
   // Externalize workspace packages — they ship their own builds
-  external: ['@lens/core'],
+  external: ['@lens/core', '@lens/engine'],
 })

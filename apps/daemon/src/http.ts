@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { grepRoutes } from "./routes/grep.js";
 import { healthRoutes } from "./routes/health.js";
+import { reposRoutes } from "./routes/repos.js";
 
 export const app = new Hono();
 
@@ -15,6 +16,7 @@ app.onError((err, c) => {
 
 app.route("/health", healthRoutes);
 app.route("/grep", grepRoutes);
+app.route("/repos", reposRoutes);
 
 export function startHttpServer(): void {
   serve({ fetch: app.fetch, port: 4111 }, (info) => {

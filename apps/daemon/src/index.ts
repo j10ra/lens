@@ -2,11 +2,13 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { configureLensFn, configureLensRoute, configureLogger, createTraceStore } from "@lens/core";
+import { configureEngineDb } from "@lens/engine";
 import { startHttpServer } from "./http.js";
 import { startMcpServer } from "./mcp.js";
 
 const DATA_DIR = process.env.LENS_DATA_DIR ?? join(homedir(), ".lens");
 const TRACE_DB = join(DATA_DIR, "traces.db");
+const INDEX_DB = join(DATA_DIR, "index.db");
 const JSON_LOGS = process.argv.includes("--json");
 
 async function main(): Promise<void> {
@@ -18,6 +20,9 @@ async function main(): Promise<void> {
   configureLensFn(store);
   configureLensRoute(store);
   configureLogger(store, JSON_LOGS);
+
+  // Engine DB initialized before any route handler accesses it
+  configureEngineDb(INDEX_DB);
 
   // HTTP server is non-blocking — returns immediately, event loop handles requests
   startHttpServer();
