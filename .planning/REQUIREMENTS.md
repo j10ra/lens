@@ -9,12 +9,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Core Framework
 
-- [ ] **CORE-01**: `lensFn()` wraps any function with auto-tracing (duration, input/output size, nested spans, errors)
-- [ ] **CORE-02**: `lensRoute()` wraps Hono handlers with request-level tracing (method, path, status, duration)
-- [ ] **CORE-03**: Structured Logger with levels (info, warn, error, debug) correlated to active trace
-- [ ] **CORE-04**: TraceStore persists traces to SQLite via Drizzle with queryable schema
-- [ ] **CORE-05**: Drizzle ORM configured for SQLite with better-sqlite3 driver, migrations support
-- [ ] **CORE-06**: Trace retention policy (auto-prune old traces to prevent unbounded growth)
+- [x] **CORE-01**: `lensFn()` wraps any function with auto-tracing (duration, input/output size, nested spans, errors)
+- [x] **CORE-02**: `lensRoute()` wraps Hono handlers with request-level tracing (method, path, status, duration)
+- [x] **CORE-03**: Structured Logger with levels (info, warn, error, debug) correlated to active trace
+- [x] **CORE-04**: TraceStore persists traces to SQLite via Drizzle with queryable schema
+- [x] **CORE-05**: Drizzle ORM configured for SQLite with better-sqlite3 driver, migrations support
+- [x] **CORE-06**: Trace retention policy (auto-prune old traces to prevent unbounded growth)
 
 ### Code Intelligence
 
@@ -89,12 +89,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | Phase 1 | Pending |
-| CORE-02 | Phase 1 | Pending |
-| CORE-03 | Phase 1 | Pending |
-| CORE-04 | Phase 1 | Pending |
-| CORE-05 | Phase 1 | Pending |
-| CORE-06 | Phase 1 | Pending |
+| CORE-01 | Phase 1 | Complete |
+| CORE-02 | Phase 1 | Complete |
+| CORE-03 | Phase 1 | Complete |
+| CORE-04 | Phase 1 | Complete |
+| CORE-05 | Phase 1 | Complete |
+| CORE-06 | Phase 1 | Complete |
 | ENGN-01 | Phase 2 | Pending |
 | ENGN-02 | Phase 2 | Pending |
 | ENGN-03 | Phase 2 | Pending |
