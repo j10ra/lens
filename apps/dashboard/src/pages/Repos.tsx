@@ -1,328 +1,171 @@
-import { Badge, Button, PageHeader, Switch } from "@lens/ui";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { Eye, EyeOff, FolderPlus, Plus, RefreshCw, Sparkles } from "lucide-react";
+import { Badge, Card, CardContent, CardHeader, CardTitle, PageHeader } from "@lens/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { FolderPlus, Plus, RefreshCw } from "lucide-react";
 import { useState } from "react";
-import { StatusBadge } from "@/components/StatusBadge";
-import { api } from "@/lib/api";
-import { timeAgo } from "@/lib/utils";
+import { Link } from "react-router";
+import { StatusBadge } from "../components/StatusBadge.js";
+import { api } from "../lib/api.js";
+import { type Repo, useRepos } from "../queries/use-repos.js";
 
-type RepoItem = Awaited<ReturnType<typeof api.repos>>["repos"][number];
+function timeAgo(ts: string | null): string {
+  if (!ts) return "never";
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+type RepoWithStats = Repo & {
+  file_count?: number;
+  chunk_count?: number;
+};
+
+function RepoCard({ repo }: { repo: RepoWithStats }) {
+  const qc = useQueryClient();
+  const reindex = useMutation({
+    mutationFn: () => api.reindex(repo.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["repos"] }),
+  });
+
+  return (
+    <Card className="border-border bg-background py-4 shadow-none">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <CardTitle className="truncate text-sm">
+                <Link to={`/repos/${repo.id}`} className="text-primary hover:underline">
+                  {repo.name}
+                </Link>
+              </CardTitle>
+              <StatusBadge status={repo.index_status} />
+            </div>
+            <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{repo.root_path}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => reindex.mutate()}
+            disabled={reindex.isPending || repo.index_status === "indexing"}
+            className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+            title="Re-index"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${reindex.isPending ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div>
+            <p className="font-mono text-xs font-semibold tabular-nums">{(repo.file_count ?? 0).toLocaleString()}</p>
+            <p className="text-[10px] text-muted-foreground">Files</p>
+          </div>
+          <div>
+            <p className="font-mono text-xs font-semibold tabular-nums">{(repo.chunk_count ?? 0).toLocaleString()}</p>
+            <p className="text-[10px] text-muted-foreground">Chunks</p>
+          </div>
+          <div>
+            <p className="font-mono text-xs font-semibold tabular-nums">{timeAgo(repo.last_indexed_at)}</p>
+            <p className="text-[10px] text-muted-foreground">Indexed</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function Repos() {
+  const { data: repos } = useRepos();
+  const qc = useQueryClient();
   const [showRegister, setShowRegister] = useState(false);
-  const [registerPath, setRegisterPath] = useState("");
-  const queryClient = useQueryClient();
-
-  const { data: usage } = useQuery({
-    queryKey: ["dashboard-usage"],
-    queryFn: api.localUsage,
-    refetchInterval: 30_000,
-  });
-  const isPro = (usage?.plan ?? "free") === "pro";
-
-  const { data } = useQuery({
-    queryKey: ["dashboard-repos"],
-    queryFn: api.repos,
-    refetchInterval: 30_000,
-    placeholderData: keepPreviousData,
-  });
+  const [repoPath, setRepoPath] = useState("");
 
   const register = useMutation({
-    mutationFn: (rootPath: string) => api.registerRepo(rootPath),
+    mutationFn: (path: string) => api.registerRepo(path),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] });
+      qc.invalidateQueries({ queryKey: ["repos"] });
       setShowRegister(false);
-      setRegisterPath("");
+      setRepoPath("");
     },
   });
 
-  const repos = data?.repos ?? [];
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!repoPath.trim()) return;
+    register.mutate(repoPath.trim());
+  };
 
   return (
     <>
       <PageHeader>
         {showRegister ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (registerPath.trim()) register.mutate(registerPath.trim());
-            }}
-            className="flex flex-1 items-center gap-2"
-          >
-            <div className="relative flex-1">
-              <FolderPlus className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                type="text"
-                value={registerPath}
-                onChange={(e) => setRegisterPath(e.target.value)}
-                placeholder="/absolute/path/to/repo"
-                className="h-7 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-            <Button
+          <form onSubmit={handleRegister} className="flex flex-1 items-center gap-2">
+            <FolderPlus className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              type="text"
+              value={repoPath}
+              onChange={(e) => setRepoPath(e.target.value)}
+              placeholder="/absolute/path/to/repo"
+              className="h-7 flex-1 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <button
               type="submit"
-              size="sm"
-              className="h-7 text-xs"
-              disabled={!registerPath.trim() || register.isPending}
+              disabled={register.isPending || !repoPath.trim()}
+              className="h-7 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {register.isPending ? "Registering..." : "Register"}
-            </Button>
-            <Button
+            </button>
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
               onClick={() => {
                 setShowRegister(false);
-                setRegisterPath("");
+                setRepoPath("");
               }}
+              className="h-7 rounded-md border border-border px-3 text-xs hover:bg-accent"
             >
               Cancel
-            </Button>
-            {register.isError && <span className="text-xs text-destructive">{(register.error as Error).message}</span>}
+            </button>
           </form>
         ) : (
           <>
             <span className="text-sm font-medium">Repositories</span>
-            <span className="text-xs text-muted-foreground">{repos.length} total</span>
+            {repos && repos.length > 0 && (
+              <Badge variant="outline" className="ml-1 font-mono text-[10px]">
+                {repos.length}
+              </Badge>
+            )}
             <div className="ml-auto">
-              <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => setShowRegister(true)}>
+              <button
+                type="button"
+                onClick={() => setShowRegister(true)}
+                className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs hover:bg-accent"
+              >
                 <Plus className="h-3.5 w-3.5" />
                 Register
-              </Button>
+              </button>
             </div>
           </>
         )}
       </PageHeader>
 
-      <div className="flex-1 min-h-0 overflow-auto">
-        {repos.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-12 text-center">
-            No repos registered. Run: <code className="text-xs">lens repo register</code>
-          </p>
-        ) : (
-          <div className="grid gap-3 p-3 @xl/main:grid-cols-2">
-            {repos.map((r) => (
-              <RepoCard key={r.id} repo={r} isPro={isPro} />
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto py-4 md:gap-6 md:py-6">
+        {repos && repos.length > 0 ? (
+          <div className="grid gap-3 px-4 lg:px-6 @xl/main:grid-cols-2">
+            {repos.map((repo) => (
+              <RepoCard key={repo.id} repo={repo} />
             ))}
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">No repos registered.</p>
+              <p className="mt-1 font-mono text-xs text-muted-foreground/70">Run: `lens register &lt;path&gt;`</p>
+            </div>
           </div>
         )}
       </div>
     </>
-  );
-}
-
-function RepoCard({ repo, isPro }: { repo: RepoItem; isPro: boolean }) {
-  const queryClient = useQueryClient();
-
-  const reindex = useMutation({
-    mutationFn: api.reindex,
-    onMutate: (id) => {
-      queryClient.setQueryData(["dashboard-repos"], (old: Awaited<ReturnType<typeof api.repos>> | undefined) => {
-        if (!old) return old;
-        return { ...old, repos: old.repos.map((r) => (r.id === id ? { ...r, index_status: "indexing" } : r)) };
-      });
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
-  });
-
-  const startWatch = useMutation({
-    mutationFn: api.startWatcher,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
-  });
-
-  const stopWatch = useMutation({
-    mutationFn: api.stopWatcher,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
-  });
-
-  const updateSettings = useMutation({
-    mutationFn: (settings: {
-      enable_embeddings?: boolean;
-      enable_summaries?: boolean;
-      enable_vocab_clusters?: boolean;
-    }) => api.updateRepoSettings(repo.id, settings),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-repos"] }),
-  });
-
-  const embPct = repo.embeddable_count > 0 ? Math.round((repo.embedded_count / repo.embeddable_count) * 100) : 0;
-  const purPct = repo.purpose_total > 0 ? Math.round((repo.purpose_count / repo.purpose_total) * 100) : 0;
-
-  return (
-    <div className="rounded-lg border bg-card">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2 p-3 pb-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Link
-              to="/repos/$repoId"
-              params={{ repoId: repo.id }}
-              className="text-sm font-medium text-primary hover:underline truncate"
-            >
-              {repo.name}
-            </Link>
-            <StatusBadge status={repo.index_status} />
-          </div>
-          <p className="text-[10px] text-muted-foreground truncate mt-0.5">{repo.root_path}</p>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0"
-            onClick={() => reindex.mutate(repo.id)}
-            disabled={reindex.isPending}
-            title="Re-index"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${reindex.isPending ? "animate-spin" : ""}`} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0"
-            onClick={() => (repo.watcher.active ? stopWatch : startWatch).mutate(repo.id)}
-            title={repo.watcher.active ? "Stop watcher" : "Start watcher"}
-          >
-            {repo.watcher.active ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-2 px-3 pb-2 text-xs">
-        <Kv label="Files" value={repo.files_indexed} />
-        <Kv label="Chunks" value={repo.chunk_count.toLocaleString()} />
-        <Kv label="Commit" value={repo.last_indexed_commit?.slice(0, 7) ?? "\u2014"} mono />
-        <Kv label="Indexed" value={timeAgo(repo.last_indexed_at)} />
-      </div>
-
-      {/* Enrichment */}
-      <div className="border-t px-3 py-2 space-y-2">
-        <div className="flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3 text-muted-foreground" />
-          <span className="text-[10px] font-medium text-muted-foreground">Enrichment</span>
-          {!isPro && (
-            <Badge variant="outline" className="text-[9px] px-1 py-0 text-amber-500 border-amber-500/40">
-              Pro
-            </Badge>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <ToggleProgress
-            label="Embeddings"
-            value={repo.embedded_count}
-            max={repo.embeddable_count}
-            pct={embPct}
-            enabled={!!repo.enable_embeddings}
-            onToggle={(v) => updateSettings.mutate({ enable_embeddings: v })}
-            disabled={!isPro}
-          />
-          <ToggleProgress
-            label="Summaries"
-            value={repo.purpose_count}
-            max={repo.purpose_total}
-            pct={purPct}
-            enabled={!!repo.enable_summaries}
-            onToggle={(v) => updateSettings.mutate({ enable_summaries: v })}
-            disabled={!isPro}
-          />
-          <ToggleCount
-            label="Vocab clusters"
-            count={repo.vocab_cluster_count}
-            enabled={!!repo.enable_vocab_clusters}
-            onToggle={(v) => updateSettings.mutate({ enable_vocab_clusters: v })}
-            disabled={!isPro}
-          />
-          {!isPro && (
-            <Link
-              to="/billing"
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 px-3 py-1.5 text-[11px] font-medium text-amber-500 hover:bg-amber-500/10 mt-1"
-            >
-              <Sparkles className="h-3 w-3" />
-              Upgrade to Pro
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ToggleProgress({
-  label,
-  value,
-  max,
-  pct,
-  enabled,
-  onToggle,
-  disabled,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  pct: number;
-  enabled: boolean;
-  onToggle: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className={`flex items-center gap-2 ${enabled && !disabled ? "" : "opacity-50"}`}>
-      <Switch
-        checked={enabled}
-        onCheckedChange={onToggle}
-        disabled={disabled}
-        className="scale-75 origin-left shrink-0"
-      />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline justify-between mb-0.5">
-          <span className="text-[10px] text-muted-foreground">{label}</span>
-          <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-            {value}/{max}
-          </span>
-        </div>
-        <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
-          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ToggleCount({
-  label,
-  count,
-  enabled,
-  onToggle,
-  disabled,
-}: {
-  label: string;
-  count: number;
-  enabled: boolean;
-  onToggle: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className={`flex items-center gap-2 ${enabled && !disabled ? "" : "opacity-50"}`}>
-      <Switch
-        checked={enabled}
-        onCheckedChange={onToggle}
-        disabled={disabled}
-        className="scale-75 origin-left shrink-0"
-      />
-      <div className="flex items-baseline justify-between flex-1">
-        <span className="text-[10px] text-muted-foreground">{label}</span>
-        <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{count}</span>
-      </div>
-    </div>
-  );
-}
-
-function Kv({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return (
-    <div>
-      <span className="text-[10px] text-muted-foreground block">{label}</span>
-      <span className={`text-xs font-medium tabular-nums ${mono ? "font-mono" : ""}`}>{value}</span>
-    </div>
   );
 }

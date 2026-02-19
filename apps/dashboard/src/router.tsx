@@ -1,6 +1,8 @@
 import { createBrowserRouter } from "react-router";
 import { RootLayout } from "./components/RootLayout.js";
 import { Overview } from "./pages/Overview.js";
+import { Repos } from "./pages/Repos.js";
+import { Traces } from "./pages/Traces.js";
 
 export const router = createBrowserRouter([
   {
@@ -13,7 +15,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "repos",
-        element: <div className="p-4 text-lg font-semibold">Repos</div>,
+        element: <Repos />,
       },
       {
         path: "repos/:repoId",
