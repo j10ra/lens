@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 3 of 4 (CLI + Dashboard)
-Plan: 1/7 done — Phase 3 in progress
-Status: CLI subcommands implemented (register, remove, list, grep, status). All 5 commands call daemon HTTP via shared daemonFetch helper.
-Last activity: 2026-02-19 — Plan 03-01 complete (CLI subcommands with formatted terminal output)
+Plan: 2/7 done — Phase 3 in progress
+Status: @lens/ui shared package complete with 10 shadcn primitives and 5 layout components. CLI subcommands implemented (03-01).
+Last activity: 2026-02-19 — Plan 03-02 complete (@lens/ui workspace package with OKLCH theme)
 
-Progress: [███████░░░] 60% (Phase 3 started, 1/7 plans done)
+Progress: [████████░░] 65% (Phase 3 in progress, 2/7 plans done)
 
 ## Performance Metrics
 
@@ -38,6 +38,7 @@ Progress: [███████░░░] 60% (Phase 3 started, 1/7 plans done)
 *Updated after each plan completion*
 | Phase 02-intelligence-engine P05 | 3 | 2 tasks | 6 files |
 | Phase 03-cli-dashboard P01 | 2 | 2 tasks | 8 files |
+| Phase 03-cli-dashboard P02 | 6 | 2 tasks | 21 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,9 @@ Recent decisions affecting current work:
 - [03-01]: daemonFetch centralizes connection-refused error — one place for "daemon not running" message
 - [03-01]: grep defaults repoPath to process.cwd() — zero-config for in-repo use
 - [03-01]: list uses unicode status icons (checkmark/dots/circle/x) — readable without color support
+- [03-02]: @lens/ui is private source-only package (no tsup build) — apps import TypeScript directly via workspace resolution
+- [03-02]: globals.css omits @import "tailwindcss" — consumer app owns CSS entry point and handles tailwind import
+- [03-02]: sidebar.tsx and tabs.tsx are custom primitives (no Radix) — simpler API, fewer dependencies
 
 ### Pending Todos
 
@@ -92,5 +96,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 03-01-PLAN.md — Phase 3 started (1/7 plans done, CLI subcommands complete)
-Resume file: .planning/phases/03-cli-dashboard/03-02-PLAN.md
+Stopped at: Completed 03-02-PLAN.md — @lens/ui shared package complete (2/7 plans done)
+Resume file: .planning/phases/03-cli-dashboard/03-03-PLAN.md

@@ -24,8 +24,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **ENGN-04**: Co-change analysis parses git log to identify files that change together
 - [x] **ENGN-05**: Hub file detection identifies high-connectivity files via import graph + co-change signals
 - [x] **ENGN-06**: Composite scoring combines TF-IDF, import graph, co-change, and hub signals
-- [ ] **ENGN-07**: `lens grep "foo|bar|baz"` returns matches per term, ranked by composite score (hub, import graph, co-change, hotness), each match enriched with structural metadata
-- [ ] **ENGN-08**: Every engine function wrapped in `lensFn()` — no naked exports
+- [x] **ENGN-07**: `lens grep "foo|bar|baz"` returns matches per term, ranked by composite score (hub, import graph, co-change, hotness), each match enriched with structural metadata
+- [x] **ENGN-08**: Every engine function wrapped in `lensFn()` — no naked exports
 
 ### Daemon
 
@@ -34,13 +34,13 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DAEM-03**: Serves dashboard static files from built SPA
 - [x] **DAEM-04**: All routes wrapped in `lensRoute()` — no naked handlers
 - [x] **DAEM-05**: Repo registration and management (add/remove/list repos)
-- [ ] **DAEM-06**: Index trigger endpoint (manual reindex)
+- [x] **DAEM-06**: Index trigger endpoint (manual reindex)
 
 ### CLI
 
 - [x] **CLI-01**: Thin CLI shell that calls daemon HTTP API
-- [ ] **CLI-02**: Commands: register, remove, list, status, grep
-- [ ] **CLI-03**: Formatted terminal output for human readability
+- [x] **CLI-02**: Commands: register, remove, list, status, grep
+- [x] **CLI-03**: Formatted terminal output for human readability
 
 ### Dashboard
 
@@ -48,7 +48,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DASH-02**: Trace waterfall viewer showing route → spans → sub-spans with timing
 - [ ] **DASH-03**: Repo file explorer with indexed file list and metadata
 - [ ] **DASH-04**: TanStack Query for all daemon API calls (caching, refetching)
-- [ ] **DASH-05**: TanStack Store for client-side UI state (selections, filters)
+- [x] **DASH-05**: TanStack Store for client-side UI state (selections, filters)
 - [ ] **DASH-06**: Connects to daemon API on localhost:4111
 
 ## v2 Requirements
@@ -101,22 +101,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENGN-04 | Phase 2 | Complete |
 | ENGN-05 | Phase 2 | Complete |
 | ENGN-06 | Phase 2 | Complete |
-| ENGN-07 | Phase 2 | Pending |
-| ENGN-08 | Phase 2 | Pending |
+| ENGN-07 | Phase 2 | Complete |
+| ENGN-08 | Phase 2 | Complete |
 | DAEM-01 | Phase 1 | Complete |
 | DAEM-02 | Phase 1 | Complete |
 | DAEM-03 | Phase 3 | Pending |
 | DAEM-04 | Phase 1 | Complete |
 | DAEM-05 | Phase 2 | Complete |
-| DAEM-06 | Phase 2 | Pending |
+| DAEM-06 | Phase 2 | Complete |
 | CLI-01 | Phase 1 | Complete |
-| CLI-02 | Phase 3 | Pending |
-| CLI-03 | Phase 3 | Pending |
+| CLI-02 | Phase 3 | Complete |
+| CLI-03 | Phase 3 | Complete |
 | DASH-01 | Phase 3 | Pending |
 | DASH-02 | Phase 3 | Pending |
 | DASH-03 | Phase 3 | Pending |
 | DASH-04 | Phase 3 | Pending |
-| DASH-05 | Phase 3 | Pending |
+| DASH-05 | Phase 3 | Complete |
 | DASH-06 | Phase 3 | Pending |
 
 **Coverage:**
