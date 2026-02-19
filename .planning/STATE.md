@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Every code query returns structural context — not just matches, but who calls it, what it imports, how hot it is, where it sits in the graph.
-**Current focus:** Phase 2 — Intelligence Engine (1/5 plans complete)
+**Current focus:** Phase 2 — Intelligence Engine (2/5 plans complete)
 
 ## Current Position
 
 Phase: 2 of 4 (Intelligence Engine)
-Plan: 1 of 5 in current phase — 02-01 DONE
-Status: Engine DB foundation complete. Ready for Plan 02-02 (scoring/indexing pipeline).
-Last activity: 2026-02-19 — Plan 02-01 complete (engine scaffold + DB + discovery + chunker + metadata + repo CRUD)
+Plan: 2 of 5 in current phase — 02-02 DONE
+Status: Import graph + git co-change analysis complete. Ready for Plan 02-03 (composite scorer).
+Last activity: 2026-02-19 — Plan 02-02 complete (import specifier extraction, import graph builder, git co-change analysis)
 
-Progress: [██░░░░░░░░] 20% (Phase 2, 1/5 plans)
+Progress: [███░░░░░░░] 30% (Phase 2, 2/5 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 (01-01, 01-02, 01-03, 01-04, 02-01)
-- Average duration: ~3 min
-- Total execution time: ~18 min
+- Total plans completed: 6 (01-01, 01-02, 01-03, 01-04, 02-01, 02-02)
+- Average duration: ~2.7 min
+- Total execution time: ~20 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-core-daemon-mcp | 4/4 | ~11 min | ~2.8 min |
-| 02-intelligence-engine | 1/5 | ~7 min | ~7 min |
+| 02-intelligence-engine | 2/5 | ~9 min | ~4.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min), 01-03 (3 min), 01-02 (3 min), 01-04 (1 min), 02-01 (7 min)
+- Last 5 plans: 01-03 (3 min), 01-02 (3 min), 01-04 (1 min), 02-01 (7 min), 02-02 (2 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - [02-01]: Drizzle migrate() not inline SQL — connection.ts calls migrate() from drizzle-orm/better-sqlite3/migrator, migration generated at packages/engine/drizzle/
 - [02-01]: lensFn only on registerRepo() — sync internal helpers (chunker, metadata, identity) stay unwrapped; called from lensFn-wrapped orchestrators above
 - [02-01]: drizzle migration path uses __filename CJS compat guard — same pattern as Phase 1 core package
+- [02-02]: resolveImport signature (specifier, sourceFilePath, knownPaths) — language not needed, resolution is extension-based
+- [02-02]: Go import resolution skipped — Go uses module paths not relative ./ paths; extractGo() returns module paths but resolveImport() returns null for non-relative specifiers
+- [02-02]: parseGitLog() exported — enables testing git commit parsing independently of execFile
 
 ### Pending Todos
 
@@ -74,5 +77,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Phase 2, Plan 01 complete — engine DB foundation, discovery, chunker, metadata, repo CRUD
-Resume file: .planning/phases/02-intelligence-engine/02-02-PLAN.md
+Stopped at: Phase 2, Plan 02 complete — import graph, git co-change analysis
+Resume file: .planning/phases/02-intelligence-engine/02-03-PLAN.md
