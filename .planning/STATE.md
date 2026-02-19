@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 1 of 4 (Core + Daemon + MCP)
-Plan: 3 of 4 in current phase
-Status: In progress — plans 01, 03 complete, plans 02, 04 remaining
-Last activity: 2026-02-19 — Plan 03 complete (@lens/cli skeleton built)
+Plan: 4 of 4 in current phase
+Status: In progress — plans 01, 02, 03 complete, plan 04 remaining
+Last activity: 2026-02-19 — Plan 02 complete (@lens/daemon skeleton built)
 
-Progress: [███░░░░░░░] 18%
+Progress: [████░░░░░░] 25%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2 (01-01, 01-03)
-- Average duration: ~3.5 min
-- Total execution time: ~7 min
+- Total plans completed: 3 (01-01, 01-02, 01-03)
+- Average duration: ~3 min
+- Total execution time: ~10 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-core-daemon-mcp | 2/4 | ~7 min | ~3.5 min |
+| 01-core-daemon-mcp | 3/4 | ~10 min | ~3.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min), 01-03 (3 min)
+- Last 5 plans: 01-01 (4 min), 01-03 (3 min), 01-02 (3 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -53,6 +53,9 @@ Recent decisions affecting current work:
 - [01-03]: @types/node required in CLI devDependencies — process.exit() fails typecheck without Node.js types
 - [01-03]: console.log in CLI is correct — CLI is terminal binary, stdout reserved for MCP only in daemon
 - [01-03]: ESM-only tsup output for CLI — Node.js 18+ binary, no CJS dual build needed
+- [01-02]: @types/node required in daemon devDependencies — same pattern as CLI; process/node:* fail tsc without it
+- [01-02]: LENS_MCP env flag for HTTP-only mode — allows curl testing without MCP stdio takeover
+- [01-02]: mkdirSync before createTraceStore — ~/.lens/ may not exist on first run; plan explicitly flagged this
 
 ### Pending Todos
 
@@ -66,5 +69,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 01-03-PLAN.md (@lens/cli skeleton)
-Resume file: .planning/phases/01-core-daemon-mcp/01-02-PLAN.md
+Stopped at: Completed 01-02-PLAN.md (@lens/daemon skeleton)
+Resume file: .planning/phases/01-core-daemon-mcp/01-04-PLAN.md

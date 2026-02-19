@@ -29,10 +29,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Daemon
 
-- [ ] **DAEM-01**: Hono HTTP server on :4111 with JSON API
-- [ ] **DAEM-02**: MCP stdio server exposing engine capabilities as tools
+- [x] **DAEM-01**: Hono HTTP server on :4111 with JSON API
+- [x] **DAEM-02**: MCP stdio server exposing engine capabilities as tools
 - [ ] **DAEM-03**: Serves dashboard static files from built SPA
-- [ ] **DAEM-04**: All routes wrapped in `lensRoute()` — no naked handlers
+- [x] **DAEM-04**: All routes wrapped in `lensRoute()` — no naked handlers
 - [ ] **DAEM-05**: Repo registration and management (add/remove/list repos)
 - [ ] **DAEM-06**: Index trigger endpoint (manual reindex)
 
@@ -103,10 +103,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENGN-06 | Phase 2 | Pending |
 | ENGN-07 | Phase 2 | Pending |
 | ENGN-08 | Phase 2 | Pending |
-| DAEM-01 | Phase 1 | Pending |
-| DAEM-02 | Phase 1 | Pending |
+| DAEM-01 | Phase 1 | Complete |
+| DAEM-02 | Phase 1 | Complete |
 | DAEM-03 | Phase 3 | Pending |
-| DAEM-04 | Phase 1 | Pending |
+| DAEM-04 | Phase 1 | Complete |
 | DAEM-05 | Phase 2 | Pending |
 | DAEM-06 | Phase 2 | Pending |
 | CLI-01 | Phase 1 | Complete |
