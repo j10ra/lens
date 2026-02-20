@@ -21,8 +21,8 @@ export interface GraphFileNode {
   hubScore: number;
   isHub: boolean;
   exports: string[];
-  commits?: number;
-  recent90d?: number;
+  commits: number;
+  recent90d: number;
 }
 
 export interface GraphFileEdge {

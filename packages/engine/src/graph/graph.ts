@@ -26,6 +26,8 @@ export interface GraphFileNode {
   exports: string[];
   hubScore: number;
   isHub: boolean;
+  commits: number;
+  recent90d: number;
 }
 
 export interface GraphFileEdge {
@@ -102,8 +104,13 @@ export function buildGraphDetail(db: Db, repoId: string, dir: string): GraphDeta
   const indegrees = getIndegrees(db, repoId);
   const maxIndegree = Math.max(1, ...indegrees.values());
 
+  // Git activity stats
+  const allStats = graphQueries.allFileStats(db, repoId);
+  const statsMap = new Map(allStats.map((s) => [s.path, s]));
+
   const files: GraphFileNode[] = dirFiles.map((f) => {
     const indegree = indegrees.get(f.path) ?? 0;
+    const stats = statsMap.get(f.path);
     let exports: string[] = [];
     try {
       exports = f.exports ? JSON.parse(f.exports) : [];
@@ -116,6 +123,8 @@ export function buildGraphDetail(db: Db, repoId: string, dir: string): GraphDeta
       exports,
       hubScore: indegree / maxIndegree,
       isHub: indegree >= 5,
+      commits: stats?.commit_count ?? 0,
+      recent90d: stats?.recent_count ?? 0,
     };
   });
 

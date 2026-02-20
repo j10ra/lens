@@ -1,7 +1,8 @@
 import { Badge, PageHeader } from "@lens/ui";
 import { Billboard, Line, OrbitControls, Text } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { ArrowLeft } from "lucide-react";
+// biome-ignore lint/performance/noBarrelFile: need all icons
+import { ArrowLeft, ChevronRight, Folder } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { CameraController } from "../components/explore/CameraController.js";
@@ -30,6 +31,12 @@ function FileNode({
   const color = languageColor(node.language);
   const fileName = node.id.split("/").pop() ?? node.id;
 
+  // Scale by heat (hubScore 0–1) — sqrt for better spread across low values
+  const heat = Math.sqrt(node.hubScore);
+  const dotRadius = 0.02 + heat * 0.14; // 0.02 → 0.16
+  const fontSize = 0.07 + heat * 0.22; // 0.07 → 0.29
+  const textOpacity = dimmed ? 0.08 : 0.2 + heat * 0.8; // cold=0.2, hot=1.0
+
   return (
     <Billboard
       position={[node.x, node.y, node.z]}
@@ -38,23 +45,28 @@ function FileNode({
         onSelect(node.id);
       }}
     >
-      {/* Language color dot */}
-      <mesh position={[-0.08, 0, 0.01]}>
-        <circleGeometry args={[0.06, 16]} />
-        <meshBasicMaterial color={selected ? "#ffffff" : color} transparent opacity={dimmed ? 0.1 : 1} />
+      {/* Language color dot — size scales with heat */}
+      <mesh position={[0, 0, 0.01]}>
+        <circleGeometry args={[dotRadius, 32]} />
+        <meshBasicMaterial
+          color={selected ? "#ffffff" : color}
+          transparent
+          opacity={dimmed ? 0.05 : 0.15 + heat * 0.85}
+        />
       </mesh>
-      {/* Filename */}
+      {/* Filename — size and brightness scale with heat */}
       <Text
-        position={[0.02, 0, 0]}
-        fontSize={node.isHub ? 0.18 : 0.13}
+        position={[dotRadius + 0.04, 0, 0]}
+        fontSize={fontSize}
         anchorX="left"
         anchorY="middle"
-        color={dimmed ? "#334155" : selected ? "#ffffff" : node.isHub ? "#f1f5f9" : "#94a3b8"}
-        outlineWidth={dimmed ? 0 : 0.008}
+        color={dimmed ? "#0f172a" : selected ? "#ffffff" : heat > 0.4 ? "#f1f5f9" : heat > 0.15 ? "#94a3b8" : "#475569"}
+        outlineWidth={dimmed ? 0 : heat * 0.012}
         outlineColor="#000000"
-        fontWeight={node.isHub ? "bold" : "normal"}
+        fontWeight={heat > 0.25 ? "bold" : "normal"}
       >
         {fileName}
+        <meshBasicMaterial transparent opacity={textOpacity} />
       </Text>
     </Billboard>
   );
@@ -147,6 +159,7 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
   const file = detail.files.find((f) => f.path === fileId);
   if (!file) return null;
 
+  const color = languageColor(file.language);
   const importers = detail.edges.filter((e) => e.target === fileId).map((e) => e.source);
   const imports = detail.edges.filter((e) => e.source === fileId).map((e) => e.target);
   const cochanges = detail.cochanges
@@ -157,103 +170,289 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
     }))
     .sort((a, b) => b.weight - a.weight);
 
+  const shortPath = (p: string) => p.split("/").pop() ?? p;
+
   return (
-    <div className="absolute bottom-3 left-3 z-10 w-72 rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-xl text-xs">
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="font-mono font-medium truncate">{file.path.split("/").pop()}</span>
-        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground ml-2">
+    <div className="absolute bottom-3 left-3 z-10 w-96 rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-xl text-xs max-h-[80vh] overflow-y-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="shrink-0 w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+          <span className="font-mono font-semibold text-sm truncate">{shortPath(file.path)}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground ml-2 text-lg leading-none"
+        >
           ×
         </button>
       </div>
-      <div className="px-3 py-2 space-y-2">
-        <div className="text-muted-foreground font-mono text-[10px] truncate">{file.path}</div>
 
-        <div className="flex gap-2 flex-wrap">
+      <div className="px-4 py-3 space-y-3">
+        {/* Full path */}
+        <div className="text-muted-foreground font-mono text-[11px] break-all">{file.path}</div>
+
+        {/* Badges row */}
+        <div className="flex gap-1.5 flex-wrap">
           {file.language && (
-            <Badge variant="secondary" className="text-[9px]">
+            <Badge variant="secondary" className="text-[10px]">
               {file.language}
             </Badge>
           )}
           {file.isHub && (
-            <Badge variant="outline" className="text-[9px] border-amber-500/50 text-amber-400">
+            <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-400">
               hub
             </Badge>
           )}
-          <Badge variant="outline" className="text-[9px]">
+          <Badge variant="outline" className="text-[10px]">
             score {file.hubScore.toFixed(2)}
           </Badge>
         </div>
 
+        {/* Git activity */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-center">
+            <div className="text-foreground font-semibold text-sm">{file.commits}</div>
+            <div className="text-muted-foreground text-[9px]">commits</div>
+          </div>
+          <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-center">
+            <div className="text-foreground font-semibold text-sm">{file.recent90d}</div>
+            <div className="text-muted-foreground text-[9px]">last 90d</div>
+          </div>
+          <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-center">
+            <div className="text-foreground font-semibold text-sm">{importers.length + imports.length}</div>
+            <div className="text-muted-foreground text-[9px]">connections</div>
+          </div>
+        </div>
+
+        {/* Exports */}
         {file.exports.length > 0 && (
           <div>
-            <div className="text-muted-foreground mb-0.5">Exports ({file.exports.length})</div>
-            <div className="font-mono text-[10px] text-foreground/80 max-h-12 overflow-auto">
-              {file.exports.slice(0, 8).join(", ")}
-              {file.exports.length > 8 && ` +${file.exports.length - 8}`}
+            <div className="text-muted-foreground font-medium mb-1">Exports ({file.exports.length})</div>
+            <div className="flex flex-wrap gap-1">
+              {file.exports.slice(0, 12).map((e) => (
+                <span key={e} className="font-mono text-[10px] bg-muted/60 px-1.5 py-0.5 rounded text-foreground/80">
+                  {e}
+                </span>
+              ))}
+              {file.exports.length > 12 && (
+                <span className="text-[10px] text-muted-foreground">+{file.exports.length - 12}</span>
+              )}
             </div>
           </div>
         )}
 
+        {/* Imported by */}
         {importers.length > 0 && (
           <div>
-            <div className="text-muted-foreground mb-0.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-blue-400 mr-1" />
+            <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-400" />
               Imported by ({importers.length})
             </div>
-            <div className="font-mono text-[10px] text-foreground/80 max-h-12 overflow-auto">
-              {importers
-                .slice(0, 5)
-                .map((p) => p.split("/").pop())
-                .join(", ")}
-              {importers.length > 5 && ` +${importers.length - 5}`}
+            <div className="space-y-0.5">
+              {importers.slice(0, 8).map((p) => (
+                <div key={p} className="font-mono text-[10px] text-foreground/80 truncate pl-4">
+                  {shortPath(p)}
+                  <span className="text-muted-foreground/50 ml-1">{p.split("/").slice(0, -1).join("/")}</span>
+                </div>
+              ))}
+              {importers.length > 8 && (
+                <div className="text-[10px] text-muted-foreground pl-4">+{importers.length - 8} more</div>
+              )}
             </div>
           </div>
         )}
 
+        {/* Imports */}
         {imports.length > 0 && (
           <div>
-            <div className="text-muted-foreground mb-0.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-blue-400 mr-1" />
+            <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-400" />
               Imports ({imports.length})
             </div>
-            <div className="font-mono text-[10px] text-foreground/80 max-h-12 overflow-auto">
-              {imports
-                .slice(0, 5)
-                .map((p) => p.split("/").pop())
-                .join(", ")}
-              {imports.length > 5 && ` +${imports.length - 5}`}
+            <div className="space-y-0.5">
+              {imports.slice(0, 8).map((p) => (
+                <div key={p} className="font-mono text-[10px] text-foreground/80 truncate pl-4">
+                  {shortPath(p)}
+                  <span className="text-muted-foreground/50 ml-1">{p.split("/").slice(0, -1).join("/")}</span>
+                </div>
+              ))}
+              {imports.length > 8 && (
+                <div className="text-[10px] text-muted-foreground pl-4">+{imports.length - 8} more</div>
+              )}
             </div>
           </div>
         )}
 
+        {/* Co-changes */}
         {cochanges.length > 0 && (
           <div>
-            <div className="text-muted-foreground mb-0.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1" />
+            <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400" />
               Co-changed with ({cochanges.length})
             </div>
-            <div className="font-mono text-[10px] text-foreground/80 max-h-12 overflow-auto">
-              {cochanges
-                .slice(0, 5)
-                .map((c) => `${c.path.split("/").pop()} ×${c.weight}`)
-                .join(", ")}
-              {cochanges.length > 5 && ` +${cochanges.length - 5}`}
+            <div className="space-y-0.5">
+              {cochanges.slice(0, 8).map((c) => (
+                <div
+                  key={c.path}
+                  className="font-mono text-[10px] text-foreground/80 truncate pl-4 flex items-center gap-1"
+                >
+                  <span className="truncate">{shortPath(c.path)}</span>
+                  <span className="text-amber-400/70 shrink-0">×{c.weight}</span>
+                  <span className="text-muted-foreground/50 truncate">{c.path.split("/").slice(0, -1).join("/")}</span>
+                </div>
+              ))}
+              {cochanges.length > 8 && (
+                <div className="text-[10px] text-muted-foreground pl-4">+{cochanges.length - 8} more</div>
+              )}
             </div>
           </div>
         )}
       </div>
 
       {/* Legend */}
-      <div className="flex gap-3 border-t border-border px-3 py-1.5 text-[9px] text-muted-foreground">
-        <span>
-          <span className="inline-block w-2 h-0.5 bg-blue-400 mr-1" />
+      <div className="flex gap-4 border-t border-border px-4 py-2 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-0.5 bg-blue-400" />
           import
         </span>
-        <span>
-          <span className="inline-block w-2 h-0.5 bg-amber-400 mr-1 border-dashed" />
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-0.5 bg-amber-400 border-dashed" />
           co-change
         </span>
       </div>
+    </div>
+  );
+}
+
+// ── File Tree ────────────────────────────────────────────────────────────────
+
+interface TreeNode {
+  name: string;
+  path: string;
+  children: Map<string, TreeNode>;
+  isFile: boolean;
+  language: string | null;
+  isHub: boolean;
+}
+
+function buildTree(files: FileLayoutNode[]): TreeNode {
+  const root: TreeNode = { name: "", path: "", children: new Map(), isFile: false, language: null, isHub: false };
+  for (const f of files) {
+    const parts = f.id.split("/");
+    let current = root;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (!current.children.has(part)) {
+        current.children.set(part, {
+          name: part,
+          path: parts.slice(0, i + 1).join("/"),
+          children: new Map(),
+          isFile: i === parts.length - 1,
+          language: i === parts.length - 1 ? f.language : null,
+          isHub: i === parts.length - 1 ? f.isHub : false,
+        });
+      }
+      current = current.children.get(part)!;
+    }
+  }
+  return root;
+}
+
+function TreeEntry({
+  node,
+  depth,
+  selectedFile,
+  onSelect,
+  defaultOpen,
+}: {
+  node: TreeNode;
+  depth: number;
+  selectedFile: string | null;
+  onSelect: (path: string) => void;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const isSelected = node.isFile && node.path === selectedFile;
+  const children = Array.from(node.children.values()).sort((a, b) => {
+    if (a.isFile !== b.isFile) return a.isFile ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  });
+
+  if (node.isFile) {
+    const color = languageColor(node.language);
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(node.path)}
+        className={`flex items-center gap-1.5 w-full text-left py-0.5 px-1 rounded text-[11px] font-mono truncate hover:bg-muted/50 ${
+          isSelected ? "bg-muted text-foreground" : "text-muted-foreground"
+        }`}
+        style={{ paddingLeft: `${depth * 12 + 4}px` }}
+      >
+        <span className="shrink-0 w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+        <span className="truncate">{node.name}</span>
+        {node.isHub && <span className="text-[8px] text-amber-400 shrink-0">hub</span>}
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 w-full text-left py-0.5 px-1 rounded text-[11px] font-mono text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+        style={{ paddingLeft: `${depth * 12 + 4}px` }}
+      >
+        <ChevronRight className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+        <Folder className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+        <span className="truncate">{node.name}</span>
+        <span className="text-[9px] text-muted-foreground/40 ml-auto shrink-0">{node.children.size}</span>
+      </button>
+      {open &&
+        children.map((child) => (
+          <TreeEntry
+            key={child.path}
+            node={child}
+            depth={depth + 1}
+            selectedFile={selectedFile}
+            onSelect={onSelect}
+            defaultOpen={depth < 1}
+          />
+        ))}
+    </div>
+  );
+}
+
+function FileTree({
+  nodes,
+  selectedFile,
+  onSelect,
+}: {
+  nodes: FileLayoutNode[];
+  selectedFile: string | null;
+  onSelect: (path: string) => void;
+}) {
+  const tree = useMemo(() => buildTree(nodes), [nodes]);
+  const topChildren = Array.from(tree.children.values()).sort((a, b) => {
+    if (a.isFile !== b.isFile) return a.isFile ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="h-full overflow-y-auto overflow-x-hidden py-1 scrollbar-thin">
+      {topChildren.map((child) => (
+        <TreeEntry
+          key={child.path}
+          node={child}
+          depth={0}
+          selectedFile={selectedFile}
+          onSelect={onSelect}
+          defaultOpen
+        />
+      ))}
     </div>
   );
 }
@@ -364,56 +563,69 @@ export function Explore() {
         <span className="ml-auto text-[10px] text-muted-foreground">⌘K to search</span>
       </PageHeader>
 
-      <div className="flex-1 min-h-0 bg-black relative">
-        {!showCanvas ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="flex flex-1 min-h-0">
+        {/* File tree sidebar */}
+        {showCanvas && layout && (
+          <div className="w-56 shrink-0 border-r border-border bg-background overflow-hidden flex flex-col">
+            <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground border-b border-border uppercase tracking-wider">
+              Files
+            </div>
+            <FileTree nodes={layout.nodes} selectedFile={selectedFile} onSelect={handleFileSelect} />
           </div>
-        ) : (
-          <Canvas
-            camera={{ position: [0, 0, 45], fov: 60 }}
-            gl={{ antialias: true, powerPreference: "high-performance" }}
-            dpr={[1, 1.5]}
-          >
-            <ambientLight intensity={1} />
-
-            {layout.nodes.map((n) => (
-              <FileNode
-                key={n.id}
-                node={n}
-                selected={n.id === selectedFile}
-                dimmed={!!connectedIds && !connectedIds.has(n.id)}
-                onSelect={handleFileSelect}
-              />
-            ))}
-            <ImportEdges nodes={layout.nodes} edges={layout.edges} selectedId={selectedFile} />
-            <CochangeEdges nodes={layout.nodes} cochanges={validCochanges} selectedId={selectedFile} />
-            <CameraController target={cameraTarget} distance={15} />
-            <OrbitControls makeDefault enableDamping dampingFactor={0.05} />
-          </Canvas>
         )}
 
-        {/* Info panel */}
-        {selectedFile && detail && (
-          <FileInfoPanel
-            fileId={selectedFile}
-            detail={detail}
-            onClose={() => {
-              setSelectedFile(null);
-              setCameraTarget(null);
-            }}
-          />
-        )}
+        {/* 3D canvas */}
+        <div className="flex-1 min-h-0 bg-black relative">
+          {!showCanvas ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : (
+            <Canvas
+              camera={{ position: [0, 0, 12], fov: 60 }}
+              gl={{ antialias: true, powerPreference: "high-performance" }}
+              dpr={[1, 1.5]}
+            >
+              <ambientLight intensity={1} />
 
-        {/* Command palette */}
-        {repo && (
-          <CommandPalette
-            repoPath={repo.root_path}
-            open={paletteOpen}
-            onClose={() => setPaletteOpen(false)}
-            onSelect={handleFileSelect}
-          />
-        )}
+              {layout.nodes.map((n) => (
+                <FileNode
+                  key={n.id}
+                  node={n}
+                  selected={n.id === selectedFile}
+                  dimmed={!!connectedIds && !connectedIds.has(n.id)}
+                  onSelect={handleFileSelect}
+                />
+              ))}
+              <ImportEdges nodes={layout.nodes} edges={layout.edges} selectedId={selectedFile} />
+              <CochangeEdges nodes={layout.nodes} cochanges={validCochanges} selectedId={selectedFile} />
+              <CameraController target={cameraTarget} distance={5} />
+              <OrbitControls makeDefault enableDamping dampingFactor={0.05} />
+            </Canvas>
+          )}
+
+          {/* Info panel */}
+          {selectedFile && detail && (
+            <FileInfoPanel
+              fileId={selectedFile}
+              detail={detail}
+              onClose={() => {
+                setSelectedFile(null);
+                setCameraTarget(null);
+              }}
+            />
+          )}
+
+          {/* Command palette */}
+          {repo && (
+            <CommandPalette
+              repoPath={repo.root_path}
+              open={paletteOpen}
+              onClose={() => setPaletteOpen(false)}
+              onSelect={handleFileSelect}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
