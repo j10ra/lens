@@ -17,7 +17,7 @@ graphRoutes.post(
       return c.json({ error: "Repo not registered", hint: "Register with: lens register <path>" }, 404);
     }
 
-    if (dir) {
+    if (dir != null) {
       const detail = await buildGraphDetail(db, repo.id, dir);
       return c.json(detail);
     }

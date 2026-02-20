@@ -10,10 +10,10 @@ export function useGraphSummary(repoPath: string | undefined) {
   });
 }
 
-export function useGraphDetail(repoPath: string | undefined, dir: string | undefined) {
+export function useGraphDetail(repoPath: string | undefined, dir?: string) {
   return useQuery<GraphDetail>({
-    queryKey: ["graph-detail", repoPath, dir],
-    queryFn: () => api.repoGraph(repoPath!, dir),
-    enabled: !!repoPath && !!dir,
+    queryKey: ["graph-detail", repoPath, dir ?? ""],
+    queryFn: () => api.repoGraph(repoPath!, dir ?? ""),
+    enabled: !!repoPath,
   });
 }

@@ -1,5 +1,5 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 interface CameraControllerProps {
@@ -8,17 +8,36 @@ interface CameraControllerProps {
 }
 
 export function CameraController({ target, distance = 30 }: CameraControllerProps) {
-  const { camera } = useThree();
-  const targetVec = useRef(new THREE.Vector3());
-  const posVec = useRef(new THREE.Vector3());
+  const { camera, controls } = useThree();
+  const goalPos = useRef(new THREE.Vector3());
+  const goalTarget = useRef(new THREE.Vector3());
+  const animating = useRef(false);
+
+  useEffect(() => {
+    if (!target) {
+      animating.current = false;
+      return;
+    }
+    goalTarget.current.set(...target);
+    goalPos.current.set(target[0], target[1], target[2] + distance);
+    animating.current = true;
+  }, [target, distance]);
 
   useFrame(() => {
-    if (!target) return;
+    if (!animating.current) return;
 
-    targetVec.current.set(...target);
-    posVec.current.copy(targetVec.current).add(new THREE.Vector3(0, 0, distance));
+    camera.position.lerp(goalPos.current, 0.05);
 
-    camera.position.lerp(posVec.current, 0.03);
+    // Also move OrbitControls target so rotation stays centered on the cluster
+    const orbitControls = controls as unknown as { target: THREE.Vector3 };
+    if (orbitControls?.target) {
+      orbitControls.target.lerp(goalTarget.current, 0.05);
+    }
+
+    // Stop animating once close enough
+    if (camera.position.distanceTo(goalPos.current) < 0.1) {
+      animating.current = false;
+    }
   });
 
   return null;

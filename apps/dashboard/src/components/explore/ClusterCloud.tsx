@@ -50,8 +50,8 @@ export function ClusterCloud({ nodes, onSelect, selectedId }: ClusterCloudProps)
           if (idx != null && nodes[idx]) onSelect(nodes[idx].id);
         }}
       >
-        <sphereGeometry args={[1, 16, 16]} />
-        <meshStandardMaterial transparent opacity={0.85} />
+        <sphereGeometry args={[1, 12, 12]} />
+        <meshBasicMaterial transparent opacity={0.85} />
       </instancedMesh>
 
       {nodes
