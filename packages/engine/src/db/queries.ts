@@ -430,3 +430,42 @@ export const cochangeQueries = {
     db.delete(fileCochanges).where(eq(fileCochanges.repo_id, repoId)).run();
   },
 };
+
+// ── Graph queries ──────────────────────────────────────────────────────────
+
+export const graphQueries = {
+  /** All import edges for a repo */
+  allImportEdges(db: Db, repoId: string): { source: string; target: string }[] {
+    return db
+      .select({ source: fileImports.source_path, target: fileImports.target_path })
+      .from(fileImports)
+      .where(eq(fileImports.repo_id, repoId))
+      .all();
+  },
+
+  /** All cochange pairs for a repo */
+  allCochanges(db: Db, repoId: string): { path_a: string; path_b: string; cochange_count: number }[] {
+    return db
+      .select({
+        path_a: fileCochanges.path_a,
+        path_b: fileCochanges.path_b,
+        cochange_count: fileCochanges.cochange_count,
+      })
+      .from(fileCochanges)
+      .where(eq(fileCochanges.repo_id, repoId))
+      .all();
+  },
+
+  /** All file stats for a repo */
+  allFileStats(db: Db, repoId: string) {
+    return db
+      .select({
+        path: fileStats.path,
+        commit_count: fileStats.commit_count,
+        recent_count: fileStats.recent_count,
+      })
+      .from(fileStats)
+      .where(eq(fileStats.repo_id, repoId))
+      .all();
+  },
+};

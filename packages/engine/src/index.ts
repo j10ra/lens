@@ -1,5 +1,6 @@
 import { lensFn } from "@lens/core";
 import type { Db } from "./db/connection.js";
+import { buildGraphDetail as _buildGraphDetail, buildGraphSummary as _buildGraphSummary } from "./graph/graph.js";
 import { grepRepoImpl } from "./grep/grep.js";
 import { getRepoStatus as _getRepoStatus, listRepos as _listRepos, removeRepo as _removeRepo } from "./repo/repo.js";
 
@@ -33,12 +34,38 @@ export const getRepoStatus = lensFn("engine.getRepoStatus", async (db: Db, repoI
 
 export const grepRepo = lensFn("engine.grepRepo", grepRepoImpl);
 
+// ── Graph engine — wrapped in lensFn ──────────────────────────────────────────
+
+export const buildGraphSummary = lensFn("engine.buildGraphSummary", async (db: Db, repoId: string) =>
+  _buildGraphSummary(db, repoId),
+);
+
+export const buildGraphDetail = lensFn("engine.buildGraphDetail", async (db: Db, repoId: string, dir: string) =>
+  _buildGraphDetail(db, repoId, dir),
+);
+
 // ── Query modules — typed drizzle access for daemon routes ───────────────────
 
-export { aggregateQueries, cochangeQueries, importQueries, metadataQueries, statsQueries } from "./db/queries.js";
+export {
+  aggregateQueries,
+  cochangeQueries,
+  graphQueries,
+  importQueries,
+  metadataQueries,
+  statsQueries,
+} from "./db/queries.js";
 
 // ── Type exports ──────────────────────────────────────────────────────────────
 
+export type {
+  GraphCluster,
+  GraphClusterEdge,
+  GraphCochange,
+  GraphDetail,
+  GraphFileEdge,
+  GraphFileNode,
+  GraphSummary,
+} from "./graph/graph.js";
 export type { EnrichedMatch, GrepResult } from "./grep/grep.js";
 export type { IndexResult } from "./index/engine.js";
 export type { RepoRecord } from "./repo/repo.js";
