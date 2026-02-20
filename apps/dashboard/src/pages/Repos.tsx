@@ -1,6 +1,6 @@
 import { Badge, Card, CardContent, CardHeader, CardTitle, PageHeader } from "@lens/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { FolderPlus, Plus, RefreshCw } from "lucide-react";
+import { FileCode, FolderPlus, GitCommit, Plus, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { StatusBadge } from "../components/StatusBadge.js";
@@ -18,11 +18,7 @@ function timeAgo(ts: string | null): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-type RepoWithStats = Repo & {
-  file_count?: number;
-};
-
-function RepoCard({ repo }: { repo: RepoWithStats }) {
+function RepoCard({ repo }: { repo: Repo }) {
   const qc = useQueryClient();
   const reindex = useMutation({
     mutationFn: () => api.reindex(repo.id),
@@ -56,10 +52,26 @@ function RepoCard({ repo }: { repo: RepoWithStats }) {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="grid grid-cols-2 gap-2 text-center">
+        <div className="grid grid-cols-3 gap-2 text-center">
           <div>
-            <p className="font-mono text-xs font-semibold tabular-nums">{(repo.file_count ?? 0).toLocaleString()}</p>
+            <p className="font-mono text-xs font-semibold tabular-nums">
+              <FileCode className="mr-0.5 inline h-3 w-3 text-muted-foreground" />
+              {repo.file_count.toLocaleString()}
+            </p>
             <p className="text-[10px] text-muted-foreground">Files</p>
+          </div>
+          <div>
+            <p className="font-mono text-xs font-semibold tabular-nums">
+              {repo.last_indexed_commit ? (
+                <>
+                  <GitCommit className="mr-0.5 inline h-3 w-3 text-muted-foreground" />
+                  {repo.last_indexed_commit.slice(0, 7)}
+                </>
+              ) : (
+                "—"
+              )}
+            </p>
+            <p className="text-[10px] text-muted-foreground">Commit</p>
           </div>
           <div>
             <p className="font-mono text-xs font-semibold tabular-nums">{timeAgo(repo.last_indexed_at)}</p>

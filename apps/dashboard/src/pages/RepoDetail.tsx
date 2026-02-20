@@ -17,7 +17,10 @@ import {
   ArrowDownLeft,
   ArrowLeft,
   ArrowUpRight,
+  Code,
+  FileCode,
   Files,
+  FolderGit2,
   GitCommit,
   Hash,
   LayoutDashboard,
@@ -29,7 +32,7 @@ import { useNavigate, useParams } from "react-router";
 import { StatusBadge } from "../components/StatusBadge.js";
 import { api } from "../lib/api.js";
 import { useRepoFileDetail, useRepoFiles } from "../queries/use-repo-files.js";
-import { useRepos } from "../queries/use-repos.js";
+import { useRepoStats, useRepos } from "../queries/use-repos.js";
 
 const FILE_LIMIT = 100;
 
@@ -207,7 +210,7 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                     Exports
                   </p>
                   <div className="flex flex-wrap gap-1">
-                    {detail.exports.map((e) => (
+                    {detail.exports.map((e: string) => (
                       <Badge key={e} variant="secondary" className="font-mono text-[10px]">
                         {e}
                       </Badge>
@@ -225,7 +228,7 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                       Sections
                     </p>
                     <div className="flex flex-wrap gap-1">
-                      {detail.sections.map((s) => (
+                      {detail.sections.map((s: string) => (
                         <Badge key={s} variant="outline" className="font-mono text-[10px]">
                           {s}
                         </Badge>
@@ -244,7 +247,7 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                       Internals
                     </p>
                     <div className="flex flex-wrap gap-1">
-                      {detail.internals.map((s) => (
+                      {detail.internals.map((s: string) => (
                         <Badge key={s} variant="secondary" className="bg-muted/50 font-mono text-[10px]">
                           {s}
                         </Badge>
@@ -264,7 +267,7 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                       Imports
                     </p>
                     <div className="flex flex-col gap-0.5">
-                      {detail.import_edges.map((imp) => (
+                      {detail.import_edges.map((imp: string) => (
                         <button
                           key={imp}
                           type="button"
@@ -289,7 +292,7 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                       Imported by
                     </p>
                     <div className="flex flex-col gap-0.5">
-                      {detail.imported_by.map((imp) => (
+                      {detail.imported_by.map((imp: string) => (
                         <button
                           key={imp}
                           type="button"
@@ -343,7 +346,7 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                       Co-changes
                     </p>
                     <div className="flex flex-col gap-0.5">
-                      {detail.cochanges.map(({ path, count }) => (
+                      {detail.cochanges.map(({ path, count }: { path: string; count: number }) => (
                         <div key={path} className="flex items-center justify-between gap-2">
                           <button
                             type="button"
@@ -368,6 +371,123 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+function OverviewTab({ repoId }: { repoId: string }) {
+  const { data: repos } = useRepos();
+  const repo = repos?.find((r) => r.id === repoId);
+  const { data: stats } = useRepoStats(repoId);
+  const { data: files } = useRepoFiles(repoId, { limit: 1 });
+
+  const languages = stats?.languages ?? [];
+  const topLangs = languages.slice(0, 6);
+
+  return (
+    <div className="flex-1 overflow-auto py-4">
+      <div className="grid gap-3 px-4 @xl/main:grid-cols-2 @3xl/main:grid-cols-3">
+        {/* Index card */}
+        <Card className="border-border bg-background py-4 shadow-none">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-1.5 text-sm">
+                <FileCode className="h-4 w-4 text-muted-foreground" />
+                Index
+              </CardTitle>
+              {repo && <StatusBadge status={repo.index_status} />}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Files</span>
+              <span className="font-mono tabular-nums">{files?.total?.toLocaleString() ?? "—"}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Import edges</span>
+              <span className="font-mono tabular-nums">{stats?.import_edges?.toLocaleString() ?? "—"}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Last indexed</span>
+              <span className="font-mono tabular-nums">{timeAgo(repo?.last_indexed_at ?? null)}</span>
+            </div>
+            {repo?.last_indexed_commit && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Commit</span>
+                <span className="font-mono tabular-nums">{repo.last_indexed_commit.slice(0, 7)}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Repository card */}
+        <Card className="border-border bg-background py-4 shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-1.5 text-sm">
+              <FolderGit2 className="h-4 w-4 text-muted-foreground" />
+              Repository
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Path</span>
+              <span className="max-w-[60%] truncate font-mono text-[11px]" title={repo?.root_path}>
+                {repo?.root_path ?? "—"}
+              </span>
+            </div>
+            {repo?.remote_url && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Remote</span>
+                <span className="max-w-[60%] truncate font-mono text-[11px]" title={repo.remote_url}>
+                  {repo.remote_url}
+                </span>
+              </div>
+            )}
+            {repo?.created_at && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Registered</span>
+                <span className="font-mono tabular-nums">{timeAgo(repo.created_at)}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Languages card */}
+        {topLangs.length > 0 && (
+          <Card className="border-border bg-background py-4 shadow-none">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-1.5 text-sm">
+                  <Code className="h-4 w-4 text-muted-foreground" />
+                  Languages
+                </CardTitle>
+                <Badge variant="outline" className="font-mono text-[10px]">
+                  {languages.length}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              {topLangs.map((lang) => {
+                const pct = files?.total ? Math.round((lang.count / files.total) * 100) : 0;
+                return (
+                  <div key={lang.language} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{lang.language}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary/60" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="w-12 text-right font-mono tabular-nums">{lang.count.toLocaleString()}</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {languages.length > 6 && (
+                <p className="text-[10px] text-muted-foreground">+{languages.length - 6} more</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -481,42 +601,7 @@ export function RepoDetail() {
 
         {/* Right content */}
         <div className="flex min-w-0 min-h-0 flex-1 flex-col">
-          {activeTab === "overview" && (
-            <div className="flex-1 overflow-auto py-4">
-              <div className="grid gap-2 px-4 @xl/main:grid-cols-2 @3xl/main:grid-cols-3">
-                {/* Index card */}
-                <Card className="border-border bg-background py-4 shadow-none">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm">Index</CardTitle>
-                      {repo && <StatusBadge status={repo.index_status} />}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Files</span>
-                      <span className="font-mono tabular-nums">{files?.total?.toLocaleString() ?? "—"}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Last indexed</span>
-                      <span className="font-mono tabular-nums">{timeAgo(repo?.last_indexed_at ?? null)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Repository card */}
-                <Card className="border-border bg-background py-4 shadow-none">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Repository</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="break-all font-mono text-[11px] text-muted-foreground">{repo?.root_path ?? "—"}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          )}
-
+          {activeTab === "overview" && <OverviewTab repoId={repoId} />}
           {activeTab === "files" && <FilesTab repoId={repoId} onSelectFile={setSelectedFilePath} />}
         </div>
       </div>

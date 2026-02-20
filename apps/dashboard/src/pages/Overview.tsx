@@ -122,8 +122,12 @@ export function Overview() {
                       <StatusBadge status={repo.index_status} className="border-border bg-muted text-foreground" />
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Indexed {timeAgo(repo.last_indexed_at)}</p>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="font-mono tabular-nums">{repo.file_count.toLocaleString()} files</span>
+                      <span>·</span>
+                      <span>{timeAgo(repo.last_indexed_at)}</span>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

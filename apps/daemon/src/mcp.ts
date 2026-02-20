@@ -6,8 +6,8 @@ import { z } from "zod";
 
 const API = "http://localhost:4111/api/mcp";
 
-// Session-based: each client (Claude Code, curl, etc.) gets its own server+transport
-const sessions = new Map<string, WebStandardStreamableHTTPServerTransport>();
+// Session map — tracks active client sessions
+const sessions = new Map<string, { transport: WebStandardStreamableHTTPServerTransport; server: McpServer }>();
 
 function registerTools(server: McpServer): void {
   server.registerTool(
@@ -74,19 +74,19 @@ function registerTools(server: McpServer): void {
   );
 }
 
-function createSession(): WebStandardStreamableHTTPServerTransport {
+function createSession(): { transport: WebStandardStreamableHTTPServerTransport; server: McpServer } {
   const server = new McpServer({ name: "lens", version: "2.0.0" });
   registerTools(server);
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
     onsessioninitialized: (sessionId) => {
-      sessions.set(sessionId, transport);
+      sessions.set(sessionId, { transport, server });
     },
   });
 
   server.connect(transport);
-  return transport;
+  return { transport, server };
 }
 
 export async function handleMcp(c: Context): Promise<Response> {
@@ -94,11 +94,18 @@ export async function handleMcp(c: Context): Promise<Response> {
 
   // Existing session — route to its transport
   if (sessionId) {
-    const transport = sessions.get(sessionId);
-    if (transport) return transport.handleRequest(c.req.raw);
+    const entry = sessions.get(sessionId);
+    if (entry) return entry.transport.handleRequest(c.req.raw);
+    // Stale session (daemon restarted) — clean up and tell client to reinitialize
+    return c.json({ jsonrpc: "2.0", error: { code: -32000, message: "Session expired" }, id: null }, 404);
   }
 
   // New client — create fresh server+transport
-  const transport = createSession();
+  const { transport } = createSession();
   return transport.handleRequest(c.req.raw);
+}
+
+/** Clean up a session when its transport closes */
+export function cleanupSession(sessionId: string): void {
+  sessions.delete(sessionId);
 }

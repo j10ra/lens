@@ -1,5 +1,5 @@
 import { lensRoute } from "@lens/core";
-import { getEngineDb, listRepos, registerRepo, removeRepo, runIndex } from "@lens/engine";
+import { aggregateQueries, getEngineDb, listRepos, registerRepo, removeRepo, runIndex } from "@lens/engine";
 import { Hono } from "hono";
 
 export const reposRoutes = new Hono();
@@ -21,12 +21,14 @@ reposRoutes.post(
   }),
 );
 
-// GET /repos — list all registered repos
+// GET /repos — list all registered repos (enriched with file counts)
 reposRoutes.get(
   "/",
   lensRoute("repos.list", async (c) => {
-    const repos = await listRepos(getEngineDb());
-    return c.json(repos);
+    const db = getEngineDb();
+    const repos = await listRepos(db);
+    const fileCounts = aggregateQueries.repoFileCounts(db);
+    return c.json(repos.map((r) => ({ ...r, file_count: fileCounts[r.id] ?? 0 })));
   }),
 );
 
@@ -38,6 +40,18 @@ reposRoutes.delete(
     const result = await removeRepo(getEngineDb(), id);
     if (!result.removed) return c.json({ error: "Repo not found" }, 404);
     return c.json({ removed: true });
+  }),
+);
+
+// GET /repos/:id/stats — per-repo aggregate stats
+reposRoutes.get(
+  "/:id/stats",
+  lensRoute("repos.stats", async (c) => {
+    const id = c.req.param("id") as string;
+    const db = getEngineDb();
+    const languages = aggregateQueries.repoLanguageCounts(db, id);
+    const imports = aggregateQueries.repoImportCount(db, id);
+    return c.json({ languages, import_edges: imports });
   }),
 );
 

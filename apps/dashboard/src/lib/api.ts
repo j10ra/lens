@@ -35,6 +35,8 @@ export const api = {
   repoFileDetail: (repoId: string, filePath: string) =>
     fetchOk(`${API}/repos/${repoId}/files/${encodeURIComponent(filePath)}`).then((r) => r.json()),
 
+  repoStats: (repoId: string) => fetchOk(`${API}/repos/${repoId}/stats`).then((r) => r.json()),
+
   reindex: (repoId: string) => fetchOk(`${API}/repos/${repoId}/index`, { method: "POST" }).then((r) => r.json()),
 
   registerRepo: (rootPath: string, name?: string) =>

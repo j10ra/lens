@@ -43,6 +43,31 @@ export const aggregateQueries = {
     return { files, total };
   },
 
+  repoFileCounts(db: Db): Record<string, number> {
+    const rows = db
+      .select({ repo_id: fileMetadata.repo_id, n: count() })
+      .from(fileMetadata)
+      .groupBy(fileMetadata.repo_id)
+      .all();
+    return Object.fromEntries(rows.map((r) => [r.repo_id, r.n]));
+  },
+
+  repoLanguageCounts(db: Db, repoId: string): { language: string; count: number }[] {
+    return db
+      .select({ language: fileMetadata.language, n: count() })
+      .from(fileMetadata)
+      .where(eq(fileMetadata.repo_id, repoId))
+      .groupBy(fileMetadata.language)
+      .orderBy(sql`count(*) DESC`)
+      .all()
+      .filter((r) => r.language != null)
+      .map((r) => ({ language: r.language!, count: r.n }));
+  },
+
+  repoImportCount(db: Db, repoId: string): number {
+    return db.select({ n: count() }).from(fileImports).where(eq(fileImports.repo_id, repoId)).get()!.n;
+  },
+
   fileCochanges(db: Db, repoId: string, path: string, limit = 20) {
     return db
       .select()
