@@ -5,8 +5,8 @@ import { cochangeQueries, repoQueries, statsQueries } from "../db/queries.js";
 
 const execFileAsync = promisify(execFile);
 
-const MAX_FILES_PER_COMMIT = 20;
-const MIN_COCHANGE_THRESHOLD = 2;
+const MAX_FILES_PER_COMMIT = 50;
+const MIN_COCHANGE_THRESHOLD = 1;
 const RECENT_DAYS = 90;
 
 interface CommitEntry {

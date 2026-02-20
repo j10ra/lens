@@ -94,7 +94,7 @@ export function interpretQuery(db: Db, repoId: string, terms: string[], limit: n
       if (
         fileNameContainsTerm(fileName, term) ||
         dirPath.toLowerCase().includes(term) ||
-        exportsContainTerm(exports, term) ||
+        exportMatchScore(exports, term) > 0 ||
         docstring.includes(term) ||
         sections.some((s) => s.toLowerCase().includes(term)) ||
         internals.some((i) => i.toLowerCase().includes(term))
@@ -132,7 +132,8 @@ export function interpretQuery(db: Db, repoId: string, terms: string[], limit: n
 
       if (fileNameContainsTerm(fileName, term)) termScore += FIELD_WEIGHTS.fileName * termIdf;
       if (dirPath.toLowerCase().includes(term)) termScore += FIELD_WEIGHTS.dirPath * termIdf;
-      if (exportsContainTerm(exports, term)) termScore += FIELD_WEIGHTS.exports * termIdf;
+      const expScore = exportMatchScore(exports, term);
+      if (expScore > 0) termScore += FIELD_WEIGHTS.exports * expScore * termIdf;
       if (docstring.includes(term)) termScore += FIELD_WEIGHTS.docstring * termIdf;
       if (sections.some((s) => s.toLowerCase().includes(term))) termScore += FIELD_WEIGHTS.sections * termIdf;
       if (internals.some((i) => i.toLowerCase().includes(term))) termScore += FIELD_WEIGHTS.internals * termIdf;
@@ -155,10 +156,10 @@ export function interpretQuery(db: Db, repoId: string, terms: string[], limit: n
       score += Math.min(5, stats.recentCount * 0.5);
     }
 
-    // Indegree boost: frequently imported files get a mild multiplier
+    // Indegree boost: any imported file gets a mild multiplier
     const indegree = indegrees.get(meta.path) ?? 0;
-    if (indegree >= 3) {
-      score *= 1 + Math.log2(indegree) * 0.1;
+    if (indegree > 0) {
+      score *= 1 + Math.log2(1 + indegree) * 0.05;
     }
 
     // Hub dampening: barrel/catch-all files with many exports dominate unfairly
@@ -166,11 +167,13 @@ export function interpretQuery(db: Db, repoId: string, terms: string[], limit: n
       score *= 1 / (1 + Math.log2(exports.length / 5) * 0.3);
     }
 
-    // Multi-term coverage bonus: reward files matching multiple terms
+    // Multi-term coverage bonus: quality-weighted so docstring-only matches get less boost
     const matchedTermCount = matchedTerms.length;
     if (matchedTermCount > 1) {
       const coverage = matchedTermCount / lowerTerms.length;
-      score *= 1 + coverage * coverage;
+      const avgTermScore = baseScore / matchedTermCount;
+      const qualityFactor = Math.min(1, avgTermScore / 3);
+      score *= 1 + coverage * coverage * qualityFactor;
     }
 
     const isHub = indegree >= HUB_THRESHOLD;
@@ -211,13 +214,21 @@ function fileNameContainsTerm(fileName: string, term: string): boolean {
   return tokens.some((t) => t === term || t.includes(term));
 }
 
-function exportsContainTerm(exports: string[], term: string): boolean {
+/**
+ * Score how well exports match a term.
+ * Exact name match → 2.0 (definition file), substring/token → 1.0, no match → 0.
+ */
+function exportMatchScore(exports: string[], term: string): number {
+  let best = 0;
   for (const exp of exports) {
     const lowerExp = exp.toLowerCase();
-    if (lowerExp === term || lowerExp.includes(term)) return true;
-    // Decompose camelCase for precise token matching
+    if (lowerExp === term) return 2.0;
+    if (lowerExp.includes(term)) {
+      best = Math.max(best, 1.0);
+      continue;
+    }
     const tokens = decomposeTokens(exp);
-    if (tokens.some((t) => t === term)) return true;
+    if (tokens.some((t) => t === term)) best = Math.max(best, 1.0);
   }
-  return false;
+  return best;
 }
