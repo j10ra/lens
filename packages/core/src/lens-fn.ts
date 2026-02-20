@@ -19,6 +19,15 @@ function safeStringify(value: unknown): string | undefined {
   }
 }
 
+/** Serialize function args — drops non-serializable values (db handles, etc.) */
+function serializeArgs(args: unknown[]): string | undefined {
+  const direct = safeStringify(args);
+  if (direct) return direct;
+  // Drop non-serializable args (db handles), keep the rest
+  const cleaned = args.filter((arg) => safeStringify(arg) != null);
+  return cleaned.length ? safeStringify(cleaned) : undefined;
+}
+
 export function lensFn<TArgs extends unknown[], TReturn>(
   name: string,
   fn: (...args: TArgs) => Promise<TReturn>,
@@ -37,7 +46,7 @@ export function lensFn<TArgs extends unknown[], TReturn>(
     };
 
     const startMs = Date.now();
-    const input = safeStringify(args);
+    const input = serializeArgs(args);
 
     return storage.run(ctx, async () => {
       try {

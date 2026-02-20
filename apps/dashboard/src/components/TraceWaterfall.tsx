@@ -175,8 +175,9 @@ export function TraceWaterfall({ spans, logs }: TraceWaterfallProps) {
   const traceEnd = Math.max(...spans.map((s) => s.started_at + s.duration_ms));
   const traceDuration = traceEnd - traceStart || 1;
 
-  // Auto-select root span so input/output is visible immediately
-  const activeSpanId = selectedSpanId ?? sorted[0]?.span_id ?? null;
+  // Auto-select root span (no parent) so input/output is visible immediately
+  const rootSpan = sorted.find((s) => !s.parent_span_id);
+  const activeSpanId = selectedSpanId ?? rootSpan?.span_id ?? sorted[0]?.span_id ?? null;
   const selectedSpan = activeSpanId ? spans.find((s) => s.span_id === activeSpanId) : null;
   const spanLogs = activeSpanId ? logs?.filter((l) => l.span_id === activeSpanId) : undefined;
 
