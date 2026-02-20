@@ -48,10 +48,14 @@ export const api = {
 
   removeRepo: (id: string) => fetchOk(`${API}/repos/${id}`, { method: "DELETE" }).then((r) => r.json()),
 
-  repoGraph: (repoPath: string, dir?: string) =>
-    fetchOk(`${API}/graph`, {
+  repoGraph: (repoPath: string, dir?: string) => {
+    const body: { repoPath: string; dir?: string } = { repoPath };
+    if (dir !== undefined) body.dir = dir;
+
+    return fetchOk(`${API}/graph`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ repoPath, dir }),
-    }).then((r) => r.json()),
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+  },
 };

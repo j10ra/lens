@@ -4,28 +4,34 @@ import type { TraceStore } from "./trace-store.js";
 
 let _store: TraceStore | undefined;
 
-const MAX_CAPTURE = 8_192;
+const MAX_CAPTURE = 262_144;
 
 export function configureLensFn(store: TraceStore): void {
   _store = store;
 }
 
-function safeStringify(value: unknown): string | undefined {
+function captureJson(value: unknown): { text?: string; size?: number } {
   try {
     const json = JSON.stringify(value);
-    return json && json.length <= MAX_CAPTURE ? json : undefined;
+    if (!json) return {};
+    if (json.length <= MAX_CAPTURE) return { text: json, size: json.length };
+
+    const truncatedChars = json.length - MAX_CAPTURE;
+    const suffix = `... [truncated ${truncatedChars} chars]`;
+    const headSize = Math.max(0, MAX_CAPTURE - suffix.length);
+    return { text: `${json.slice(0, headSize)}${suffix}`, size: json.length };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
 /** Serialize function args — drops non-serializable values (db handles, etc.) */
 function serializeArgs(args: unknown[]): string | undefined {
-  const direct = safeStringify(args);
+  const direct = captureJson(args).text;
   if (direct) return direct;
   // Drop non-serializable args (db handles), keep the rest
-  const cleaned = args.filter((arg) => safeStringify(arg) != null);
-  return cleaned.length ? safeStringify(cleaned) : undefined;
+  const cleaned = args.filter((arg) => captureJson(arg).text != null);
+  return cleaned.length ? captureJson(cleaned).text : undefined;
 }
 
 export function lensFn<TArgs extends unknown[], TReturn>(
@@ -51,7 +57,8 @@ export function lensFn<TArgs extends unknown[], TReturn>(
     return storage.run(ctx, async () => {
       try {
         const result = await fn(...args);
-        const output = safeStringify(result);
+        const capturedOutput = captureJson(result);
+        const output = capturedOutput.text;
         _store?.pushSpan({
           spanId,
           traceId,
@@ -60,7 +67,7 @@ export function lensFn<TArgs extends unknown[], TReturn>(
           startedAt: startMs,
           durationMs: Date.now() - startMs,
           inputSize: input?.length ?? 0,
-          outputSize: output?.length ?? 0,
+          outputSize: capturedOutput.size ?? 0,
           input,
           output,
         });

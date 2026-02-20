@@ -8,6 +8,8 @@ graphRoutes.post(
   "/",
   lensRoute("graph.post", async (c) => {
     const { repoPath, dir } = await c.req.json();
+    const hasDir = typeof dir === "string";
+    const normalizedDir = hasDir ? dir.trim() : undefined;
 
     const db = getEngineDb();
     const repos = await listRepos(db);
@@ -17,8 +19,8 @@ graphRoutes.post(
       return c.json({ error: "Repo not registered", hint: "Register with: lens register <path>" }, 404);
     }
 
-    if (dir != null) {
-      const detail = await buildGraphDetail(db, repo.id, dir);
+    if (hasDir) {
+      const detail = await buildGraphDetail(db, repo.id, normalizedDir ?? "");
       return c.json(detail);
     }
 

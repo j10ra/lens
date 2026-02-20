@@ -3,8 +3,8 @@ import { Billboard, Line, OrbitControls, Text } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 // biome-ignore lint/performance/noBarrelFile: need all icons
 import { ArrowLeft, ChevronRight, Folder } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { CameraController } from "../components/explore/CameraController.js";
 import { CommandPalette } from "../components/explore/CommandPalette.js";
 import { StatusBadge } from "../components/StatusBadge.js";
@@ -17,25 +17,37 @@ import { useRepos } from "../queries/use-repos.js";
 
 // ── 3D Components ────────────────────────────────────────────────────────────
 
+function spherePoint(index: number, total: number, radius: number): [number, number, number] {
+  if (total <= 1) return [radius, 0, 0];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const y = 1 - (index / (total - 1)) * 2;
+  const r = Math.sqrt(Math.max(0, 1 - y * y)) * radius;
+  const theta = golden * index;
+  return [Math.cos(theta) * r, y * radius, Math.sin(theta) * r];
+}
+
 function FileNode({
   node,
   selected,
   dimmed,
+  showLabel = false,
   onSelect,
 }: {
   node: FileLayoutNode;
   selected: boolean;
   dimmed: boolean;
+  showLabel?: boolean;
   onSelect: (id: string) => void;
 }) {
   const color = languageColor(node.language);
   const fileName = node.id.split("/").pop() ?? node.id;
+  const label = fileName.length > 22 ? `${fileName.slice(0, 21)}…` : fileName;
 
   // Scale by heat (hubScore 0–1) — sqrt for better spread across low values
-  const heat = Math.sqrt(node.hubScore);
-  const dotRadius = 0.02 + heat * 0.14; // 0.02 → 0.16
-  const fontSize = 0.07 + heat * 0.22; // 0.07 → 0.29
-  const textOpacity = dimmed ? 0.08 : 0.2 + heat * 0.8; // cold=0.2, hot=1.0
+  const heat = Math.sqrt(Math.min(1, Math.max(0, node.hubScore)));
+  const dotRadius = selected ? 0.022 + heat * 0.1 : 0.016 + heat * 0.075;
+  const fontSize = selected ? 0.085 + heat * 0.09 : 0.055 + heat * 0.065;
+  const textOpacity = dimmed ? 0.25 : selected ? 0.98 : 0.7 + heat * 0.24;
 
   return (
     <Billboard
@@ -51,23 +63,29 @@ function FileNode({
         <meshBasicMaterial
           color={selected ? "#ffffff" : color}
           transparent
-          opacity={dimmed ? 0.05 : 0.15 + heat * 0.85}
+          opacity={dimmed ? 0.16 : 0.32 + heat * 0.62}
         />
       </mesh>
       {/* Filename — size and brightness scale with heat */}
-      <Text
-        position={[dotRadius + 0.04, 0, 0]}
-        fontSize={fontSize}
-        anchorX="left"
-        anchorY="middle"
-        color={dimmed ? "#0f172a" : selected ? "#ffffff" : heat > 0.4 ? "#f1f5f9" : heat > 0.15 ? "#94a3b8" : "#475569"}
-        outlineWidth={dimmed ? 0 : heat * 0.012}
-        outlineColor="#000000"
-        fontWeight={heat > 0.25 ? "bold" : "normal"}
-      >
-        {fileName}
-        <meshBasicMaterial transparent opacity={textOpacity} />
-      </Text>
+      {showLabel && (
+        <Text
+          position={[dotRadius + 0.04, 0, 0]}
+          fontSize={fontSize}
+          anchorX="left"
+          anchorY="middle"
+          maxWidth={2.8}
+          color={
+            dimmed ? "#64748b" : selected ? "#ffffff" : heat > 0.35 ? "#f8fafc" : heat > 0.12 ? "#cbd5e1" : "#94a3b8"
+          }
+          outlineWidth={dimmed ? 0.003 : selected ? 0.016 : 0.01}
+          outlineColor="#020617"
+          outlineBlur={selected ? 0.15 : 0.06}
+          fontWeight={heat > 0.22 || selected ? "bold" : "normal"}
+        >
+          {label}
+          <meshBasicMaterial transparent opacity={textOpacity} />
+        </Text>
+      )}
     </Billboard>
   );
 }
@@ -144,12 +162,55 @@ function CochangeEdges({
             opacity={0.5}
             transparent
             dashed
-            dashSize={0.3}
-            gapSize={0.2}
+            dashSize={0.22}
+            gapSize={0.08}
           />
         );
       })}
     </group>
+  );
+}
+
+function SceneBackdrop() {
+  const stars = useMemo(() => {
+    const count = 900;
+    const positions = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      const radius = 10 + Math.random() * 24;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+
+      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = radius * Math.cos(phi);
+    }
+
+    return positions;
+  }, []);
+
+  return (
+    <>
+      <color attach="background" args={["#01040d"]} />
+      <fog attach="fog" args={["#01040d", 22, 70]} />
+      <ambientLight intensity={0.9} />
+      <pointLight position={[8, 5, 6]} intensity={0.75} color="#7dd3fc" />
+      <pointLight position={[-10, -6, -8]} intensity={0.35} color="#f59e0b" />
+
+      <points frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[stars, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          color="#cbd5e1"
+          size={0.03}
+          sizeAttenuation
+          transparent
+          opacity={0.42}
+          depthWrite={false}
+        />
+      </points>
+    </>
   );
 }
 
@@ -462,10 +523,14 @@ function FileTree({
 export function Explore() {
   const { repoId } = useParams<{ repoId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeDirParam = searchParams.get("dir") ?? "";
+  const activeDir = activeDirParam.trim();
   const { data: repos } = useRepos();
   const repo = repos?.find((r) => r.id === repoId);
 
-  const { data: detail, isLoading } = useGraphDetail(repo?.root_path);
+  // Empty string means "all files detail". Non-empty uses backend dir filtering.
+  const { data: detail, isLoading } = useGraphDetail(repo?.root_path, activeDir);
 
   const layout = useMemo<{ nodes: FileLayoutNode[]; edges: FileLayoutEdge[] } | null>(() => {
     if (!detail || detail.files.length === 0) return null;
@@ -475,6 +540,11 @@ export function Explore() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [cameraTarget, setCameraTarget] = useState<[number, number, number] | null>(null);
+  const [autoRotateDirection, setAutoRotateDirection] = useState(1);
+  const orbitRef = useRef<any>(null);
+  const draggingRef = useRef(false);
+  const lastAzimuthRef = useRef<number | null>(null);
+  const lastDragDeltaRef = useRef(0);
 
   // Cochanges with valid endpoints
   const validCochanges = useMemo(() => {
@@ -508,6 +578,49 @@ export function Explore() {
     return ids;
   }, [selectedFile, detail]);
 
+  const sceneNodes = useMemo(() => {
+    if (!layout) return [] as FileLayoutNode[];
+    if (!selectedFile || !connectedIds) return layout.nodes;
+
+    const selected = layout.nodes.find((n) => n.id === selectedFile);
+    if (!selected) return layout.nodes;
+
+    const connectedNodes = layout.nodes.filter((n) => n.id !== selectedFile && connectedIds.has(n.id));
+    if (connectedNodes.length === 0) return layout.nodes;
+
+    const spreadRadius = Math.min(4.8, Math.max(1.8, 1.2 + Math.sqrt(connectedNodes.length) * 0.42));
+    const ordered = [...connectedNodes].sort((a, b) => {
+      if (a.hubScore !== b.hubScore) return b.hubScore - a.hubScore;
+      return a.id.localeCompare(b.id);
+    });
+
+    const repositioned = new Map<string, [number, number, number]>();
+    for (let i = 0; i < ordered.length; i++) {
+      const [ox, oy, oz] = spherePoint(i, ordered.length, spreadRadius);
+      repositioned.set(ordered[i].id, [selected.x + ox, selected.y + oy, selected.z + oz]);
+    }
+
+    return layout.nodes.map((n) => {
+      const p = repositioned.get(n.id);
+      if (!p) return n;
+      return { ...n, x: p[0], y: p[1], z: p[2] };
+    });
+  }, [layout, selectedFile, connectedIds]);
+
+  const focusDistance = useMemo(() => {
+    if (!selectedFile || !connectedIds) return 5;
+    const count = Math.max(0, connectedIds.size - 1);
+    return Math.min(10, Math.max(6, 4.6 + Math.sqrt(count) * 0.9));
+  }, [selectedFile, connectedIds]);
+
+  const selectedFileDir = useMemo(() => {
+    if (!selectedFile) return "";
+    const idx = selectedFile.lastIndexOf("/");
+    return idx > 0 ? selectedFile.slice(0, idx) : "";
+  }, [selectedFile]);
+
+  const labelIds = useMemo(() => new Set(sceneNodes.map((n) => n.id)), [sceneNodes]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -537,10 +650,44 @@ export function Explore() {
     [findNodePos],
   );
 
+  const handleOrbitStart = useCallback(() => {
+    draggingRef.current = true;
+    lastDragDeltaRef.current = 0;
+    lastAzimuthRef.current = orbitRef.current?.getAzimuthalAngle() ?? null;
+  }, []);
+
+  const handleOrbitChange = useCallback(() => {
+    if (!draggingRef.current || !orbitRef.current) return;
+    const current = orbitRef.current.getAzimuthalAngle();
+    const prev = lastAzimuthRef.current;
+    if (prev != null) {
+      const delta = current - prev;
+      if (Math.abs(delta) > 1e-4) {
+        lastDragDeltaRef.current = delta;
+      }
+    }
+    lastAzimuthRef.current = current;
+  }, []);
+
+  const handleOrbitEnd = useCallback(() => {
+    draggingRef.current = false;
+    lastAzimuthRef.current = null;
+    const delta = lastDragDeltaRef.current;
+    if (Math.abs(delta) > 1e-4) {
+      // OrbitControls auto-rotate sign is opposite drag theta delta.
+      setAutoRotateDirection(delta < 0 ? 1 : -1);
+    }
+  }, []);
+
   if (!repoId) return null;
 
   const showCanvas = !isLoading && layout && layout.nodes.length > 0;
   const hubCount = layout?.nodes.filter((n) => n.isHub).length ?? 0;
+  const overviewDistance = useMemo(() => {
+    if (!layout || layout.nodes.length === 0) return 8;
+    const maxRadius = layout.nodes.reduce((max, n) => Math.max(max, Math.hypot(n.x, n.y, n.z)), 0);
+    return Math.min(10, Math.max(5.2, maxRadius * 2.05));
+  }, [layout]);
 
   return (
     <div className="flex flex-1 flex-col min-h-0">
@@ -554,6 +701,36 @@ export function Explore() {
         </button>
         <span className="text-sm font-medium truncate">{repo?.name ?? repoId}</span>
         {repo && <StatusBadge status={repo.index_status} className="ml-1" />}
+        {activeDir && (
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete("dir");
+              setSearchParams(next, { replace: true });
+            }}
+            className="ml-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            title="Clear directory filter"
+          >
+            dir: {activeDir} ×
+          </button>
+        )}
+        {selectedFileDir && selectedFileDir !== activeDir && (
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.set("dir", selectedFileDir);
+              setSearchParams(next, { replace: true });
+              setSelectedFile(null);
+              setCameraTarget(null);
+            }}
+            className="ml-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            title="Filter graph to selected file directory"
+          >
+            use dir: {selectedFileDir}
+          </button>
+        )}
         {layout && (
           <span className="ml-2 font-mono text-[10px] text-muted-foreground">
             {layout.nodes.length} files · {layout.edges.length} imports · {validCochanges.length} co-changes ·{" "}
@@ -575,32 +752,51 @@ export function Explore() {
         )}
 
         {/* 3D canvas */}
-        <div className="flex-1 min-h-0 bg-black relative">
+        <div className="relative flex-1 min-h-0 overflow-hidden bg-[#01040d]">
+          <div className="pointer-events-none absolute inset-0 z-0 opacity-35 [background-image:radial-gradient(rgba(148,163,184,0.24)_0.6px,transparent_0.6px)] [background-size:3px_3px]" />
+          <div className="pointer-events-none absolute inset-0 z-0 opacity-25 [background-image:repeating-linear-gradient(0deg,rgba(30,41,59,0.45)_0px,rgba(30,41,59,0.45)_1px,transparent_1px,transparent_5px)]" />
           {!showCanvas ? (
             <div className="flex h-full items-center justify-center">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : (
             <Canvas
-              camera={{ position: [0, 0, 12], fov: 60 }}
+              className="relative z-[1]"
+              camera={{ position: [0, 0, overviewDistance], fov: 55 }}
               gl={{ antialias: true, powerPreference: "high-performance" }}
               dpr={[1, 1.5]}
             >
-              <ambientLight intensity={1} />
+              <SceneBackdrop />
 
-              {layout.nodes.map((n) => (
+              {sceneNodes.map((n) => (
                 <FileNode
                   key={n.id}
                   node={n}
                   selected={n.id === selectedFile}
                   dimmed={!!connectedIds && !connectedIds.has(n.id)}
+                  showLabel={labelIds.has(n.id)}
                   onSelect={handleFileSelect}
                 />
               ))}
-              <ImportEdges nodes={layout.nodes} edges={layout.edges} selectedId={selectedFile} />
-              <CochangeEdges nodes={layout.nodes} cochanges={validCochanges} selectedId={selectedFile} />
-              <CameraController target={cameraTarget} distance={5} />
-              <OrbitControls makeDefault enableDamping dampingFactor={0.05} />
+              <ImportEdges nodes={sceneNodes} edges={layout.edges} selectedId={selectedFile} />
+              <CochangeEdges nodes={sceneNodes} cochanges={validCochanges} selectedId={selectedFile} />
+              <CameraController target={cameraTarget} distance={focusDistance} homeDistance={overviewDistance} />
+              <OrbitControls
+                ref={orbitRef}
+                makeDefault
+                enableDamping
+                dampingFactor={0.03}
+                rotateSpeed={0.62}
+                panSpeed={0.75}
+                zoomSpeed={0.9}
+                autoRotate
+                autoRotateSpeed={0.1 * autoRotateDirection}
+                onStart={handleOrbitStart}
+                onChange={handleOrbitChange}
+                onEnd={handleOrbitEnd}
+                minDistance={2}
+                maxDistance={overviewDistance * 2.5}
+              />
             </Canvas>
           )}
 

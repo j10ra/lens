@@ -24,6 +24,10 @@ export function CommandPalette({ repoPath, onSelect, onClose, open }: CommandPal
   const [results, setResults] = useState<GrepMatch[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [loading, setLoading] = useState(false);
+  const hasSearchInput = query.trim().length >= 2;
+  const showResults = results.length > 0;
+  const showNoResults = hasSearchInput && results.length === 0 && !loading;
+  const showPanel = showResults || showNoResults;
 
   useEffect(() => {
     if (open) {
@@ -73,7 +77,7 @@ export function CommandPalette({ repoPath, onSelect, onClose, open }: CommandPal
     (e: React.KeyboardEvent) => {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIdx((i) => Math.min(i + 1, results.length - 1));
+        setSelectedIdx((i) => (results.length > 0 ? Math.min(i + 1, results.length - 1) : 0));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedIdx((i) => Math.max(i - 1, 0));
@@ -93,8 +97,8 @@ export function CommandPalette({ repoPath, onSelect, onClose, open }: CommandPal
   return (
     <div className="absolute inset-0 z-50 flex items-start justify-center pt-[20vh]">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-lg rounded-lg border border-border bg-background shadow-2xl">
-        <div className="flex items-center gap-2 border-b border-border px-3">
+      <div className={`relative w-full max-w-lg rounded-2xl border border-border bg-background transition-shadow ${showPanel ? "shadow-2xl" : "shadow-lg"}`}>
+        <div className={`flex items-center gap-2 px-3 ${showPanel ? "border-b border-border" : ""}`}>
           <Search className="h-4 w-4 text-muted-foreground" />
           <input
             ref={inputRef}
@@ -113,7 +117,9 @@ export function CommandPalette({ repoPath, onSelect, onClose, open }: CommandPal
           </button>
         </div>
 
-        {results.length > 0 && (
+        {!showPanel && <div className="mx-3 h-px bg-border/70" />}
+
+        {showResults && (
           <div className="max-h-64 overflow-auto py-1">
             {results.map((r, i) => (
               <button
@@ -139,7 +145,7 @@ export function CommandPalette({ repoPath, onSelect, onClose, open }: CommandPal
           </div>
         )}
 
-        {query.length >= 2 && results.length === 0 && !loading && (
+        {showNoResults && (
           <div className="px-3 py-4 text-center text-xs text-muted-foreground">No results</div>
         )}
       </div>

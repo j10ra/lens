@@ -5,18 +5,24 @@ import type { TraceStore } from "./trace-store.js";
 
 let _store: TraceStore | undefined;
 
-const MAX_CAPTURE = 8_192; // cap payload capture at 8KB
+const MAX_CAPTURE = 262_144; // cap payload capture at 256KB
 
 export function configureLensRoute(store: TraceStore): void {
   _store = store;
 }
 
-function safeStringify(value: unknown): string | undefined {
+function captureJson(value: unknown): { text?: string; size?: number } {
   try {
     const json = JSON.stringify(value);
-    return json && json.length <= MAX_CAPTURE ? json : undefined;
+    if (!json) return {};
+    if (json.length <= MAX_CAPTURE) return { text: json, size: json.length };
+
+    const truncatedChars = json.length - MAX_CAPTURE;
+    const suffix = `... [truncated ${truncatedChars} chars]`;
+    const headSize = Math.max(0, MAX_CAPTURE - suffix.length);
+    return { text: `${json.slice(0, headSize)}${suffix}`, size: json.length };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -36,11 +42,14 @@ export function lensRoute<E extends Env = Env, P extends string = string, I exte
     return storage.run(ctx, async () => {
       // Capture request body (only for POST/PUT/PATCH with JSON)
       let input: string | undefined;
+      let inputSize: number | undefined;
       const contentType = c.req.header("content-type") ?? "";
       if (contentType.includes("json") && ["POST", "PUT", "PATCH"].includes(c.req.method)) {
         try {
           const body = await c.req.json();
-          input = safeStringify(body);
+          const captured = captureJson(body);
+          input = captured.text;
+          inputSize = captured.size;
         } catch {
           // no body or not parseable
         }
@@ -51,17 +60,21 @@ export function lensRoute<E extends Env = Env, P extends string = string, I exte
 
         // Capture response body from the Response object
         let output: string | undefined;
+        let outputSize = 0;
         if (result instanceof Response) {
           try {
             const cloned = result.clone();
             const responseBody = await cloned.json();
-            output = safeStringify(responseBody);
+            const captured = captureJson(responseBody);
+            output = captured.text;
+            outputSize = captured.size ?? 0;
           } catch {
             // non-JSON response
           }
         }
 
-        const inputSize = input?.length ?? Number(c.req.header("content-length") ?? 0);
+        const contentLength = Number(c.req.header("content-length") ?? 0);
+        const resolvedInputSize = inputSize ?? (Number.isFinite(contentLength) ? contentLength : 0);
         _store?.pushSpan({
           spanId,
           traceId,
@@ -69,8 +82,8 @@ export function lensRoute<E extends Env = Env, P extends string = string, I exte
           name,
           startedAt: startMs,
           durationMs: Date.now() - startMs,
-          inputSize,
-          outputSize: output?.length ?? 0,
+          inputSize: resolvedInputSize,
+          outputSize,
           input,
           output,
           source,
