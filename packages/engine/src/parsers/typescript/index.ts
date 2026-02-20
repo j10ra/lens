@@ -3,6 +3,7 @@ import type { LanguageParser } from "../types.js"
 import { extractExports } from "./exports.js"
 import { extractImports } from "./imports.js"
 import { resolveImport } from "./resolve.js"
+import { extractSymbols } from "./symbols.js"
 
 const JSDOC_RE = /^\/\*\*\s*([\s\S]*?)\*\//m
 
@@ -19,5 +20,6 @@ export const typescriptParser: LanguageParser = {
   extractDocstring,
   extractSections,
   extractInternals: extractUniversalInternals,
+  extractSymbols,
   resolveImport,
 }

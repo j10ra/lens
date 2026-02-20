@@ -64,6 +64,7 @@ export type {
   GraphDetail,
   GraphFileEdge,
   GraphFileNode,
+  GraphSymbol,
   GraphSummary,
 } from "./graph/graph.js";
 export type { EnrichedMatch, GrepResult } from "./grep/grep.js";

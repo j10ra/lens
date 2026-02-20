@@ -57,7 +57,11 @@ export default defineConfig({
 		js: [
 			"#!/usr/bin/env node",
 			'import { createRequire as __cjsRequire } from "node:module";',
+			'import { fileURLToPath as __fileURLToPath } from "node:url";',
+			'import { dirname as __dirnameFn } from "node:path";',
 			"const require = __cjsRequire(import.meta.url);",
+			"const __filename = __fileURLToPath(import.meta.url);",
+			"const __dirname = __dirnameFn(__filename);",
 		].join("\n"),
 	},
 	outExtension: () => ({ js: ".js" }),

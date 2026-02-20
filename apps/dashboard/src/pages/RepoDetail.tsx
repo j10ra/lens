@@ -220,6 +220,37 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                 </section>
               )}
 
+              {/* Symbols */}
+              {detail.symbols && detail.symbols.length > 0 && (
+                <>
+                  <Separator />
+                  <section>
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Symbols
+                    </p>
+                    <div className="space-y-1">
+                      {detail.symbols.slice(0, 80).map((symbol) => (
+                        <div key={`${symbol.kind}:${symbol.name}:${symbol.line}`} className="flex items-center gap-2">
+                          <Badge variant="outline" className="h-4 px-1.5 font-mono text-[9px] lowercase">
+                            {symbol.kind}
+                          </Badge>
+                          <span className="flex-1 break-all font-mono text-[11px] text-foreground/90">{symbol.name}</span>
+                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">L{symbol.line}</span>
+                          {symbol.exported && (
+                            <Badge variant="secondary" className="h-4 px-1.5 font-mono text-[9px]">
+                              export
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                      {detail.symbols.length > 80 && (
+                        <p className="text-[10px] text-muted-foreground">+{detail.symbols.length - 80} more</p>
+                      )}
+                    </div>
+                  </section>
+                </>
+              )}
+
               {/* Sections */}
               {detail.sections && detail.sections.length > 0 && (
                 <>

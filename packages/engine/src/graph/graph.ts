@@ -20,10 +20,18 @@ export interface GraphSummary {
   edges: GraphClusterEdge[];
 }
 
+export interface GraphSymbol {
+  name: string;
+  kind: string;
+  line: number;
+  exported: boolean;
+}
+
 export interface GraphFileNode {
   path: string;
   language: string | null;
   exports: string[];
+  symbols: GraphSymbol[];
   hubScore: number;
   isHub: boolean;
   commits: number;
@@ -112,8 +120,27 @@ export function buildGraphDetail(db: Db, repoId: string, dir: string): GraphDeta
     const indegree = indegrees.get(f.path) ?? 0;
     const stats = statsMap.get(f.path);
     let exports: string[] = [];
+    let symbols: GraphSymbol[] = [];
     try {
       exports = f.exports ? JSON.parse(f.exports) : [];
+    } catch {
+      // malformed JSON — default to empty
+    }
+    try {
+      const parsed = f.symbols ? JSON.parse(f.symbols) : [];
+      if (Array.isArray(parsed)) {
+        symbols = parsed
+          .filter(
+            (s): s is GraphSymbol =>
+              !!s &&
+              typeof s === "object" &&
+              typeof s.name === "string" &&
+              typeof s.kind === "string" &&
+              typeof s.line === "number" &&
+              typeof s.exported === "boolean",
+          )
+          .slice(0, 200);
+      }
     } catch {
       // malformed JSON — default to empty
     }
@@ -121,6 +148,7 @@ export function buildGraphDetail(db: Db, repoId: string, dir: string): GraphDeta
       path: f.path,
       language: f.language,
       exports,
+      symbols,
       hubScore: indegree / maxIndegree,
       isHub: indegree >= 5,
       commits: stats?.commit_count ?? 0,

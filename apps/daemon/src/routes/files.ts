@@ -55,6 +55,7 @@ filesRoutes.get(
       docstring: metadata.docstring,
       sections: JSON.parse(metadata.sections ?? "[]"),
       internals: JSON.parse(metadata.internals ?? "[]"),
+      symbols: JSON.parse(metadata.symbols ?? "[]"),
       import_edges: importEdges,
       imported_by: importedBy,
       git_stats: gitStats

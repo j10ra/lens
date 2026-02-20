@@ -304,6 +304,32 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
           </div>
         )}
 
+        {/* Symbols */}
+        {file.symbols.length > 0 && (
+          <div>
+            <div className="text-muted-foreground font-medium mb-1">Symbols ({file.symbols.length})</div>
+            <div className="space-y-1">
+              {file.symbols.slice(0, 12).map((symbol) => (
+                <div key={`${symbol.kind}:${symbol.name}:${symbol.line}`} className="flex items-center gap-1.5 text-[10px]">
+                  <Badge variant="outline" className="h-4 px-1.5 font-mono text-[9px] lowercase">
+                    {symbol.kind}
+                  </Badge>
+                  <span className="flex-1 truncate font-mono text-foreground/85">{symbol.name}</span>
+                  <span className="shrink-0 font-mono text-muted-foreground">L{symbol.line}</span>
+                  {symbol.exported && (
+                    <Badge variant="secondary" className="h-4 px-1.5 font-mono text-[9px]">
+                      export
+                    </Badge>
+                  )}
+                </div>
+              ))}
+              {file.symbols.length > 12 && (
+                <span className="text-[10px] text-muted-foreground">+{file.symbols.length - 12} more</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Imported by */}
         {importers.length > 0 && (
           <div>

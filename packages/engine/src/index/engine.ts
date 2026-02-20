@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { lensFn } from "@lens/core";
 import type { Db } from "../db/connection.js";
-import { repoQueries } from "../db/queries.js";
+import { metadataQueries, repoQueries } from "../db/queries.js";
 import { diffScan, fullScan, getHeadCommit } from "./discovery.js";
 import { extractAndPersistMetadata } from "./extract-metadata.js";
 import { analyzeGitHistory } from "./git-analysis.js";
@@ -46,13 +46,16 @@ async function indexImpl(db: Db, repoId: string, force: boolean): Promise<IndexR
 
     const headCommit = await getHeadCommit(repo.root_path);
 
-    if (!force && repo.last_indexed_commit === headCommit) {
+    const hasSymbols = metadataQueries.hasAnySymbols(db, repoId);
+    const hasSymbolEligibleFiles = metadataQueries.hasAnySymbolEligibleFiles(db, repoId);
+    const needsSymbolBackfill = hasSymbolEligibleFiles && !hasSymbols;
+    if (!force && repo.last_indexed_commit === headCommit && !needsSymbolBackfill) {
       return { files_scanned: 0, duration_ms: Date.now() - start, skipped: true };
     }
 
     repoQueries.setIndexing(db, repoId);
 
-    const isFullScan = force || !repo.last_indexed_commit;
+    const isFullScan = force || !repo.last_indexed_commit || needsSymbolBackfill;
     const files = isFullScan
       ? await fullScan(repo.root_path)
       : await diffScan(repo.root_path, repo.last_indexed_commit!, headCommit);

@@ -15,12 +15,20 @@ export interface GraphSummary {
   edges: GraphClusterEdge[];
 }
 
+export interface GraphSymbol {
+  name: string;
+  kind: string;
+  line: number;
+  exported: boolean;
+}
+
 export interface GraphFileNode {
   path: string;
   language: string | null;
   hubScore: number;
   isHub: boolean;
   exports: string[];
+  symbols: GraphSymbol[];
   commits: number;
   recent90d: number;
 }

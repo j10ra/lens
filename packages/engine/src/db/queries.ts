@@ -1,6 +1,7 @@
 import { and, count, eq, like, or, sql } from "drizzle-orm";
 import type { Db } from "./connection.js";
 import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos } from "./schema.js";
+import type { ParsedSymbol } from "../parsers/types.js";
 
 // ── Aggregate queries ────────────────────────────────────────────────────────
 
@@ -231,6 +232,7 @@ export const metadataQueries = {
       docstring: string;
       sections: string[];
       internals: string[];
+      symbols: ParsedSymbol[];
     },
   ) {
     const existing = db
@@ -248,6 +250,7 @@ export const metadataQueries = {
           docstring: metadata.docstring,
           sections: JSON.stringify(metadata.sections),
           internals: JSON.stringify(metadata.internals),
+          symbols: JSON.stringify(metadata.symbols),
         })
         .where(eq(fileMetadata.id, existing.id))
         .run();
@@ -263,6 +266,7 @@ export const metadataQueries = {
           docstring: metadata.docstring,
           sections: JSON.stringify(metadata.sections),
           internals: JSON.stringify(metadata.internals),
+          symbols: JSON.stringify(metadata.symbols),
         })
         .run();
     }
@@ -280,6 +284,29 @@ export const metadataQueries = {
 
   getAllForRepo(db: Db, repoId: string) {
     return db.select().from(fileMetadata).where(eq(fileMetadata.repo_id, repoId)).all();
+  },
+
+  hasAnySymbols(db: Db, repoId: string): boolean {
+    const row = db
+      .select({ n: count() })
+      .from(fileMetadata)
+      .where(and(eq(fileMetadata.repo_id, repoId), sql`${fileMetadata.symbols} <> '[]'`))
+      .get();
+    return (row?.n ?? 0) > 0;
+  },
+
+  hasAnySymbolEligibleFiles(db: Db, repoId: string): boolean {
+    const row = db
+      .select({ n: count() })
+      .from(fileMetadata)
+      .where(
+        and(
+          eq(fileMetadata.repo_id, repoId),
+          or(eq(fileMetadata.language, "typescript"), eq(fileMetadata.language, "javascript")),
+        ),
+      )
+      .get();
+    return (row?.n ?? 0) > 0;
   },
 };
 

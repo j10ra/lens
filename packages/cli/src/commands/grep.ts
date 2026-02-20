@@ -6,6 +6,14 @@ interface EnrichedMatch {
   score: number;
   isHub: boolean;
   importers: string[];
+  matches: StructuralMatch[];
+}
+
+interface StructuralMatch {
+  kind: string;
+  value: string;
+  symbolKind?: string;
+  line?: number;
 }
 
 interface GrepResult {
@@ -63,6 +71,20 @@ export const grep = defineCommand({
         const hubFlag = match.isHub ? " [hub]" : "";
         const importedBy = match.importers.length > 0 ? ` <- ${match.importers.slice(0, 2).join(", ")}` : "";
         console.log(`  ${match.path}${hubFlag}  score=${match.score.toFixed(2)}${importedBy}`);
+        const evidence = match.matches
+          .slice(0, 3)
+          .map((m) => {
+            if (m.kind === "symbol") {
+              const kind = m.symbolKind ? `${m.symbolKind}:` : "";
+              const line = typeof m.line === "number" ? `@${m.line}` : "";
+              return `${kind}${m.value}${line}`;
+            }
+            return `${m.kind}:${m.value}`;
+          })
+          .join(" | ");
+        if (evidence) {
+          console.log(`    matches: ${evidence}`);
+        }
       }
     }
   },

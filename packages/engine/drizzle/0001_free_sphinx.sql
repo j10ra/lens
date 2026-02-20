@@ -1,0 +1,1 @@
+ALTER TABLE `file_metadata` ADD `symbols` text DEFAULT '[]';

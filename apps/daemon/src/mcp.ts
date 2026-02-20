@@ -15,7 +15,7 @@ function registerTools(server: McpServer): void {
     {
       title: "LENS Grep",
       description:
-        "Grep a codebase with structural ranking. Returns matched files per search term, ranked by import graph centrality, co-change frequency, and hub score.",
+        "Grep a codebase with structural ranking. Returns matched files per search term with structural evidence (symbols/functions/classes), ranked by graph centrality, co-change frequency, and hub score.",
       inputSchema: {
         repoPath: z.string().describe("Absolute path to the repository root (e.g. /Users/dev/myproject)"),
         query: z

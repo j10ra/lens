@@ -1,5 +1,6 @@
 import type { Db } from "../db/connection.js";
 import { metadataQueries } from "../db/queries.js";
+import type { ParsedSymbol } from "../parsers/types.js";
 import { getFileStats, getIndegrees } from "./structural.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -14,6 +15,7 @@ const FIELD_WEIGHTS = {
   docstring: 1,
   sections: 1,
   internals: 1.5,
+  symbols: 3,
 } as const;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -88,6 +90,7 @@ export function interpretQuery(db: Db, repoId: string, terms: string[], limit: n
     const docstring = (meta.docstring ?? "").toLowerCase();
     const sections: string[] = safeJsonParse(meta.sections ?? "[]");
     const internals: string[] = safeJsonParse(meta.internals ?? "[]");
+    const symbols: ParsedSymbol[] = safeSymbolJsonParse(meta.symbols ?? "[]");
 
     for (const term of lowerTerms) {
       const count = df.get(term) ?? 0;
@@ -95,6 +98,7 @@ export function interpretQuery(db: Db, repoId: string, terms: string[], limit: n
         fileNameContainsTerm(fileName, term) ||
         dirPath.toLowerCase().includes(term) ||
         exportMatchScore(exports, term) > 0 ||
+        symbolMatchScore(symbols, term) > 0 ||
         docstring.includes(term) ||
         sections.some((s) => s.toLowerCase().includes(term)) ||
         internals.some((i) => i.toLowerCase().includes(term))
@@ -122,6 +126,7 @@ export function interpretQuery(db: Db, repoId: string, terms: string[], limit: n
     const docstring = (meta.docstring ?? "").toLowerCase();
     const sections: string[] = safeJsonParse(meta.sections ?? "[]");
     const internals: string[] = safeJsonParse(meta.internals ?? "[]");
+    const symbols: ParsedSymbol[] = safeSymbolJsonParse(meta.symbols ?? "[]");
 
     let baseScore = 0;
     const matchedTerms: string[] = [];
@@ -134,6 +139,8 @@ export function interpretQuery(db: Db, repoId: string, terms: string[], limit: n
       if (dirPath.toLowerCase().includes(term)) termScore += FIELD_WEIGHTS.dirPath * termIdf;
       const expScore = exportMatchScore(exports, term);
       if (expScore > 0) termScore += FIELD_WEIGHTS.exports * expScore * termIdf;
+      const symScore = symbolMatchScore(symbols, term);
+      if (symScore > 0) termScore += FIELD_WEIGHTS.symbols * symScore * termIdf;
       if (docstring.includes(term)) termScore += FIELD_WEIGHTS.docstring * termIdf;
       if (sections.some((s) => s.toLowerCase().includes(term))) termScore += FIELD_WEIGHTS.sections * termIdf;
       if (internals.some((i) => i.toLowerCase().includes(term))) termScore += FIELD_WEIGHTS.internals * termIdf;
@@ -206,6 +213,25 @@ function safeJsonParse(json: string | null): string[] {
   }
 }
 
+function safeSymbolJsonParse(json: string | null): ParsedSymbol[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (s): s is ParsedSymbol =>
+        !!s &&
+        typeof s === "object" &&
+        typeof s.name === "string" &&
+        typeof s.kind === "string" &&
+        typeof s.line === "number" &&
+        typeof s.exported === "boolean",
+    );
+  } catch {
+    return [];
+  }
+}
+
 function fileNameContainsTerm(fileName: string, term: string): boolean {
   const lowerName = fileName.toLowerCase();
   if (lowerName.includes(term)) return true;
@@ -229,6 +255,27 @@ function exportMatchScore(exports: string[], term: string): number {
     }
     const tokens = decomposeTokens(exp);
     if (tokens.some((t) => t === term)) best = Math.max(best, 1.0);
+  }
+  return best;
+}
+
+/**
+ * Score how well symbol declarations match a term.
+ * Exact symbol match => 2.5, token match => 1.5, substring => 1.0.
+ */
+function symbolMatchScore(symbols: ParsedSymbol[], term: string): number {
+  let best = 0;
+  for (const symbol of symbols) {
+    const lowerName = symbol.name.toLowerCase();
+    if (lowerName === term) return 2.5;
+    const tokens = decomposeTokens(symbol.name);
+    if (tokens.some((t) => t === term)) {
+      best = Math.max(best, 1.5);
+      continue;
+    }
+    if (lowerName.includes(term) || tokens.some((t) => t.includes(term))) {
+      best = Math.max(best, 1.0);
+    }
   }
   return best;
 }

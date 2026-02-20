@@ -14,6 +14,14 @@ export type RepoFilesResult = {
 };
 
 export type FileDetail = {
+  symbols:
+    | {
+        name: string;
+        kind: string;
+        line: number;
+        exported: boolean;
+      }[]
+    | null;
   path: string;
   language: string | null;
   exports: string[] | null;

@@ -2,6 +2,7 @@ import type { Db } from "../db/connection.js"
 import { metadataQueries } from "../db/queries.js"
 import { extractSections, extractUniversalInternals } from "../parsers/common/patterns.js"
 import { getParser } from "../parsers/registry.js"
+import type { ParsedSymbol } from "../parsers/types.js"
 
 export interface FileMetadata {
   path: string
@@ -11,6 +12,7 @@ export interface FileMetadata {
   docstring: string
   sections: string[]
   internals: string[]
+  symbols: ParsedSymbol[]
 }
 
 export function extractFileMetadata(content: string, path: string, language: string | null): FileMetadata {
@@ -25,6 +27,7 @@ export function extractFileMetadata(content: string, path: string, language: str
     docstring: parser?.extractDocstring(content) ?? "",
     sections: parser?.extractSections(content) ?? extractSections(content),
     internals: parser?.extractInternals(content, exports) ?? extractUniversalInternals(content, exports),
+    symbols: parser?.extractSymbols?.(content) ?? [],
   }
 }
 
@@ -43,6 +46,7 @@ export function extractAndPersistMetadata(
       docstring: meta.docstring,
       sections: meta.sections,
       internals: meta.internals,
+      symbols: meta.symbols,
     })
     count++
   }
