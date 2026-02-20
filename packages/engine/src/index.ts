@@ -10,8 +10,8 @@ export { configureEngineDb, getEngineDb, getRawDb } from "./db/connection.js";
 
 // ── Already lensFn-wrapped exports (re-export as-is) ──────────────────────────
 
-// runIndex is lensFn("engine.runIndex", ...) in engine.ts
-export { runIndex } from "./index/engine.js";
+// runIndex + ensureIndex are lensFn-wrapped in engine.ts
+export { ensureIndex, runIndex } from "./index/engine.js";
 
 // registerRepo is lensFn("engine.registerRepo", ...) in repo.ts
 export { registerRepo } from "./repo/repo.js";

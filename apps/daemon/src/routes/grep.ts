@@ -1,5 +1,5 @@
 import { lensRoute } from "@lens/core";
-import { getEngineDb, grepRepo, listRepos } from "@lens/engine";
+import { ensureIndex, getEngineDb, grepRepo, listRepos } from "@lens/engine";
 import { Hono } from "hono";
 
 export const grepRoutes = new Hono();
@@ -23,15 +23,8 @@ grepRoutes.post(
       );
     }
 
-    if (repo.index_status !== "ready") {
-      return c.json(
-        {
-          error: "Repo not indexed",
-          hint: `Index status: ${repo.index_status}. Trigger with POST /repos/${repo.id}/index`,
-        },
-        409,
-      );
-    }
+    // Auto-reindex if HEAD moved since last index
+    await ensureIndex(db, repo.id);
 
     const result = await grepRepo(db, repo.id, query, limit);
     return c.json(result);
