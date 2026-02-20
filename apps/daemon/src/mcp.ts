@@ -72,6 +72,31 @@ function registerTools(server: McpServer): void {
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     },
   );
+
+  server.registerTool(
+    "lens_graph",
+    {
+      title: "LENS Graph",
+      description:
+        "Get the dependency graph of a codebase. Without dir: returns directory clusters and inter-cluster import edges. With dir: returns individual files, import edges, and co-change pairs within that directory.",
+      inputSchema: {
+        repoPath: z.string().describe("Absolute path to the repository root"),
+        dir: z
+          .string()
+          .optional()
+          .describe("Directory prefix to drill into (e.g. 'packages/engine/src'). Omit for cluster-level summary."),
+      },
+    },
+    async ({ repoPath, dir }) => {
+      const res = await fetch(`${API}/graph`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoPath, dir }),
+      });
+      const data = await res.json();
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    },
+  );
 }
 
 function createSession(): { transport: WebStandardStreamableHTTPServerTransport; server: McpServer } {

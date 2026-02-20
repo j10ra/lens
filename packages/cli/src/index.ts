@@ -1,5 +1,6 @@
 import { defineCommand, runMain } from "citty";
 import { daemon } from "./commands/daemon.js";
+import { graph } from "./commands/graph.js";
 import { grep } from "./commands/grep.js";
 import { list } from "./commands/list.js";
 import { register } from "./commands/register.js";
@@ -19,6 +20,7 @@ const main = defineCommand({
     remove,
     list,
     grep,
+    graph,
   },
 });
 

@@ -9,6 +9,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { filesRoutes } from "./routes/files.js";
+import { graphRoutes } from "./routes/graph.js";
 import { grepRoutes } from "./routes/grep.js";
 import { healthRoutes } from "./routes/health.js";
 import { reposRoutes } from "./routes/repos.js";
@@ -36,6 +37,7 @@ app.onError((err, c) => {
 // Source is determined by URL prefix, not headers. No race conditions.
 
 function mountRoutes(router: Hono): void {
+  router.route("/graph", graphRoutes);
   router.route("/grep", grepRoutes);
   router.route("/repos", reposRoutes);
   router.route("/repos", filesRoutes);
