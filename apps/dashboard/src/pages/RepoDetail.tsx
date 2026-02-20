@@ -22,6 +22,7 @@ import {
   Files,
   FolderGit2,
   GitCommit,
+  Globe,
   Hash,
   LayoutDashboard,
   Search,
@@ -581,6 +582,17 @@ export function RepoDetail() {
                 )}
               </button>
             ))}
+            <a
+              href={`/repos/${repoId}/explore`}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(`/repos/${repoId}/explore`);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+            >
+              <Globe className="h-3.5 w-3.5 shrink-0" />
+              Explore
+            </a>
           </nav>
         </aside>
 

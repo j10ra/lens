@@ -47,4 +47,11 @@ export const api = {
     }).then((r) => r.json()),
 
   removeRepo: (id: string) => fetchOk(`${API}/repos/${id}`, { method: "DELETE" }).then((r) => r.json()),
+
+  repoGraph: (repoPath: string, dir?: string) =>
+    fetchOk(`${API}/graph`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repoPath, dir }),
+    }).then((r) => r.json()),
 };
