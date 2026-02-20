@@ -21,6 +21,7 @@ import {
   FileCode,
   Files,
   FolderGit2,
+  ExternalLink,
   GitCommit,
   Globe,
   Hash,
@@ -28,12 +29,13 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { StatusBadge } from "../components/StatusBadge.js";
 import { api } from "../lib/api.js";
 import { useRepoFileDetail, useRepoFiles } from "../queries/use-repo-files.js";
 import { useRepoStats, useRepos } from "../queries/use-repos.js";
+import { RepoGraphTab } from "./Explore.js";
 
 const FILE_LIMIT = 100;
 
@@ -48,16 +50,45 @@ function timeAgo(ts: string | null): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-type Section = "overview" | "files";
+type Section = "overview" | "files" | "grep" | "graph";
 
-const SECTIONS: { id: Section; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "files", label: "Files", icon: Files },
-];
+const SECTIONS: { id: Section; label: string; icon: typeof LayoutDashboard }[] =
+  [
+    { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "files", label: "Files", icon: Files },
+    { id: "grep", label: "Grep", icon: Search },
+    { id: "graph", label: "Graph", icon: Globe },
+  ];
 
 interface FilesTabProps {
   repoId: string;
   onSelectFile: (path: string) => void;
+}
+
+interface StructuralMatch {
+  kind: "symbol" | "export" | "internal" | "section" | "file" | "directory" | "docstring";
+  value: string;
+  symbolKind?: string;
+  line?: number;
+  exported?: boolean;
+}
+
+interface GrepMatch {
+  path: string;
+  score: number;
+  language: string | null;
+  importers: string[];
+  cochangePartners: Array<{ path: string; count: number }>;
+  isHub: boolean;
+  hubScore: number;
+  exports: string[];
+  matches: StructuralMatch[];
+}
+
+interface GrepResult {
+  repoId: string;
+  terms: string[];
+  results: Record<string, GrepMatch[]>;
 }
 
 function FilesTab({ repoId, onSelectFile }: FilesTabProps) {
@@ -110,9 +141,15 @@ function FilesTab({ repoId, onSelectFile }: FilesTabProps) {
                 <th className="w-12 border-b border-r border-border px-3 py-1.5 text-center font-mono text-[10px] text-muted-foreground">
                   #
                 </th>
-                <th className="border-b border-r border-border px-3 py-1.5 text-left font-medium">Path</th>
-                <th className="w-16 border-b border-r border-border px-3 py-1.5 text-left font-medium">Lang</th>
-                <th className="w-16 border-b border-border px-3 py-1.5 text-right font-medium">Exports</th>
+                <th className="border-b border-r border-border px-3 py-1.5 text-left font-medium">
+                  Path
+                </th>
+                <th className="w-16 border-b border-r border-border px-3 py-1.5 text-left font-medium">
+                  Lang
+                </th>
+                <th className="w-16 border-b border-border px-3 py-1.5 text-right font-medium">
+                  Exports
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -140,7 +177,10 @@ function FilesTab({ repoId, onSelectFile }: FilesTabProps) {
               ))}
               {files.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={4}
+                    className="px-3 py-8 text-center text-muted-foreground"
+                  >
                     No files found.
                   </td>
                 </tr>
@@ -183,6 +223,176 @@ function FilesTab({ repoId, onSelectFile }: FilesTabProps) {
   );
 }
 
+interface GrepTabProps {
+  repoPath: string;
+  onSelectFile: (path: string) => void;
+}
+
+function GrepTab({ repoPath, onSelectFile }: GrepTabProps) {
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(20);
+  const [submittedQuery, setSubmittedQuery] = useState("");
+  const grep = useMutation({
+    mutationFn: (input: { query: string; limit: number }) =>
+      api.grep(repoPath, input.query, input.limit) as Promise<GrepResult>,
+  });
+
+  const runSearch = (nextQuery?: string) => {
+    const value = (nextQuery ?? query).trim();
+    if (!value) return;
+    setSubmittedQuery(value);
+    grep.mutate({ query: value, limit });
+  };
+
+  const result = grep.data;
+  const totalResults =
+    result?.terms.reduce((sum, term) => sum + (result.results[term]?.length ?? 0), 0) ?? 0;
+
+  return (
+    <div className="flex flex-1 min-h-0 flex-col">
+      <form
+        className="flex items-center gap-2 border-b border-border px-4 py-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          runSearch();
+        }}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border bg-background px-2">
+          <Search className="h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search terms, use | for multiple terms (e.g. auth|token|session)"
+            className="h-8 w-full bg-transparent text-xs focus:outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-1 rounded-md border border-border bg-background px-2">
+          <span className="font-mono text-[10px] text-muted-foreground">limit</span>
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={limit}
+            onChange={(e) => setLimit(Math.min(50, Math.max(1, Number(e.target.value) || 1)))}
+            className="h-8 w-12 bg-transparent text-right font-mono text-xs focus:outline-none"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={grep.isPending || !query.trim()}
+          className="h-8 rounded-md border border-border px-3 text-xs hover:bg-accent disabled:opacity-50"
+        >
+          {grep.isPending ? "Searching..." : "Run grep"}
+        </button>
+      </form>
+
+      <div className="flex-1 overflow-auto p-4">
+        {!submittedQuery && !grep.data && (
+          <div className="rounded-lg border border-dashed border-border p-6 text-center">
+            <p className="text-sm font-medium">Lens Grep</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Enter terms in the textbox above to run `grep.post` and inspect ranked matches.
+            </p>
+          </div>
+        )}
+
+        {grep.isError && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+            {grep.error instanceof Error ? grep.error.message : "Failed to run grep"}
+          </div>
+        )}
+
+        {result && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {result.terms.length} terms
+              </Badge>
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {totalResults} matches
+              </Badge>
+              <span className="font-mono text-[10px]">query: {submittedQuery}</span>
+            </div>
+
+            {result.terms.map((term) => {
+              const matches = result.results[term] ?? [];
+              return (
+                <div key={term} className="overflow-hidden rounded-lg border border-border">
+                  <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2">
+                    <div className="font-mono text-xs">{term}</div>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {matches.length}
+                    </Badge>
+                  </div>
+
+                  {matches.length === 0 ? (
+                    <div className="px-3 py-4 text-xs text-muted-foreground">No matches</div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {matches.map((match) => (
+                        <div key={`${term}:${match.path}`} className="space-y-2 px-3 py-2">
+                          <div className="flex items-center gap-2 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => onSelectFile(match.path)}
+                              className="min-w-0 truncate font-mono text-primary hover:underline"
+                            >
+                              {match.path}
+                            </button>
+                            <Badge variant="outline" className="font-mono text-[9px]">
+                              {match.language ?? "unknown"}
+                            </Badge>
+                            {match.isHub && (
+                              <Badge variant="outline" className="font-mono text-[9px] border-amber-500/50 text-amber-500">
+                                hub
+                              </Badge>
+                            )}
+                            <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+                              score {match.score.toFixed(2)} · hub {match.hubScore.toFixed(2)}
+                            </span>
+                          </div>
+
+                          {match.matches.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {match.matches.slice(0, 6).map((m, idx) => (
+                                <span
+                                  key={`${match.path}:${m.kind}:${m.value}:${idx}`}
+                                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
+                                >
+                                  {m.kind}
+                                  {m.symbolKind ? `:${m.symbolKind}` : ""}:{m.value}
+                                  {typeof m.line === "number" ? `@${m.line}` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                            {match.importers.length > 0 && (
+                              <span className="font-mono">imported by {match.importers.length}</span>
+                            )}
+                            {match.cochangePartners.length > 0 && (
+                              <span className="font-mono">co-change {match.cochangePartners.length}</span>
+                            )}
+                            {match.exports.length > 0 && (
+                              <span className="font-mono">exports {match.exports.length}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface FileDetailSheetProps {
   repoId: string;
   filePath: string | null;
@@ -190,8 +400,22 @@ interface FileDetailSheetProps {
   onNavigate: (path: string) => void;
 }
 
-function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSheetProps) {
+function FileDetailSheet({
+  repoId,
+  filePath,
+  onClose,
+  onNavigate,
+}: FileDetailSheetProps) {
   const { data: detail } = useRepoFileDetail(repoId, filePath);
+  const openInEditor = async (line?: number) => {
+    if (!filePath) return;
+    try {
+      await api.openFile(repoId, filePath, line);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      window.alert(`Failed to open editor: ${message}`);
+    }
+  };
 
   return (
     <Sheet open={!!filePath} onOpenChange={(open) => !open && onClose()}>
@@ -199,11 +423,24 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
         {detail ? (
           <>
             <SheetHeader>
-              <SheetTitle className="break-all select-all font-mono text-sm">{detail.path}</SheetTitle>
-              <SheetDescription>{detail.language ?? "unknown"}</SheetDescription>
+              <SheetTitle className="break-all select-all font-mono text-sm">
+                {detail.path}
+              </SheetTitle>
+              <SheetDescription>
+                {detail.language ?? "unknown"}
+              </SheetDescription>
             </SheetHeader>
 
             <div className="mt-4 space-y-4">
+              <button
+                type="button"
+                onClick={() => void openInEditor()}
+                className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/40"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Open in editor
+              </button>
+
               {/* Exports */}
               {detail.exports && detail.exports.length > 0 && (
                 <section>
@@ -212,7 +449,11 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {detail.exports.map((e: string) => (
-                      <Badge key={e} variant="secondary" className="font-mono text-[10px]">
+                      <Badge
+                        key={e}
+                        variant="secondary"
+                        className="font-mono text-[10px]"
+                      >
                         {e}
                       </Badge>
                     ))}
@@ -230,21 +471,39 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                     </p>
                     <div className="space-y-1">
                       {detail.symbols.slice(0, 80).map((symbol) => (
-                        <div key={`${symbol.kind}:${symbol.name}:${symbol.line}`} className="flex items-center gap-2">
-                          <Badge variant="outline" className="h-4 px-1.5 font-mono text-[9px] lowercase">
+                        <button
+                          key={`${symbol.kind}:${symbol.name}:${symbol.line}`}
+                          type="button"
+                          onClick={() => void openInEditor(symbol.line)}
+                          className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-accent/40"
+                        >
+                          <Badge
+                            variant="outline"
+                            className="h-4 px-1.5 font-mono text-[9px] lowercase"
+                          >
                             {symbol.kind}
                           </Badge>
-                          <span className="flex-1 break-all font-mono text-[11px] text-foreground/90">{symbol.name}</span>
-                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">L{symbol.line}</span>
+                          <span className="flex-1 break-all font-mono text-[11px] text-foreground/90">
+                            {symbol.name}
+                          </span>
+                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                            L{symbol.line}
+                          </span>
+                          <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/80" />
                           {symbol.exported && (
-                            <Badge variant="secondary" className="h-4 px-1.5 font-mono text-[9px]">
+                            <Badge
+                              variant="secondary"
+                              className="h-4 px-1.5 font-mono text-[9px]"
+                            >
                               export
                             </Badge>
                           )}
-                        </div>
+                        </button>
                       ))}
                       {detail.symbols.length > 80 && (
-                        <p className="text-[10px] text-muted-foreground">+{detail.symbols.length - 80} more</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          +{detail.symbols.length - 80} more
+                        </p>
                       )}
                     </div>
                   </section>
@@ -261,7 +520,11 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {detail.sections.map((s: string) => (
-                        <Badge key={s} variant="outline" className="font-mono text-[10px]">
+                        <Badge
+                          key={s}
+                          variant="outline"
+                          className="font-mono text-[10px]"
+                        >
                           {s}
                         </Badge>
                       ))}
@@ -280,7 +543,11 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {detail.internals.map((s: string) => (
-                        <Badge key={s} variant="secondary" className="bg-muted/50 font-mono text-[10px]">
+                        <Badge
+                          key={s}
+                          variant="secondary"
+                          className="bg-muted/50 font-mono text-[10px]"
+                        >
                           {s}
                         </Badge>
                       ))}
@@ -350,18 +617,28 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                     </p>
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div>
-                        <p className="font-mono text-xs font-semibold tabular-nums">{detail.git_stats.commits}</p>
-                        <p className="text-[10px] text-muted-foreground">Commits</p>
+                        <p className="font-mono text-xs font-semibold tabular-nums">
+                          {detail.git_stats.commits}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Commits
+                        </p>
                       </div>
                       <div>
-                        <p className="font-mono text-xs font-semibold tabular-nums">{detail.git_stats.recent_90d}</p>
-                        <p className="text-[10px] text-muted-foreground">Recent (90d)</p>
+                        <p className="font-mono text-xs font-semibold tabular-nums">
+                          {detail.git_stats.recent_90d}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Recent (90d)
+                        </p>
                       </div>
                       <div>
                         <p className="font-mono text-xs font-semibold tabular-nums">
                           {timeAgo(detail.git_stats.last_modified)}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">Last modified</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Last modified
+                        </p>
                       </div>
                     </div>
                   </section>
@@ -378,18 +655,25 @@ function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSh
                       Co-changes
                     </p>
                     <div className="flex flex-col gap-0.5">
-                      {detail.cochanges.map(({ path, count }: { path: string; count: number }) => (
-                        <div key={path} className="flex items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => onNavigate(path)}
-                            className="flex-1 break-all text-left font-mono text-[11px] text-primary hover:underline"
+                      {detail.cochanges.map(
+                        ({ path, count }: { path: string; count: number }) => (
+                          <div
+                            key={path}
+                            className="flex items-center justify-between gap-2"
                           >
-                            {path}
-                          </button>
-                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{count}x</span>
-                        </div>
-                      ))}
+                            <button
+                              type="button"
+                              onClick={() => onNavigate(path)}
+                              className="flex-1 break-all text-left font-mono text-[11px] text-primary hover:underline"
+                            >
+                              {path}
+                            </button>
+                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                              {count}x
+                            </span>
+                          </div>
+                        ),
+                      )}
                     </div>
                   </section>
                 </>
@@ -432,20 +716,28 @@ function OverviewTab({ repoId }: { repoId: string }) {
           <CardContent className="space-y-1.5">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Files</span>
-              <span className="font-mono tabular-nums">{files?.total?.toLocaleString() ?? "—"}</span>
+              <span className="font-mono tabular-nums">
+                {files?.total?.toLocaleString() ?? "—"}
+              </span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Import edges</span>
-              <span className="font-mono tabular-nums">{stats?.import_edges?.toLocaleString() ?? "—"}</span>
+              <span className="font-mono tabular-nums">
+                {stats?.import_edges?.toLocaleString() ?? "—"}
+              </span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Last indexed</span>
-              <span className="font-mono tabular-nums">{timeAgo(repo?.last_indexed_at ?? null)}</span>
+              <span className="font-mono tabular-nums">
+                {timeAgo(repo?.last_indexed_at ?? null)}
+              </span>
             </div>
             {repo?.last_indexed_commit && (
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Commit</span>
-                <span className="font-mono tabular-nums">{repo.last_indexed_commit.slice(0, 7)}</span>
+                <span className="font-mono tabular-nums">
+                  {repo.last_indexed_commit.slice(0, 7)}
+                </span>
               </div>
             )}
           </CardContent>
@@ -462,14 +754,20 @@ function OverviewTab({ repoId }: { repoId: string }) {
           <CardContent className="space-y-1.5">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Path</span>
-              <span className="max-w-[60%] truncate font-mono text-[11px]" title={repo?.root_path}>
+              <span
+                className="max-w-[60%] truncate font-mono text-[11px]"
+                title={repo?.root_path}
+              >
                 {repo?.root_path ?? "—"}
               </span>
             </div>
             {repo?.remote_url && (
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Remote</span>
-                <span className="max-w-[60%] truncate font-mono text-[11px]" title={repo.remote_url}>
+                <span
+                  className="max-w-[60%] truncate font-mono text-[11px]"
+                  title={repo.remote_url}
+                >
                   {repo.remote_url}
                 </span>
               </div>
@@ -477,7 +775,9 @@ function OverviewTab({ repoId }: { repoId: string }) {
             {repo?.created_at && (
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Registered</span>
-                <span className="font-mono tabular-nums">{timeAgo(repo.created_at)}</span>
+                <span className="font-mono tabular-nums">
+                  {timeAgo(repo.created_at)}
+                </span>
               </div>
             )}
           </CardContent>
@@ -499,21 +799,35 @@ function OverviewTab({ repoId }: { repoId: string }) {
             </CardHeader>
             <CardContent className="space-y-1.5">
               {topLangs.map((lang) => {
-                const pct = files?.total ? Math.round((lang.count / files.total) * 100) : 0;
+                const pct = files?.total
+                  ? Math.round((lang.count / files.total) * 100)
+                  : 0;
                 return (
-                  <div key={lang.language} className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">{lang.language}</span>
+                  <div
+                    key={lang.language}
+                    className="flex items-center justify-between text-xs"
+                  >
+                    <span className="text-muted-foreground">
+                      {lang.language}
+                    </span>
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-primary/60" style={{ width: `${pct}%` }} />
+                        <div
+                          className="h-full rounded-full bg-primary/60"
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
-                      <span className="w-12 text-right font-mono tabular-nums">{lang.count.toLocaleString()}</span>
+                      <span className="w-12 text-right font-mono tabular-nums">
+                        {lang.count.toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 );
               })}
               {languages.length > 6 && (
-                <p className="text-[10px] text-muted-foreground">+{languages.length - 6} more</p>
+                <p className="text-[10px] text-muted-foreground">
+                  +{languages.length - 6} more
+                </p>
               )}
             </CardContent>
           </Card>
@@ -526,12 +840,20 @@ function OverviewTab({ repoId }: { repoId: string }) {
 export function RepoDetail() {
   const { repoId } = useParams<{ repoId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const qc = useQueryClient();
 
   const { data: repos } = useRepos();
   const repo = repos?.find((r) => r.id === repoId);
 
-  const [activeTab, setActiveTab] = useState<Section>("overview");
+  const initialTab: Section = (() => {
+    const tab = searchParams.get("tab");
+    if (tab === "files") return "files";
+    if (tab === "grep") return "grep";
+    if (tab === "graph") return "graph";
+    return "overview";
+  })();
+  const [activeTab, setActiveTab] = useState<Section>(initialTab);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
 
   const { data: files } = useRepoFiles(repoId ?? "", { limit: 1 });
@@ -552,6 +874,29 @@ export function RepoDetail() {
     }
   };
 
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    const nextTab: Section =
+      tab === "files"
+        ? "files"
+        : tab === "grep"
+          ? "grep"
+          : tab === "graph"
+            ? "graph"
+            : "overview";
+    setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
+  }, [searchParams]);
+
+  const setSection = (section: Section) => {
+    setActiveTab(section);
+    const next = new URLSearchParams(searchParams);
+    if (section === "overview") next.delete("tab");
+    if (section === "files") next.set("tab", "files");
+    if (section === "grep") next.set("tab", "grep");
+    if (section === "graph") next.set("tab", "graph");
+    setSearchParams(next, { replace: true });
+  };
+
   if (!repoId) return null;
 
   return (
@@ -565,7 +910,9 @@ export function RepoDetail() {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <span className="text-sm font-medium truncate">{repo?.name ?? repoId}</span>
+        <span className="text-sm font-medium truncate">
+          {repo?.name ?? repoId}
+        </span>
         {repo && <StatusBadge status={repo.index_status} className="ml-1" />}
         <div className="ml-auto flex items-center gap-1.5">
           <button
@@ -597,7 +944,7 @@ export function RepoDetail() {
               <button
                 key={id}
                 type="button"
-                onClick={() => setActiveTab(id)}
+                onClick={() => setSection(id)}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${
                   activeTab === id
                     ? "bg-accent text-accent-foreground font-medium"
@@ -613,17 +960,6 @@ export function RepoDetail() {
                 )}
               </button>
             ))}
-            <a
-              href={`/repos/${repoId}/explore`}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(`/repos/${repoId}/explore`);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-            >
-              <Globe className="h-3.5 w-3.5 shrink-0" />
-              Explore
-            </a>
           </nav>
         </aside>
 
@@ -631,7 +967,7 @@ export function RepoDetail() {
         <div className="border-b border-border px-4 py-2 md:hidden w-full">
           <select
             value={activeTab}
-            onChange={(e) => setActiveTab(e.target.value as Section)}
+            onChange={(e) => setSection(e.target.value as Section)}
             className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
           >
             {SECTIONS.map(({ id, label }) => (
@@ -645,7 +981,13 @@ export function RepoDetail() {
         {/* Right content */}
         <div className="flex min-w-0 min-h-0 flex-1 flex-col">
           {activeTab === "overview" && <OverviewTab repoId={repoId} />}
-          {activeTab === "files" && <FilesTab repoId={repoId} onSelectFile={setSelectedFilePath} />}
+          {activeTab === "files" && (
+            <FilesTab repoId={repoId} onSelectFile={setSelectedFilePath} />
+          )}
+          {activeTab === "grep" && repo && (
+            <GrepTab repoPath={repo.root_path} onSelectFile={setSelectedFilePath} />
+          )}
+          {activeTab === "graph" && <RepoGraphTab repoId={repoId} />}
         </div>
       </div>
 

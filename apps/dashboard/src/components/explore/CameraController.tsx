@@ -5,17 +5,30 @@ import * as THREE from "three";
 interface CameraControllerProps {
   target: [number, number, number] | null;
   distance?: number;
+  homeDistance?: number;
+  targetScreenOffsetPx?: number;
 }
 
 export function CameraController({
   target,
   distance = 30,
   homeDistance = 12,
-}: CameraControllerProps & { homeDistance?: number }) {
-  const { camera, controls } = useThree();
+  targetScreenOffsetPx = 0,
+}: CameraControllerProps) {
+  const { camera, controls, size } = useThree();
   const goalPos = useRef(new THREE.Vector3());
   const goalTarget = useRef(new THREE.Vector3());
   const animating = useRef(false);
+
+  useEffect(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera) || size.width <= 0 || size.height <= 0) return;
+    if (targetScreenOffsetPx !== 0) {
+      camera.setViewOffset(size.width, size.height, targetScreenOffsetPx, 0, size.width, size.height);
+    } else {
+      camera.clearViewOffset();
+    }
+    camera.updateProjectionMatrix();
+  }, [camera, size.width, size.height, targetScreenOffsetPx]);
 
   useEffect(() => {
     if (!target) {

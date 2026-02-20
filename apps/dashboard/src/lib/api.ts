@@ -35,6 +35,13 @@ export const api = {
   repoFileDetail: (repoId: string, filePath: string) =>
     fetchOk(`${API}/repos/${repoId}/files/${encodeURIComponent(filePath)}`).then((r) => r.json()),
 
+  openFile: (repoId: string, filePath: string, line?: number, column?: number) =>
+    fetchOk(`${API}/repos/${repoId}/open`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath, line, column }),
+    }).then((r) => r.json()),
+
   repoStats: (repoId: string) => fetchOk(`${API}/repos/${repoId}/stats`).then((r) => r.json()),
 
   reindex: (repoId: string) => fetchOk(`${API}/repos/${repoId}/index`, { method: "POST" }).then((r) => r.json()),
@@ -58,4 +65,11 @@ export const api = {
       body: JSON.stringify(body),
     }).then((r) => r.json());
   },
+
+  grep: (repoPath: string, query: string, limit = 20) =>
+    fetchOk(`${API}/grep`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repoPath, query, limit }),
+    }).then((r) => r.json()),
 };

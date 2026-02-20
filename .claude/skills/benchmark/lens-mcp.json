@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lens": {
+      "type": "http",
+      "url": "http://localhost:4111/mcp"
+    }
+  }
+}

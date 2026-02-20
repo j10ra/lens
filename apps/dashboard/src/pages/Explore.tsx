@@ -1,13 +1,17 @@
-import { Badge, PageHeader } from "@lens/ui";
+import { Badge, cn } from "@lens/ui";
 import { Billboard, Line, OrbitControls, Text } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 // biome-ignore lint/performance/noBarrelFile: need all icons
-import { ArrowLeft, ChevronRight, Folder } from "lucide-react";
+import {
+  ChevronRight,
+  ExternalLink,
+  Folder,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { Navigate, useParams, useSearchParams } from "react-router";
 import { CameraController } from "../components/explore/CameraController.js";
 import { CommandPalette } from "../components/explore/CommandPalette.js";
-import { StatusBadge } from "../components/StatusBadge.js";
+import { api } from "../lib/api.js";
 import type { FileLayoutEdge, FileLayoutNode } from "../lib/graph-layout.js";
 import { layoutFiles } from "../lib/graph-layout.js";
 import type { GraphCochange, GraphDetail } from "../lib/graph-types.js";
@@ -17,7 +21,11 @@ import { useRepos } from "../queries/use-repos.js";
 
 // ── 3D Components ────────────────────────────────────────────────────────────
 
-function spherePoint(index: number, total: number, radius: number): [number, number, number] {
+function spherePoint(
+  index: number,
+  total: number,
+  radius: number,
+): [number, number, number] {
   if (total <= 1) return [radius, 0, 0];
   const golden = Math.PI * (3 - Math.sqrt(5));
   const y = 1 - (index / (total - 1)) * 2;
@@ -26,17 +34,131 @@ function spherePoint(index: number, total: number, radius: number): [number, num
   return [Math.cos(theta) * r, y * radius, Math.sin(theta) * r];
 }
 
+interface ExploreSceneTheme {
+  shellBgClass: string;
+  dotsTextureClass: string;
+  linesTextureClass: string;
+  backdropColor: string;
+  fogColor: string;
+  fogNear: number;
+  fogFar: number;
+  ambientIntensity: number;
+  keyLightColor: string;
+  keyLightIntensity: number;
+  fillLightColor: string;
+  fillLightIntensity: number;
+  starColor: string;
+  starOpacity: number;
+  labelDim: string;
+  labelSelected: string;
+  labelHot: string;
+  labelMid: string;
+  labelCold: string;
+  labelOutline: string;
+  importEdge: string;
+  importEdgeMuted: string;
+  cochangeEdge: string;
+}
+
+const DARK_SCENE_THEME: ExploreSceneTheme = {
+  shellBgClass: "bg-background",
+  dotsTextureClass:
+    "text-muted-foreground opacity-22 [background-image:radial-gradient(circle,currentColor_1px,transparent_1.25px)] [background-size:14px_14px]",
+  linesTextureClass:
+    "text-border opacity-14 [background-image:radial-gradient(circle_at_50%_0%,currentColor,transparent_64%)]",
+  backdropColor: "#141922",
+  fogColor: "#141922",
+  fogNear: 54,
+  fogFar: 190,
+  ambientIntensity: 0.9,
+  keyLightColor: "#7dd3fc",
+  keyLightIntensity: 0.75,
+  fillLightColor: "#f59e0b",
+  fillLightIntensity: 0.35,
+  starColor: "#cbd5e1",
+  starOpacity: 0.42,
+  labelDim: "#64748b",
+  labelSelected: "#ffffff",
+  labelHot: "#f8fafc",
+  labelMid: "#cbd5e1",
+  labelCold: "#94a3b8",
+  labelOutline: "#020617",
+  importEdge: "#60a5fa",
+  importEdgeMuted: "#334155",
+  cochangeEdge: "#f59e0b",
+};
+
+const LIGHT_SCENE_THEME: ExploreSceneTheme = {
+  shellBgClass: "bg-background",
+  dotsTextureClass:
+    "text-muted-foreground opacity-18 [background-image:radial-gradient(circle,currentColor_1px,transparent_1.25px)] [background-size:14px_14px]",
+  linesTextureClass:
+    "text-border opacity-10 [background-image:radial-gradient(circle_at_50%_0%,currentColor,transparent_66%)]",
+  backdropColor: "#eef1f6",
+  fogColor: "#dfe4ec",
+  fogNear: 44,
+  fogFar: 160,
+  ambientIntensity: 1,
+  keyLightColor: "#2563eb",
+  keyLightIntensity: 0.55,
+  fillLightColor: "#d97706",
+  fillLightIntensity: 0.2,
+  starColor: "#334155",
+  starOpacity: 0.2,
+  labelDim: "#94a3b8",
+  labelSelected: "#0f172a",
+  labelHot: "#0f172a",
+  labelMid: "#1e293b",
+  labelCold: "#334155",
+  labelOutline: "#ffffff",
+  importEdge: "#2563eb",
+  importEdgeMuted: "#94a3b8",
+  cochangeEdge: "#d97706",
+};
+
+function getIsDarkTheme(): boolean {
+  if (typeof document === "undefined") return true;
+  return document.documentElement.classList.contains("dark");
+}
+
+function useIsDarkTheme(): boolean {
+  const [isDark, setIsDark] = useState<boolean>(getIsDarkTheme);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => setIsDark(getIsDarkTheme());
+    update();
+
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    window.addEventListener("storage", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("storage", update);
+    };
+  }, []);
+
+  return isDark;
+}
+
 function FileNode({
   node,
   selected,
   dimmed,
+  cochangeHighlighted = false,
   showLabel = false,
+  sceneTheme,
   onSelect,
 }: {
   node: FileLayoutNode;
   selected: boolean;
   dimmed: boolean;
+  cochangeHighlighted?: boolean;
   showLabel?: boolean;
+  sceneTheme: ExploreSceneTheme;
   onSelect: (id: string) => void;
 }) {
   const color = languageColor(node.language);
@@ -48,6 +170,16 @@ function FileNode({
   const dotRadius = selected ? 0.022 + heat * 0.1 : 0.016 + heat * 0.075;
   const fontSize = selected ? 0.085 + heat * 0.09 : 0.055 + heat * 0.065;
   const textOpacity = dimmed ? 0.25 : selected ? 0.98 : 0.7 + heat * 0.24;
+  const dotColor = selected
+    ? "#ffffff"
+    : cochangeHighlighted
+      ? sceneTheme.cochangeEdge
+      : color;
+  const dotOpacity = dimmed
+    ? 0.16
+    : cochangeHighlighted
+      ? 0.55 + heat * 0.35
+      : 0.32 + heat * 0.62;
 
   return (
     <Billboard
@@ -60,11 +192,7 @@ function FileNode({
       {/* Language color dot — size scales with heat */}
       <mesh position={[0, 0, 0.01]}>
         <circleGeometry args={[dotRadius, 32]} />
-        <meshBasicMaterial
-          color={selected ? "#ffffff" : color}
-          transparent
-          opacity={dimmed ? 0.16 : 0.32 + heat * 0.62}
-        />
+        <meshBasicMaterial color={dotColor} transparent opacity={dotOpacity} />
       </mesh>
       {/* Filename — size and brightness scale with heat */}
       {showLabel && (
@@ -75,10 +203,18 @@ function FileNode({
           anchorY="middle"
           maxWidth={2.8}
           color={
-            dimmed ? "#64748b" : selected ? "#ffffff" : heat > 0.35 ? "#f8fafc" : heat > 0.12 ? "#cbd5e1" : "#94a3b8"
+            dimmed
+              ? sceneTheme.labelDim
+              : selected
+                ? sceneTheme.labelSelected
+                : heat > 0.35
+                  ? sceneTheme.labelHot
+                  : heat > 0.12
+                    ? sceneTheme.labelMid
+                    : sceneTheme.labelCold
           }
           outlineWidth={dimmed ? 0.003 : selected ? 0.016 : 0.01}
-          outlineColor="#020617"
+          outlineColor={sceneTheme.labelOutline}
           outlineBlur={selected ? 0.15 : 0.06}
           fontWeight={heat > 0.22 || selected ? "bold" : "normal"}
         >
@@ -94,10 +230,12 @@ function ImportEdges({
   nodes,
   edges,
   selectedId,
+  sceneTheme,
 }: {
   nodes: FileLayoutNode[];
   edges: FileLayoutEdge[];
   selectedId: string | null;
+  sceneTheme: ExploreSceneTheme;
 }) {
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
@@ -108,7 +246,8 @@ function ImportEdges({
         const t = nodeMap.get(e.target);
         if (!s || !t) return null;
 
-        const isHighlighted = selectedId && (e.source === selectedId || e.target === selectedId);
+        const isHighlighted =
+          selectedId && (e.source === selectedId || e.target === selectedId);
         if (selectedId && !isHighlighted) return null; // hide unrelated edges when file selected
 
         return (
@@ -118,7 +257,9 @@ function ImportEdges({
               [s.x, s.y, s.z],
               [t.x, t.y, t.z],
             ]}
-            color={isHighlighted ? "#60a5fa" : "#334155"}
+            color={
+              isHighlighted ? sceneTheme.importEdge : sceneTheme.importEdgeMuted
+            }
             lineWidth={isHighlighted ? 1.5 : 0.5}
             opacity={isHighlighted ? 0.7 : 0.12}
             transparent
@@ -133,10 +274,12 @@ function CochangeEdges({
   nodes,
   cochanges,
   selectedId,
+  sceneTheme,
 }: {
   nodes: FileLayoutNode[];
   cochanges: GraphCochange[];
   selectedId: string | null;
+  sceneTheme: ExploreSceneTheme;
 }) {
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
@@ -157,7 +300,7 @@ function CochangeEdges({
               [s.x, s.y, s.z],
               [t.x, t.y, t.z],
             ]}
-            color="#f59e0b"
+            color={sceneTheme.cochangeEdge}
             lineWidth={Math.min(2, 0.5 + c.weight * 0.3)}
             opacity={0.5}
             transparent
@@ -171,7 +314,7 @@ function CochangeEdges({
   );
 }
 
-function SceneBackdrop() {
+function SceneBackdrop({ sceneTheme }: { sceneTheme: ExploreSceneTheme }) {
   const stars = useMemo(() => {
     const count = 900;
     const positions = new Float32Array(count * 3);
@@ -191,22 +334,32 @@ function SceneBackdrop() {
 
   return (
     <>
-      <color attach="background" args={["#01040d"]} />
-      <fog attach="fog" args={["#01040d", 22, 70]} />
-      <ambientLight intensity={0.9} />
-      <pointLight position={[8, 5, 6]} intensity={0.75} color="#7dd3fc" />
-      <pointLight position={[-10, -6, -8]} intensity={0.35} color="#f59e0b" />
+      <fog
+        attach="fog"
+        args={[sceneTheme.fogColor, sceneTheme.fogNear, sceneTheme.fogFar]}
+      />
+      <ambientLight intensity={sceneTheme.ambientIntensity} />
+      <pointLight
+        position={[8, 5, 6]}
+        intensity={sceneTheme.keyLightIntensity}
+        color={sceneTheme.keyLightColor}
+      />
+      <pointLight
+        position={[-10, -6, -8]}
+        intensity={sceneTheme.fillLightIntensity}
+        color={sceneTheme.fillLightColor}
+      />
 
       <points frustumCulled={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[stars, 3]} />
         </bufferGeometry>
         <pointsMaterial
-          color="#cbd5e1"
+          color={sceneTheme.starColor}
           size={0.03}
           sizeAttenuation
           transparent
-          opacity={0.42}
+          opacity={sceneTheme.starOpacity}
           depthWrite={false}
         />
       </points>
@@ -216,13 +369,29 @@ function SceneBackdrop() {
 
 // ── Info Panel ────────────────────────────────────────────────────────────────
 
-function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: GraphDetail; onClose: () => void }) {
+function FileInfoPanel({
+  repoId,
+  fileId,
+  detail,
+  onClose,
+  onNavigate,
+}: {
+  repoId: string;
+  fileId: string;
+  detail: GraphDetail;
+  onClose: () => void;
+  onNavigate: (path: string) => void;
+}) {
   const file = detail.files.find((f) => f.path === fileId);
   if (!file) return null;
 
   const color = languageColor(file.language);
-  const importers = detail.edges.filter((e) => e.target === fileId).map((e) => e.source);
-  const imports = detail.edges.filter((e) => e.source === fileId).map((e) => e.target);
+  const importers = detail.edges
+    .filter((e) => e.target === fileId)
+    .map((e) => e.source);
+  const imports = detail.edges
+    .filter((e) => e.source === fileId)
+    .map((e) => e.target);
   const cochanges = detail.cochanges
     .filter((c) => c.source === fileId || c.target === fileId)
     .map((c) => ({
@@ -232,14 +401,27 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
     .sort((a, b) => b.weight - a.weight);
 
   const shortPath = (p: string) => p.split("/").pop() ?? p;
+  const openInEditor = async (line?: number) => {
+    try {
+      await api.openFile(repoId, file.path, line);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      window.alert(`Failed to open editor: ${message}`);
+    }
+  };
 
   return (
-    <div className="absolute bottom-3 left-3 z-10 w-96 rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-xl text-xs max-h-[80vh] overflow-y-auto">
+    <div className="absolute left-auto right-3 top-3 bottom-3 z-10 w-96 rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-xl text-xs overflow-y-auto">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="shrink-0 w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-          <span className="font-mono font-semibold text-sm truncate">{shortPath(file.path)}</span>
+          <span
+            className="shrink-0 w-3 h-3 rounded-full"
+            style={{ backgroundColor: color }}
+          />
+          <span className="font-mono font-semibold text-sm truncate">
+            {shortPath(file.path)}
+          </span>
         </div>
         <button
           type="button"
@@ -252,7 +434,17 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
 
       <div className="px-4 py-3 space-y-3">
         {/* Full path */}
-        <div className="text-muted-foreground font-mono text-[11px] break-all">{file.path}</div>
+        <div className="text-muted-foreground font-mono text-[11px] break-all">
+          {file.path}
+        </div>
+        <button
+          type="button"
+          onClick={() => void openInEditor()}
+          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Open in editor
+        </button>
 
         {/* Badges row */}
         <div className="flex gap-1.5 flex-wrap">
@@ -262,7 +454,10 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
             </Badge>
           )}
           {file.isHub && (
-            <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-400">
+            <Badge
+              variant="outline"
+              className="text-[10px] border-amber-500/50 text-amber-400"
+            >
               hub
             </Badge>
           )}
@@ -274,15 +469,21 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
         {/* Git activity */}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-center">
-            <div className="text-foreground font-semibold text-sm">{file.commits}</div>
+            <div className="text-foreground font-semibold text-sm">
+              {file.commits}
+            </div>
             <div className="text-muted-foreground text-[9px]">commits</div>
           </div>
           <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-center">
-            <div className="text-foreground font-semibold text-sm">{file.recent90d}</div>
+            <div className="text-foreground font-semibold text-sm">
+              {file.recent90d}
+            </div>
             <div className="text-muted-foreground text-[9px]">last 90d</div>
           </div>
           <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-center">
-            <div className="text-foreground font-semibold text-sm">{importers.length + imports.length}</div>
+            <div className="text-foreground font-semibold text-sm">
+              {importers.length + imports.length}
+            </div>
             <div className="text-muted-foreground text-[9px]">connections</div>
           </div>
         </div>
@@ -290,15 +491,22 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
         {/* Exports */}
         {file.exports.length > 0 && (
           <div>
-            <div className="text-muted-foreground font-medium mb-1">Exports ({file.exports.length})</div>
+            <div className="text-muted-foreground font-medium mb-1">
+              Exports ({file.exports.length})
+            </div>
             <div className="flex flex-wrap gap-1">
               {file.exports.slice(0, 12).map((e) => (
-                <span key={e} className="font-mono text-[10px] bg-muted/60 px-1.5 py-0.5 rounded text-foreground/80">
+                <span
+                  key={e}
+                  className="font-mono text-[10px] bg-muted/60 px-1.5 py-0.5 rounded text-foreground/80"
+                >
                   {e}
                 </span>
               ))}
               {file.exports.length > 12 && (
-                <span className="text-[10px] text-muted-foreground">+{file.exports.length - 12}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  +{file.exports.length - 12}
+                </span>
               )}
             </div>
           </div>
@@ -307,24 +515,44 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
         {/* Symbols */}
         {file.symbols.length > 0 && (
           <div>
-            <div className="text-muted-foreground font-medium mb-1">Symbols ({file.symbols.length})</div>
+            <div className="text-muted-foreground font-medium mb-1">
+              Symbols ({file.symbols.length})
+            </div>
             <div className="space-y-1">
               {file.symbols.slice(0, 12).map((symbol) => (
-                <div key={`${symbol.kind}:${symbol.name}:${symbol.line}`} className="flex items-center gap-1.5 text-[10px]">
-                  <Badge variant="outline" className="h-4 px-1.5 font-mono text-[9px] lowercase">
+                <button
+                  key={`${symbol.kind}:${symbol.name}:${symbol.line}`}
+                  type="button"
+                  onClick={() => void openInEditor(symbol.line)}
+                  className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-[10px] hover:bg-muted/50"
+                >
+                  <Badge
+                    variant="outline"
+                    className="h-4 px-1.5 font-mono text-[9px] lowercase"
+                  >
                     {symbol.kind}
                   </Badge>
-                  <span className="flex-1 truncate font-mono text-foreground/85">{symbol.name}</span>
-                  <span className="shrink-0 font-mono text-muted-foreground">L{symbol.line}</span>
+                  <span className="flex-1 truncate font-mono text-foreground/85">
+                    {symbol.name}
+                  </span>
+                  <span className="shrink-0 font-mono text-muted-foreground">
+                    L{symbol.line}
+                  </span>
+                  <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/80" />
                   {symbol.exported && (
-                    <Badge variant="secondary" className="h-4 px-1.5 font-mono text-[9px]">
+                    <Badge
+                      variant="secondary"
+                      className="h-4 px-1.5 font-mono text-[9px]"
+                    >
                       export
                     </Badge>
                   )}
-                </div>
+                </button>
               ))}
               {file.symbols.length > 12 && (
-                <span className="text-[10px] text-muted-foreground">+{file.symbols.length - 12} more</span>
+                <span className="text-[10px] text-muted-foreground">
+                  +{file.symbols.length - 12} more
+                </span>
               )}
             </div>
           </div>
@@ -339,13 +567,22 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
             </div>
             <div className="space-y-0.5">
               {importers.slice(0, 8).map((p) => (
-                <div key={p} className="font-mono text-[10px] text-foreground/80 truncate pl-4">
-                  {shortPath(p)}
-                  <span className="text-muted-foreground/50 ml-1">{p.split("/").slice(0, -1).join("/")}</span>
-                </div>
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onNavigate(p)}
+                  className="flex w-full items-center gap-1 truncate pl-4 text-left font-mono text-[10px] text-foreground/80 hover:text-primary"
+                >
+                  <span className="truncate">{shortPath(p)}</span>
+                  <span className="truncate text-muted-foreground/50">
+                    {p.split("/").slice(0, -1).join("/")}
+                  </span>
+                </button>
               ))}
               {importers.length > 8 && (
-                <div className="text-[10px] text-muted-foreground pl-4">+{importers.length - 8} more</div>
+                <div className="text-[10px] text-muted-foreground pl-4">
+                  +{importers.length - 8} more
+                </div>
               )}
             </div>
           </div>
@@ -360,13 +597,22 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
             </div>
             <div className="space-y-0.5">
               {imports.slice(0, 8).map((p) => (
-                <div key={p} className="font-mono text-[10px] text-foreground/80 truncate pl-4">
-                  {shortPath(p)}
-                  <span className="text-muted-foreground/50 ml-1">{p.split("/").slice(0, -1).join("/")}</span>
-                </div>
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onNavigate(p)}
+                  className="flex w-full items-center gap-1 truncate pl-4 text-left font-mono text-[10px] text-foreground/80 hover:text-primary"
+                >
+                  <span className="truncate">{shortPath(p)}</span>
+                  <span className="truncate text-muted-foreground/50">
+                    {p.split("/").slice(0, -1).join("/")}
+                  </span>
+                </button>
               ))}
               {imports.length > 8 && (
-                <div className="text-[10px] text-muted-foreground pl-4">+{imports.length - 8} more</div>
+                <div className="text-[10px] text-muted-foreground pl-4">
+                  +{imports.length - 8} more
+                </div>
               )}
             </div>
           </div>
@@ -381,17 +627,25 @@ function FileInfoPanel({ fileId, detail, onClose }: { fileId: string; detail: Gr
             </div>
             <div className="space-y-0.5">
               {cochanges.slice(0, 8).map((c) => (
-                <div
+                <button
                   key={c.path}
-                  className="font-mono text-[10px] text-foreground/80 truncate pl-4 flex items-center gap-1"
+                  type="button"
+                  onClick={() => onNavigate(c.path)}
+                  className="flex w-full items-center gap-1 truncate pl-4 text-left font-mono text-[10px] text-foreground/80 hover:text-primary"
                 >
                   <span className="truncate">{shortPath(c.path)}</span>
-                  <span className="text-amber-400/70 shrink-0">×{c.weight}</span>
-                  <span className="text-muted-foreground/50 truncate">{c.path.split("/").slice(0, -1).join("/")}</span>
-                </div>
+                  <span className="text-amber-400/70 shrink-0">
+                    ×{c.weight}
+                  </span>
+                  <span className="truncate text-muted-foreground/50">
+                    {c.path.split("/").slice(0, -1).join("/")}
+                  </span>
+                </button>
               ))}
               {cochanges.length > 8 && (
-                <div className="text-[10px] text-muted-foreground pl-4">+{cochanges.length - 8} more</div>
+                <div className="text-[10px] text-muted-foreground pl-4">
+                  +{cochanges.length - 8} more
+                </div>
               )}
             </div>
           </div>
@@ -425,7 +679,14 @@ interface TreeNode {
 }
 
 function buildTree(files: FileLayoutNode[]): TreeNode {
-  const root: TreeNode = { name: "", path: "", children: new Map(), isFile: false, language: null, isHub: false };
+  const root: TreeNode = {
+    name: "",
+    path: "",
+    children: new Map(),
+    isFile: false,
+    language: null,
+    isHub: false,
+  };
   for (const f of files) {
     const parts = f.id.split("/");
     let current = root;
@@ -478,9 +739,14 @@ function TreeEntry({
         }`}
         style={{ paddingLeft: `${depth * 12 + 4}px` }}
       >
-        <span className="shrink-0 w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+        <span
+          className="shrink-0 w-2 h-2 rounded-full"
+          style={{ backgroundColor: color }}
+        />
         <span className="truncate">{node.name}</span>
-        {node.isHub && <span className="text-[8px] text-amber-400 shrink-0">hub</span>}
+        {node.isHub && (
+          <span className="text-[8px] text-amber-400 shrink-0">hub</span>
+        )}
       </button>
     );
   }
@@ -493,10 +759,14 @@ function TreeEntry({
         className="flex items-center gap-1 w-full text-left py-0.5 px-1 rounded text-[11px] font-mono text-muted-foreground hover:bg-muted/50 hover:text-foreground"
         style={{ paddingLeft: `${depth * 12 + 4}px` }}
       >
-        <ChevronRight className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+        <ChevronRight
+          className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+        />
         <Folder className="h-3 w-3 shrink-0 text-muted-foreground/60" />
         <span className="truncate">{node.name}</span>
-        <span className="text-[9px] text-muted-foreground/40 ml-auto shrink-0">{node.children.size}</span>
+        <span className="text-[9px] text-muted-foreground/40 ml-auto shrink-0">
+          {node.children.size}
+        </span>
       </button>
       {open &&
         children.map((child) => (
@@ -546,37 +816,50 @@ function FileTree({
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-export function Explore() {
-  const { repoId } = useParams<{ repoId: string }>();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+export function RepoGraphTab({ repoId }: { repoId: string }) {
+  const isDarkTheme = useIsDarkTheme();
+  const sceneTheme = isDarkTheme ? DARK_SCENE_THEME : LIGHT_SCENE_THEME;
+  const [searchParams] = useSearchParams();
   const activeDirParam = searchParams.get("dir") ?? "";
   const activeDir = activeDirParam.trim();
   const { data: repos } = useRepos();
   const repo = repos?.find((r) => r.id === repoId);
 
   // Empty string means "all files detail". Non-empty uses backend dir filtering.
-  const { data: detail, isLoading } = useGraphDetail(repo?.root_path, activeDir);
+  const { data: detail, isLoading } = useGraphDetail(
+    repo?.root_path,
+    activeDir,
+  );
 
-  const layout = useMemo<{ nodes: FileLayoutNode[]; edges: FileLayoutEdge[] } | null>(() => {
+  const layout = useMemo<{
+    nodes: FileLayoutNode[];
+    edges: FileLayoutEdge[];
+  } | null>(() => {
     if (!detail || detail.files.length === 0) return null;
     return layoutFiles(detail);
   }, [detail]);
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [cameraTarget, setCameraTarget] = useState<[number, number, number] | null>(null);
+  const [cameraTarget, setCameraTarget] = useState<
+    [number, number, number] | null
+  >(null);
   const [autoRotateDirection, setAutoRotateDirection] = useState(1);
   const orbitRef = useRef<any>(null);
   const draggingRef = useRef(false);
   const lastAzimuthRef = useRef<number | null>(null);
+  const lastPolarRef = useRef<number | null>(null);
   const lastDragDeltaRef = useRef(0);
+  const sceneNodeClickRef = useRef(false);
+  const hadOrbitInteractionRef = useRef(false);
+  const suppressCanvasClickRef = useRef(false);
 
   // Cochanges with valid endpoints
   const validCochanges = useMemo(() => {
     if (!detail || !layout) return [];
     const nodeSet = new Set(layout.nodes.map((n) => n.id));
-    return detail.cochanges.filter((c) => nodeSet.has(c.source) && nodeSet.has(c.target));
+    return detail.cochanges.filter(
+      (c) => nodeSet.has(c.source) && nodeSet.has(c.target),
+    );
   }, [detail, layout]);
 
   const findNodePos = useCallback(
@@ -603,6 +886,24 @@ export function Explore() {
     }
     return ids;
   }, [selectedFile, detail]);
+  const importIds = useMemo(() => {
+    if (!selectedFile || !detail) return null;
+    const ids = new Set<string>();
+    for (const e of detail.edges) {
+      if (e.source === selectedFile) ids.add(e.target);
+      if (e.target === selectedFile) ids.add(e.source);
+    }
+    return ids;
+  }, [selectedFile, detail]);
+  const cochangeIds = useMemo(() => {
+    if (!selectedFile) return null;
+    const ids = new Set<string>();
+    for (const c of validCochanges) {
+      if (c.source === selectedFile) ids.add(c.target);
+      if (c.target === selectedFile) ids.add(c.source);
+    }
+    return ids;
+  }, [selectedFile, validCochanges]);
 
   const sceneNodes = useMemo(() => {
     if (!layout) return [] as FileLayoutNode[];
@@ -611,10 +912,15 @@ export function Explore() {
     const selected = layout.nodes.find((n) => n.id === selectedFile);
     if (!selected) return layout.nodes;
 
-    const connectedNodes = layout.nodes.filter((n) => n.id !== selectedFile && connectedIds.has(n.id));
+    const connectedNodes = layout.nodes.filter(
+      (n) => n.id !== selectedFile && connectedIds.has(n.id),
+    );
     if (connectedNodes.length === 0) return layout.nodes;
 
-    const spreadRadius = Math.min(4.8, Math.max(1.8, 1.2 + Math.sqrt(connectedNodes.length) * 0.42));
+    const spreadRadius = Math.min(
+      4.8,
+      Math.max(1.8, 1.2 + Math.sqrt(connectedNodes.length) * 0.42),
+    );
     const ordered = [...connectedNodes].sort((a, b) => {
       if (a.hubScore !== b.hubScore) return b.hubScore - a.hubScore;
       return a.id.localeCompare(b.id);
@@ -623,7 +929,11 @@ export function Explore() {
     const repositioned = new Map<string, [number, number, number]>();
     for (let i = 0; i < ordered.length; i++) {
       const [ox, oy, oz] = spherePoint(i, ordered.length, spreadRadius);
-      repositioned.set(ordered[i].id, [selected.x + ox, selected.y + oy, selected.z + oz]);
+      repositioned.set(ordered[i].id, [
+        selected.x + ox,
+        selected.y + oy,
+        selected.z + oz,
+      ]);
     }
 
     return layout.nodes.map((n) => {
@@ -639,33 +949,25 @@ export function Explore() {
     return Math.min(10, Math.max(6, 4.6 + Math.sqrt(count) * 0.9));
   }, [selectedFile, connectedIds]);
 
-  const selectedFileDir = useMemo(() => {
-    if (!selectedFile) return "";
-    const idx = selectedFile.lastIndexOf("/");
-    return idx > 0 ? selectedFile.slice(0, idx) : "";
-  }, [selectedFile]);
+  const labelIds = useMemo(
+    () => new Set(sceneNodes.map((n) => n.id)),
+    [sceneNodes],
+  );
 
-  const labelIds = useMemo(() => new Set(sceneNodes.map((n) => n.id)), [sceneNodes]);
+  const clearFocus = useCallback(() => {
+    setSelectedFile(null);
+    setCameraTarget(null);
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setPaletteOpen(true);
-      }
-      if (e.key === "/" && !paletteOpen && document.activeElement === document.body) {
-        e.preventDefault();
-        setPaletteOpen(true);
-      }
       if (e.key === "Escape") {
-        setSelectedFile(null);
-        setCameraTarget(null);
-        setPaletteOpen(false);
+        clearFocus();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [paletteOpen]);
+  }, [clearFocus]);
 
   const handleFileSelect = useCallback(
     (path: string) => {
@@ -676,28 +978,52 @@ export function Explore() {
     [findNodePos],
   );
 
+  const handleSceneNodeSelect = useCallback(
+    (path: string) => {
+      sceneNodeClickRef.current = true;
+      handleFileSelect(path);
+    },
+    [handleFileSelect],
+  );
+
   const handleOrbitStart = useCallback(() => {
     draggingRef.current = true;
     lastDragDeltaRef.current = 0;
+    hadOrbitInteractionRef.current = false;
     lastAzimuthRef.current = orbitRef.current?.getAzimuthalAngle() ?? null;
+    lastPolarRef.current = orbitRef.current?.getPolarAngle() ?? null;
   }, []);
 
   const handleOrbitChange = useCallback(() => {
     if (!draggingRef.current || !orbitRef.current) return;
-    const current = orbitRef.current.getAzimuthalAngle();
-    const prev = lastAzimuthRef.current;
-    if (prev != null) {
-      const delta = current - prev;
-      if (Math.abs(delta) > 1e-4) {
-        lastDragDeltaRef.current = delta;
+    const currentAzimuth = orbitRef.current.getAzimuthalAngle();
+    const currentPolar = orbitRef.current.getPolarAngle();
+    const prevAzimuth = lastAzimuthRef.current;
+    const prevPolar = lastPolarRef.current;
+    if (prevAzimuth != null && prevPolar != null) {
+      const azimuthDelta = currentAzimuth - prevAzimuth;
+      const polarDelta = currentPolar - prevPolar;
+      const moved =
+        Math.abs(azimuthDelta) > 2e-3 || Math.abs(polarDelta) > 2e-3;
+      if (moved) {
+        hadOrbitInteractionRef.current = true;
+        if (Math.abs(azimuthDelta) > 1e-4) {
+          lastDragDeltaRef.current = azimuthDelta;
+        }
       }
     }
-    lastAzimuthRef.current = current;
+    lastAzimuthRef.current = currentAzimuth;
+    lastPolarRef.current = currentPolar;
   }, []);
 
   const handleOrbitEnd = useCallback(() => {
     draggingRef.current = false;
     lastAzimuthRef.current = null;
+    lastPolarRef.current = null;
+    if (hadOrbitInteractionRef.current) {
+      suppressCanvasClickRef.current = true;
+      hadOrbitInteractionRef.current = false;
+    }
     const delta = lastDragDeltaRef.current;
     if (Math.abs(delta) > 1e-4) {
       // OrbitControls auto-rotate sign is opposite drag theta delta.
@@ -708,147 +1034,159 @@ export function Explore() {
   if (!repoId) return null;
 
   const showCanvas = !isLoading && layout && layout.nodes.length > 0;
-  const hubCount = layout?.nodes.filter((n) => n.isHub).length ?? 0;
   const overviewDistance = useMemo(() => {
     if (!layout || layout.nodes.length === 0) return 8;
-    const maxRadius = layout.nodes.reduce((max, n) => Math.max(max, Math.hypot(n.x, n.y, n.z)), 0);
+    const maxRadius = layout.nodes.reduce(
+      (max, n) => Math.max(max, Math.hypot(n.x, n.y, n.z)),
+      0,
+    );
     return Math.min(10, Math.max(5.2, maxRadius * 2.05));
   }, [layout]);
+  const focusPanelCompensationPx = selectedFile ? 200 : 0;
 
   return (
-    <div className="flex flex-1 flex-col min-h-0">
-      <PageHeader>
-        <button
-          type="button"
-          onClick={() => navigate(`/repos/${repoId}`)}
-          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <span className="text-sm font-medium truncate">{repo?.name ?? repoId}</span>
-        {repo && <StatusBadge status={repo.index_status} className="ml-1" />}
-        {activeDir && (
-          <button
-            type="button"
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              next.delete("dir");
-              setSearchParams(next, { replace: true });
-            }}
-            className="ml-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
-            title="Clear directory filter"
-          >
-            dir: {activeDir} ×
-          </button>
-        )}
-        {selectedFileDir && selectedFileDir !== activeDir && (
-          <button
-            type="button"
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              next.set("dir", selectedFileDir);
-              setSearchParams(next, { replace: true });
-              setSelectedFile(null);
-              setCameraTarget(null);
-            }}
-            className="ml-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
-            title="Filter graph to selected file directory"
-          >
-            use dir: {selectedFileDir}
-          </button>
-        )}
-        {layout && (
-          <span className="ml-2 font-mono text-[10px] text-muted-foreground">
-            {layout.nodes.length} files · {layout.edges.length} imports · {validCochanges.length} co-changes ·{" "}
-            {hubCount} hubs
-          </span>
-        )}
-        <span className="ml-auto text-[10px] text-muted-foreground">⌘K to search</span>
-      </PageHeader>
-
-      <div className="flex flex-1 min-h-0">
-        {/* File tree sidebar */}
-        {showCanvas && layout && (
-          <div className="w-56 shrink-0 border-r border-border bg-background overflow-hidden flex flex-col">
-            <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground border-b border-border uppercase tracking-wider">
-              Files
-            </div>
-            <FileTree nodes={layout.nodes} selectedFile={selectedFile} onSelect={handleFileSelect} />
+    <div className="flex flex-1 min-h-0">
+      {showCanvas && layout && (
+        <div className="w-56 shrink-0 border-r border-border bg-background overflow-hidden flex flex-col">
+          <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground border-b border-border uppercase tracking-wider">
+            Files
           </div>
+          <FileTree
+            nodes={layout.nodes}
+            selectedFile={selectedFile}
+            onSelect={handleFileSelect}
+          />
+        </div>
+      )}
+
+      <div
+        className={cn(
+          "relative flex-1 min-h-0 overflow-hidden",
+          sceneTheme.shellBgClass,
+        )}
+      >
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-0 z-0",
+            sceneTheme.dotsTextureClass,
+          )}
+        />
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-0 z-0",
+            sceneTheme.linesTextureClass,
+          )}
+        />
+        {!showCanvas ? (
+          <div className="relative z-[3] flex h-full items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : (
+          <Canvas
+            className="relative z-[1]"
+            camera={{ position: [0, 0, overviewDistance], fov: 55 }}
+            gl={{
+              antialias: true,
+              powerPreference: "high-performance",
+              alpha: true,
+            }}
+            dpr={[1, 1.5]}
+            onClick={() => {
+              if (sceneNodeClickRef.current) {
+                sceneNodeClickRef.current = false;
+                suppressCanvasClickRef.current = false;
+                return;
+              }
+              if (suppressCanvasClickRef.current) {
+                suppressCanvasClickRef.current = false;
+                return;
+              }
+              if (selectedFile) clearFocus();
+            }}
+          >
+            <SceneBackdrop sceneTheme={sceneTheme} />
+
+            {sceneNodes.map((n) => (
+              <FileNode
+                key={n.id}
+                node={n}
+                selected={n.id === selectedFile}
+                dimmed={!!connectedIds && !connectedIds.has(n.id)}
+                cochangeHighlighted={
+                  !!cochangeIds?.has(n.id) && !importIds?.has(n.id)
+                }
+                showLabel={labelIds.has(n.id)}
+                sceneTheme={sceneTheme}
+                onSelect={handleSceneNodeSelect}
+              />
+            ))}
+            <ImportEdges
+              nodes={sceneNodes}
+              edges={layout.edges}
+              selectedId={selectedFile}
+              sceneTheme={sceneTheme}
+            />
+            <CochangeEdges
+              nodes={sceneNodes}
+              cochanges={validCochanges}
+              selectedId={selectedFile}
+              sceneTheme={sceneTheme}
+            />
+            <CameraController
+              target={cameraTarget}
+              distance={focusDistance}
+              homeDistance={overviewDistance}
+              targetScreenOffsetPx={focusPanelCompensationPx}
+            />
+            <OrbitControls
+              ref={orbitRef}
+              makeDefault
+              enableDamping
+              dampingFactor={0.03}
+              rotateSpeed={0.62}
+              panSpeed={0.75}
+              zoomSpeed={0.9}
+              autoRotate
+              autoRotateSpeed={0.1 * autoRotateDirection}
+              onStart={handleOrbitStart}
+              onChange={handleOrbitChange}
+              onEnd={handleOrbitEnd}
+              minDistance={2}
+              maxDistance={overviewDistance * 2.5}
+            />
+          </Canvas>
         )}
 
-        {/* 3D canvas */}
-        <div className="relative flex-1 min-h-0 overflow-hidden bg-[#01040d]">
-          <div className="pointer-events-none absolute inset-0 z-0 opacity-35 [background-image:radial-gradient(rgba(148,163,184,0.24)_0.6px,transparent_0.6px)] [background-size:3px_3px]" />
-          <div className="pointer-events-none absolute inset-0 z-0 opacity-25 [background-image:repeating-linear-gradient(0deg,rgba(30,41,59,0.45)_0px,rgba(30,41,59,0.45)_1px,transparent_1px,transparent_5px)]" />
-          {!showCanvas ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            </div>
-          ) : (
-            <Canvas
-              className="relative z-[1]"
-              camera={{ position: [0, 0, overviewDistance], fov: 55 }}
-              gl={{ antialias: true, powerPreference: "high-performance" }}
-              dpr={[1, 1.5]}
-            >
-              <SceneBackdrop />
+        {selectedFile && detail && (
+          <FileInfoPanel
+            repoId={repoId}
+            fileId={selectedFile}
+            detail={detail}
+            onNavigate={handleFileSelect}
+            onClose={() => {
+              clearFocus();
+            }}
+          />
+        )}
 
-              {sceneNodes.map((n) => (
-                <FileNode
-                  key={n.id}
-                  node={n}
-                  selected={n.id === selectedFile}
-                  dimmed={!!connectedIds && !connectedIds.has(n.id)}
-                  showLabel={labelIds.has(n.id)}
-                  onSelect={handleFileSelect}
-                />
-              ))}
-              <ImportEdges nodes={sceneNodes} edges={layout.edges} selectedId={selectedFile} />
-              <CochangeEdges nodes={sceneNodes} cochanges={validCochanges} selectedId={selectedFile} />
-              <CameraController target={cameraTarget} distance={focusDistance} homeDistance={overviewDistance} />
-              <OrbitControls
-                ref={orbitRef}
-                makeDefault
-                enableDamping
-                dampingFactor={0.03}
-                rotateSpeed={0.62}
-                panSpeed={0.75}
-                zoomSpeed={0.9}
-                autoRotate
-                autoRotateSpeed={0.1 * autoRotateDirection}
-                onStart={handleOrbitStart}
-                onChange={handleOrbitChange}
-                onEnd={handleOrbitEnd}
-                minDistance={2}
-                maxDistance={overviewDistance * 2.5}
-              />
-            </Canvas>
-          )}
-
-          {/* Info panel */}
-          {selectedFile && detail && (
-            <FileInfoPanel
-              fileId={selectedFile}
-              detail={detail}
-              onClose={() => {
-                setSelectedFile(null);
-                setCameraTarget(null);
-              }}
-            />
-          )}
-
-          {/* Command palette */}
-          {repo && (
-            <CommandPalette
-              repoPath={repo.root_path}
-              open={paletteOpen}
-              onClose={() => setPaletteOpen(false)}
-              onSelect={handleFileSelect}
-            />
-          )}
-        </div>
+        {repo && (
+          <CommandPalette
+            repoPath={repo.root_path}
+            open
+            mode="pinned"
+            onSelect={handleFileSelect}
+          />
+        )}
       </div>
     </div>
   );
+}
+
+export function Explore() {
+  const { repoId } = useParams<{ repoId: string }>();
+  const [searchParams] = useSearchParams();
+  if (!repoId) return null;
+  const next = new URLSearchParams(searchParams);
+  next.set("tab", "graph");
+  return <Navigate to={`/repos/${repoId}?${next.toString()}`} replace />;
 }
