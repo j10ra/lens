@@ -1,12 +1,12 @@
 {
   "name": "@lens/daemon",
   "version": "2.0.0",
-  "private": true,
   "type": "module",
   "main": "./dist/index.js",
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
-    "dev": "tsup --watch",
+    "dev": "bash ../../scripts/dev.sh",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },

@@ -1,4 +1,5 @@
 import { defineCommand, runMain } from "citty";
+import { daemon } from "./commands/daemon.js";
 import { grep } from "./commands/grep.js";
 import { list } from "./commands/list.js";
 import { register } from "./commands/register.js";
@@ -12,6 +13,7 @@ const main = defineCommand({
     description: "LENS — structured code query engine",
   },
   subCommands: {
+    daemon,
     status,
     register,
     remove,

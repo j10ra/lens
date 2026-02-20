@@ -1,9 +1,11 @@
-export const DAEMON_URL = "http://localhost:4111";
+const BASE = "http://localhost:4111";
+
+export const DAEMON_URL = BASE;
 
 export async function daemonFetch(path: string, init?: RequestInit): Promise<Response> {
   let res: Response;
   try {
-    res = await fetch(DAEMON_URL + path, init);
+    res = await fetch(`${BASE}/api/cli${path}`, init);
   } catch {
     console.error("lens daemon is not running. Start it with: lens daemon start");
     process.exit(1);

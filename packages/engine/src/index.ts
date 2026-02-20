@@ -33,6 +33,10 @@ export const getRepoStatus = lensFn("engine.getRepoStatus", async (db: Db, repoI
 
 export const grepRepo = lensFn("engine.grepRepo", grepRepoImpl);
 
+// ── Query modules — typed drizzle access for daemon routes ───────────────────
+
+export { aggregateQueries, cochangeQueries, importQueries, metadataQueries, statsQueries } from "./db/queries.js";
+
 // ── Type exports ──────────────────────────────────────────────────────────────
 
 export type { EnrichedMatch, GrepResult } from "./grep/grep.js";

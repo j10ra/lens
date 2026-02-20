@@ -1,6 +1,0 @@
-model_mapping,sonnet=glm-5,opus=glm-5
-model_mapping,sonnet=glm-5,opus=glm-5
-pinn-exp-01,without,160,attempt=1
-pinn-chg-01,without,201,attempt=1
-pinn-exp-01,with,211,attempt=1
-pinn-chg-01,with,301,attempt=1

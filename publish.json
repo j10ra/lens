@@ -1,29 +1,23 @@
 {
 	"name": "lens-engine",
-	"version": "0.1.21",
-	"description": "LENS — Local-first repo context engine for AI agents",
+	"version": "2.0.0",
+	"description": "LENS — Structured code query engine for AI agents",
 	"type": "module",
 	"bin": {
 		"lens": "./cli.js",
 		"lens-daemon": "./daemon.js"
 	},
-	"files": ["cli.js", "daemon.js", "dashboard"],
+	"files": ["cli.js", "daemon.js", "dashboard", "drizzle-core", "drizzle-engine"],
 	"dependencies": {
 		"better-sqlite3": "^12.6.2"
 	},
 	"engines": {
 		"node": ">=20"
 	},
-	"scripts": {
-		"postinstall": "echo '\\n  Run \"lens start\" to launch the daemon (auto-starts on login).\\n'"
-	},
 	"license": "MIT",
 	"homepage": "https://github.com/j10ra/lens",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/j10ra/lens.git"
-	},
-	"bugs": {
-		"url": "https://github.com/j10ra/lens/issues"
 	}
 }

@@ -1,12 +1,10 @@
-export const DAEMON_URL = "http://localhost:4111";
+const API = "http://localhost:4111/api/dashboard";
 
 async function fetchOk(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(url, init);
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   return res;
 }
-
-const API = `${DAEMON_URL}/api`;
 
 export const api = {
   health: () => fetchOk(`${API}/health`).then((r) => r.json()),
@@ -15,7 +13,13 @@ export const api = {
 
   stats: () => fetchOk(`${API}/stats`).then((r) => r.json()),
 
-  traces: (limit?: number) => fetchOk(`${API}/traces${limit != null ? `?limit=${limit}` : ""}`).then((r) => r.json()),
+  traces: (limit?: number, sources?: string[]) => {
+    const qs = new URLSearchParams();
+    if (limit != null) qs.set("limit", String(limit));
+    if (sources?.length) qs.set("source", sources.join(","));
+    const query = qs.toString();
+    return fetchOk(`${API}/traces${query ? `?${query}` : ""}`).then((r) => r.json());
+  },
 
   traceSpans: (traceId: string) => fetchOk(`${API}/traces/${traceId}`).then((r) => r.json()),
 

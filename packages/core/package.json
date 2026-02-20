@@ -15,6 +15,7 @@
   "files": ["dist", "drizzle"],
   "scripts": {
     "build": "tsup",
+    "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate"
   },

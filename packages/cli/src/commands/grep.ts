@@ -41,7 +41,7 @@ export const grep = defineCommand({
 
     let result: GrepResult;
     try {
-      const res = await daemonFetch("/api/grep", {
+      const res = await daemonFetch("/grep", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ repoPath, query: args.query, limit: parseInt(args.limit, 10) }),

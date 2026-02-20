@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PUBLISH_JSON="$ROOT/publish.json"
-CLI_INDEX="$ROOT/packages/cli/src/index.ts"
 
 # Read current version
 CURRENT=$(node -p "require('$PUBLISH_JSON').version")
@@ -21,17 +20,14 @@ esac
 NEW="$MAJOR.$MINOR.$PATCH"
 echo "Bumping $CURRENT → $NEW ($BUMP)"
 
-# 1. Update publish.json
+# 1. Update publish.json version
 sed -i '' "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" "$PUBLISH_JSON"
 
-# 2. Update CLI source
-sed -i '' "s/.version(\"$CURRENT\")/.version(\"$NEW\")/" "$CLI_INDEX"
-
-# 3. Build everything
+# 2. Build everything
 echo "Building..."
 pnpm -w build:publish
 
-# 4. Verify
+# 3. Verify
 BUILT_VER=$(node -p "require('$ROOT/publish/package.json').version")
 echo "publish/package.json: $BUILT_VER"
 
@@ -40,13 +36,13 @@ if [ "$BUILT_VER" != "$NEW" ]; then
   exit 1
 fi
 
-# 5. Publish
+# 4. Publish
 cd "$ROOT/publish" && npm publish
 echo "Published lens-engine@$NEW"
 
-# 6. Commit + tag + push
+# 5. Commit + tag + push
 cd "$ROOT"
-git add publish.json packages/cli/src/index.ts
+git add publish.json
 git commit -m "release: v$NEW"
 git tag "v$NEW"
 git push && git push --tags

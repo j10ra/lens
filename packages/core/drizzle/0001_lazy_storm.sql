@@ -1,0 +1,1 @@
+ALTER TABLE `traces` ADD `source` text DEFAULT 'unknown' NOT NULL;

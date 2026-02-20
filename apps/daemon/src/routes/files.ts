@@ -1,5 +1,5 @@
 import { lensRoute } from "@lens/core";
-import { getRawDb } from "@lens/engine";
+import { aggregateQueries, getEngineDb, importQueries, metadataQueries, statsQueries } from "@lens/engine";
 import { Hono } from "hono";
 
 export const filesRoutes = new Hono();
@@ -8,44 +8,20 @@ export const filesRoutes = new Hono();
 filesRoutes.get(
   "/:repoId/files",
   lensRoute("files.list", async (c) => {
-    const repoId = c.req.param("repoId");
+    const repoId = c.req.param("repoId")!;
     const limit = Number(c.req.query("limit") ?? "100");
     const offset = Number(c.req.query("offset") ?? "0");
-    const search = c.req.query("search") ?? "";
+    const search = c.req.query("search") || undefined;
 
-    const db = getRawDb();
-
-    const searchClause = search ? "AND fm.path LIKE ?" : "";
-    const params: (string | number)[] = search ? [repoId, `%${search}%`, limit, offset] : [repoId, limit, offset];
-
-    const files = db
-      .prepare(
-        `SELECT fm.path, fm.language, fm.exports,
-                COUNT(DISTINCT fi.id) AS import_count
-         FROM file_metadata fm
-         LEFT JOIN file_imports fi ON fi.repo_id = fm.repo_id AND fi.source_path = fm.path
-         WHERE fm.repo_id = ? ${searchClause}
-         GROUP BY fm.path
-         ORDER BY fm.path ASC
-         LIMIT ? OFFSET ?`,
-      )
-      .all(...params) as Array<{
-      path: string;
-      language: string | null;
-      exports: string;
-      import_count: number;
-    }>;
-
-    const countRow = db
-      .prepare(`SELECT COUNT(*) AS total FROM file_metadata WHERE repo_id = ?${search ? " AND path LIKE ?" : ""}`)
-      .get(...(search ? [repoId, `%${search}%`] : [repoId])) as { total: number };
+    const db = getEngineDb();
+    const { files, total } = aggregateQueries.filesList(db, repoId, { limit, offset, search });
 
     return c.json({
       files: files.map((f) => ({
         ...f,
         exports: JSON.parse(f.exports ?? "[]"),
       })),
-      total: countRow.total,
+      total,
     });
   }),
 );
@@ -54,48 +30,22 @@ filesRoutes.get(
 filesRoutes.get(
   "/:repoId/files/:filePath{.+}",
   lensRoute("files.get", async (c) => {
-    const repoId = c.req.param("repoId");
-    const filePath = decodeURIComponent(c.req.param("filePath"));
+    const repoId = c.req.param("repoId")!;
+    const filePath = decodeURIComponent(c.req.param("filePath")!);
 
-    const db = getRawDb();
+    const db = getEngineDb();
 
-    const metadata = db.prepare("SELECT * FROM file_metadata WHERE repo_id = ? AND path = ?").get(repoId, filePath) as
-      | {
-          path: string;
-          language: string | null;
-          exports: string;
-          imports: string;
-          docstring: string;
-          sections: string;
-          internals: string;
-        }
-      | undefined;
-
+    const metadata = metadataQueries.getByRepoPath(db, repoId, filePath);
     if (!metadata) return c.json({ error: "file not found" }, 404);
 
-    const importEdges = db
-      .prepare("SELECT target_path FROM file_imports WHERE repo_id = ? AND source_path = ?")
-      .all(repoId, filePath) as Array<{ target_path: string }>;
-
-    const importedBy = db
-      .prepare("SELECT source_path FROM file_imports WHERE repo_id = ? AND target_path = ?")
-      .all(repoId, filePath) as Array<{ source_path: string }>;
-
-    const gitStats = db.prepare("SELECT * FROM file_stats WHERE repo_id = ? AND path = ?").get(repoId, filePath) as
-      | { commit_count: number; recent_count: number; last_modified: string | null }
-      | undefined;
-
-    const cochanges = db
-      .prepare(
-        `SELECT path_a, path_b, cochange_count FROM file_cochanges
-         WHERE repo_id = ? AND (path_a = ? OR path_b = ?)
-         ORDER BY cochange_count DESC LIMIT 20`,
-      )
-      .all(repoId, filePath, filePath) as Array<{
-      path_a: string;
-      path_b: string;
-      cochange_count: number;
-    }>;
+    const importEdges = importQueries.getImports(db, repoId, filePath);
+    const importedBy = importQueries.getImporters(db, repoId, filePath);
+    const gitStats = statsQueries.getByPath(db, repoId, filePath);
+    const rawCochanges = aggregateQueries.fileCochanges(db, repoId, filePath);
+    const cochanges = rawCochanges.map((c) => ({
+      path: c.path_a === filePath ? c.path_b : c.path_a,
+      count: c.cochange_count,
+    }));
 
     return c.json({
       path: metadata.path,
@@ -105,9 +55,15 @@ filesRoutes.get(
       docstring: metadata.docstring,
       sections: JSON.parse(metadata.sections ?? "[]"),
       internals: JSON.parse(metadata.internals ?? "[]"),
-      import_edges: importEdges.map((i) => i.target_path),
-      imported_by: importedBy.map((i) => i.source_path),
-      git_stats: gitStats ?? null,
+      import_edges: importEdges,
+      imported_by: importedBy,
+      git_stats: gitStats
+        ? {
+            commits: gitStats.commit_count,
+            recent_90d: gitStats.recent_count,
+            last_modified: gitStats.last_modified,
+          }
+        : null,
       cochanges,
     });
   }),

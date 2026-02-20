@@ -2,11 +2,21 @@ import { randomUUID } from "node:crypto";
 import { type Span, storage, type TraceContext } from "./context.js";
 import type { TraceStore } from "./trace-store.js";
 
-// Global TraceStore reference — set via configure() before first lensFn call
 let _store: TraceStore | undefined;
+
+const MAX_CAPTURE = 8_192;
 
 export function configureLensFn(store: TraceStore): void {
   _store = store;
+}
+
+function safeStringify(value: unknown): string | undefined {
+  try {
+    const json = JSON.stringify(value);
+    return json && json.length <= MAX_CAPTURE ? json : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function lensFn<TArgs extends unknown[], TReturn>(
@@ -27,12 +37,12 @@ export function lensFn<TArgs extends unknown[], TReturn>(
     };
 
     const startMs = Date.now();
+    const input = safeStringify(args);
 
     return storage.run(ctx, async () => {
       try {
         const result = await fn(...args);
-        const inputSize = estimateSize(args);
-        const outputSize = estimateSize(result);
+        const output = safeStringify(result);
         _store?.pushSpan({
           spanId,
           traceId,
@@ -40,12 +50,13 @@ export function lensFn<TArgs extends unknown[], TReturn>(
           name,
           startedAt: startMs,
           durationMs: Date.now() - startMs,
-          inputSize,
-          outputSize,
+          inputSize: input?.length ?? 0,
+          outputSize: output?.length ?? 0,
+          input,
+          output,
         });
         return result;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
         _store?.pushSpan({
           spanId,
           traceId,
@@ -53,18 +64,11 @@ export function lensFn<TArgs extends unknown[], TReturn>(
           name,
           startedAt: startMs,
           durationMs: Date.now() - startMs,
-          errorMessage,
+          errorMessage: err instanceof Error ? err.message : String(err),
+          input,
         });
         throw err;
       }
     });
   };
-}
-
-function estimateSize(value: unknown): number {
-  try {
-    return JSON.stringify(value)?.length ?? 0;
-  } catch {
-    return 0;
-  }
 }

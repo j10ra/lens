@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
@@ -9,7 +10,7 @@ import * as schema from "./schema.js";
 // but import.meta is empty — fall back to __filename injected by CJS runtime.
 declare const __filename: string | undefined;
 const _file = typeof __filename !== "undefined" ? __filename : fileURLToPath(import.meta.url);
-const __dirname = dirname(_file);
+const __dir = dirname(_file);
 
 export interface SpanRecord {
   spanId: string;
@@ -21,6 +22,9 @@ export interface SpanRecord {
   errorMessage?: string;
   inputSize?: number;
   outputSize?: number;
+  input?: string; // JSON-serialized payload
+  output?: string; // JSON-serialized response
+  source?: string; // cli | mcp | dashboard | infra
 }
 
 export interface LogRecord {
@@ -49,8 +53,9 @@ export class TraceStore {
 
     this.db = drizzle(this.sqlite, { schema });
 
-    // Migrations folder is co-located with the built package
-    const migrationsFolder = join(__dirname, "..", "drizzle");
+    // Published: drizzle-core/ sibling to daemon.js. Dev: ../drizzle relative to dist/
+    const published = join(__dir, "drizzle-core");
+    const migrationsFolder = existsSync(published) ? published : join(__dir, "..", "drizzle");
     migrate(this.db, { migrationsFolder });
 
     this.retentionMs = retentionMs;
@@ -76,15 +81,28 @@ export class TraceStore {
     const logs = this.logBuffer.splice(0);
 
     // Group spans by trace; upsert traces first (foreign key constraint)
-    const traceMap = new Map<string, { name: string; startedAt: number; endedAt: number; durationMs: number }>();
+    const traceMap = new Map<
+      string,
+      { name: string; source: string; startedAt: number; endedAt: number; durationMs: number }
+    >();
     for (const s of spans) {
       const existing = traceMap.get(s.traceId);
-      if (!existing || s.startedAt < existing.startedAt) {
+      const isRoot = s.parentSpanId == null;
+      if (!existing) {
         traceMap.set(s.traceId, {
-          name: s.parentSpanId == null ? s.name : (existing?.name ?? s.name),
-          startedAt: Math.min(s.startedAt, existing?.startedAt ?? s.startedAt),
-          endedAt: Math.max(s.startedAt + s.durationMs, existing?.endedAt ?? 0),
+          name: s.name,
+          source: s.source ?? "unknown",
+          startedAt: s.startedAt,
+          endedAt: s.startedAt + s.durationMs,
           durationMs: s.durationMs,
+        });
+      } else {
+        traceMap.set(s.traceId, {
+          name: isRoot ? s.name : existing.name,
+          source: isRoot && s.source ? s.source : existing.source,
+          startedAt: Math.min(s.startedAt, existing.startedAt),
+          endedAt: Math.max(s.startedAt + s.durationMs, existing.endedAt),
+          durationMs: isRoot ? s.durationMs : existing.durationMs,
         });
       }
     }
@@ -93,18 +111,23 @@ export class TraceStore {
       for (const [traceId, t] of traceMap) {
         this.sqlite
           .prepare(
-            `INSERT INTO traces (trace_id, root_span_name, started_at, ended_at, duration_ms)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(trace_id) DO UPDATE SET ended_at = excluded.ended_at, duration_ms = excluded.duration_ms`,
+            `INSERT INTO traces (trace_id, root_span_name, source, started_at, ended_at, duration_ms)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(trace_id) DO UPDATE SET
+             root_span_name = CASE WHEN excluded.started_at <= traces.started_at THEN excluded.root_span_name ELSE traces.root_span_name END,
+             source = CASE WHEN excluded.started_at <= traces.started_at THEN excluded.source ELSE traces.source END,
+             started_at = MIN(excluded.started_at, traces.started_at),
+             ended_at = MAX(excluded.ended_at, traces.ended_at),
+             duration_ms = CASE WHEN excluded.started_at <= traces.started_at THEN excluded.duration_ms ELSE traces.duration_ms END`,
           )
-          .run(traceId, t.name, t.startedAt, t.endedAt, t.durationMs);
+          .run(traceId, t.name, t.source, t.startedAt, t.endedAt, t.durationMs);
       }
 
       for (const s of spans) {
         this.sqlite
           .prepare(
-            `INSERT OR IGNORE INTO spans (span_id, trace_id, parent_span_id, name, started_at, duration_ms, error_message, input_size, output_size)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT OR IGNORE INTO spans (span_id, trace_id, parent_span_id, name, started_at, duration_ms, error_message, input_size, output_size, input, output)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(
             s.spanId,
@@ -116,6 +139,8 @@ export class TraceStore {
             s.errorMessage ?? null,
             s.inputSize ?? null,
             s.outputSize ?? null,
+            s.input ?? null,
+            s.output ?? null,
           );
       }
 
@@ -142,16 +167,34 @@ export class TraceStore {
     this.sqlite.close();
   }
 
-  queryTraces(limit = 50): Array<{
+  queryTraces(
+    limit = 50,
+    sources?: string[],
+  ): Array<{
     trace_id: string;
     root_span_name: string;
+    source: string;
     started_at: number;
     ended_at: number;
     duration_ms: number;
   }> {
+    if (sources?.length) {
+      const placeholders = sources.map(() => "?").join(",");
+      return this.sqlite
+        .prepare(`SELECT * FROM traces WHERE source IN (${placeholders}) ORDER BY started_at DESC LIMIT ?`)
+        .all(...sources, limit) as Array<{
+        trace_id: string;
+        root_span_name: string;
+        source: string;
+        started_at: number;
+        ended_at: number;
+        duration_ms: number;
+      }>;
+    }
     return this.sqlite.prepare("SELECT * FROM traces ORDER BY started_at DESC LIMIT ?").all(limit) as Array<{
       trace_id: string;
       root_span_name: string;
+      source: string;
       started_at: number;
       ended_at: number;
       duration_ms: number;
@@ -162,6 +205,12 @@ export class TraceStore {
     return this.sqlite
       .prepare("SELECT * FROM spans WHERE trace_id = ? ORDER BY started_at ASC")
       .all(traceId) as SpanRecord[];
+  }
+
+  queryLogs(traceId: string): LogRecord[] {
+    return this.sqlite
+      .prepare("SELECT * FROM logs WHERE trace_id = ? ORDER BY timestamp ASC")
+      .all(traceId) as LogRecord[];
   }
 }
 

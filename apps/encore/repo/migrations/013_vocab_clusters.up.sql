@@ -1,1 +1,0 @@
-ALTER TABLE repos ADD COLUMN vocab_clusters JSONB DEFAULT NULL;

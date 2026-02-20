@@ -17,37 +17,31 @@ interface CommitEntry {
 
 /**
  * Parses git log --name-only --format=%H%x00%aI output into commit entries.
- * Each block: `hash\0isoDate\n\nfile1\nfile2\n\n`
+ * Linear scan — handles blank lines between header and file list correctly.
  */
 export function parseGitLog(stdout: string): CommitEntry[] {
   const commits: CommitEntry[] = [];
-  // Split on double newline — separates commit blocks
-  const blocks = stdout.split(/\n\n+/);
+  let current: CommitEntry | null = null;
 
-  for (const block of blocks) {
-    const lines = block.trim().split("\n").filter(Boolean);
-    if (lines.length === 0) continue;
+  for (const raw of stdout.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
 
-    // First line: hash\0isoDate
-    const header = lines[0];
-    const nullIdx = header.indexOf("\0");
-    if (nullIdx === -1) continue;
-
-    const hash = header.slice(0, nullIdx).trim();
-    const isoDate = header.slice(nullIdx + 1).trim();
-    if (!hash || !isoDate) continue;
-
-    const date = new Date(isoDate);
-    if (Number.isNaN(date.getTime())) continue;
-
-    const files = lines
-      .slice(1)
-      .map((l) => l.trim())
-      .filter(Boolean);
-
-    commits.push({ hash, date, files });
+    // Header line: 40-char hex hash followed by \0 then ISO date
+    const nullIdx = line.indexOf("\0");
+    if (nullIdx !== -1 && /^[0-9a-f]{40}$/.test(line.slice(0, nullIdx))) {
+      if (current) commits.push(current);
+      const hash = line.slice(0, nullIdx);
+      const isoDate = line.slice(nullIdx + 1);
+      const date = new Date(isoDate);
+      if (Number.isNaN(date.getTime())) continue;
+      current = { hash, date, files: [] };
+    } else if (current) {
+      current.files.push(line);
+    }
   }
 
+  if (current) commits.push(current);
   return commits;
 }
 

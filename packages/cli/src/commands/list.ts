@@ -21,7 +21,7 @@ export const list = defineCommand({
     description: "List all registered repos.",
   },
   async run() {
-    const res = await daemonFetch("/api/repos");
+    const res = await daemonFetch("/repos");
     const repos = (await res.json()) as Repo[];
 
     if (repos.length === 0) {

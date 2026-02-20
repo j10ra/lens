@@ -15,9 +15,9 @@ The observability framework (`lensFn`, `lensRoute`, Logger, TraceStore), Hono HT
 
 ### Logger Design
 - Inside `lensFn()` → logs auto-attach to active span (traceId + spanId). Outside → standalone structured output.
-- Dual output: stdout AND SQLite persistence (TraceStore)
+- Dual output: **stderr** AND SQLite persistence (TraceStore) — stderr everywhere because MCP stdio monopolizes stdout for JSON-RPC
 - Minimal fields per entry: timestamp, level, message, traceId, spanId
-- Stdout format: human-readable by default, `--json` flag for structured JSON (one object per line, pipe to jq)
+- Stderr format: human-readable by default, `--json` flag for structured JSON (one object per line, pipe to jq)
 - Levels: info, warn, error, debug
 
 ### Claude's Discretion

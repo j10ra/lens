@@ -1,16 +1,18 @@
 {
   "name": "@lens/cli",
   "version": "2.0.0",
-  "private": true,
   "type": "module",
   "bin": {
     "lens": "./dist/index.js"
   },
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
+    "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@lens/daemon": "workspace:*",
     "citty": "^0.2.1"
   },
   "devDependencies": {

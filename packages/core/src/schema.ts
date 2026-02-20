@@ -3,6 +3,7 @@ import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 export const traces = sqliteTable("traces", {
   traceId: text("trace_id").primaryKey(),
   rootSpanName: text("root_span_name").notNull(),
+  source: text("source").notNull().default("unknown"), // cli | mcp | dashboard | infra
   startedAt: integer("started_at").notNull(), // Unix ms
   endedAt: integer("ended_at"),
   durationMs: real("duration_ms"),
@@ -20,6 +21,8 @@ export const spans = sqliteTable("spans", {
   errorMessage: text("error_message"),
   inputSize: integer("input_size"),
   outputSize: integer("output_size"),
+  input: text("input"), // JSON-serialized request payload / function args
+  output: text("output"), // JSON-serialized response body / return value
 });
 
 export const logs = sqliteTable("logs", {

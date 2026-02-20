@@ -1,6 +1,58 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, count, eq, like, or, sql } from "drizzle-orm";
 import type { Db } from "./connection.js";
 import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos } from "./schema.js";
+
+// ── Aggregate queries ────────────────────────────────────────────────────────
+
+export const aggregateQueries = {
+  counts(db: Db) {
+    const reposCount = db.select({ n: count() }).from(repos).get()!.n;
+    const filesCount = db.select({ n: count() }).from(fileMetadata).get()!.n;
+    return { repos: reposCount, files: filesCount };
+  },
+
+  filesList(db: Db, repoId: string, opts: { limit: number; offset: number; search?: string }) {
+    const conditions = [eq(fileMetadata.repo_id, repoId)];
+    if (opts.search) conditions.push(like(fileMetadata.path, `%${opts.search}%`));
+
+    const files = db
+      .select({
+        path: fileMetadata.path,
+        language: fileMetadata.language,
+        exports: fileMetadata.exports,
+        import_count: count(fileImports.id),
+      })
+      .from(fileMetadata)
+      .leftJoin(
+        fileImports,
+        and(eq(fileImports.repo_id, fileMetadata.repo_id), eq(fileImports.source_path, fileMetadata.path)),
+      )
+      .where(and(...conditions))
+      .groupBy(fileMetadata.path)
+      .orderBy(fileMetadata.path)
+      .limit(opts.limit)
+      .offset(opts.offset)
+      .all();
+
+    const total = db
+      .select({ n: count() })
+      .from(fileMetadata)
+      .where(and(...conditions))
+      .get()!.n;
+
+    return { files, total };
+  },
+
+  fileCochanges(db: Db, repoId: string, path: string, limit = 20) {
+    return db
+      .select()
+      .from(fileCochanges)
+      .where(and(eq(fileCochanges.repo_id, repoId), or(eq(fileCochanges.path_a, path), eq(fileCochanges.path_b, path))))
+      .orderBy(sql`${fileCochanges.cochange_count} DESC`)
+      .limit(limit)
+      .all();
+  },
+};
 
 // ── Repo queries ──────────────────────────────────────────────────────────────
 

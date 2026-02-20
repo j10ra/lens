@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
@@ -25,7 +26,9 @@ export function configureEngineDb(dbPath: string): Db {
   _sqlite = sqlite;
   _db = drizzle(sqlite, { schema });
 
-  const migrationsFolder = join(_dirname, "..", "drizzle");
+  // Published: drizzle-engine/ sibling to daemon.js. Dev: ../drizzle relative to dist/
+  const published = join(_dirname, "drizzle-engine");
+  const migrationsFolder = existsSync(published) ? published : join(_dirname, "..", "drizzle");
   migrate(_db, { migrationsFolder });
 
   return _db;

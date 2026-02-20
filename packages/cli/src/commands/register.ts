@@ -42,7 +42,7 @@ export const register = defineCommand({
     const absPath = resolve(args.path);
 
     // 1. Register
-    const res = await daemonFetch("/api/repos", {
+    const res = await daemonFetch("/repos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: absPath, name: args.name }),
@@ -61,7 +61,7 @@ export const register = defineCommand({
       process.stdout.write(`\r  ${cyan(f)} Indexing...`);
     }, 80);
 
-    const idxRes = await daemonFetch(`/api/repos/${repo.id}/index`, {
+    const idxRes = await daemonFetch(`/repos/${repo.id}/index`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ force: true }),
@@ -73,7 +73,7 @@ export const register = defineCommand({
 
     // 3. Fetch stats for summary
     try {
-      const statsRes = await daemonFetch(`/api/repos/${repo.id}/files?limit=0`);
+      const statsRes = await daemonFetch(`/repos/${repo.id}/files?limit=0`);
       const statsData = (await statsRes.json()) as { total: number };
 
       console.log(`  ${green("✓")} Metadata         ${dim(`${statsData.total} files`)}`);

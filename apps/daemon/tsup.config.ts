@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/mcp-stdio.ts'],
   format: ['esm'],
   // No CJS needed — daemon is a Node process, not a library
   // No createRequire banner needed — core package handles better-sqlite3 internally

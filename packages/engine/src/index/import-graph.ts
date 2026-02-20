@@ -1,64 +1,34 @@
-import type { Db } from "../db/connection.js";
-import { chunkQueries, importQueries } from "../db/queries.js";
-import { extractImportSpecifiers, resolveImport } from "./imports.js";
+import type { Db } from "../db/connection.js"
+import { importQueries, metadataQueries } from "../db/queries.js"
+import { getParser } from "../parsers/registry.js"
 
-const SUPPORTED_LANGUAGES = new Set([
-  "typescript",
-  "typescriptreact",
-  "javascript",
-  "javascriptreact",
-  "python",
-  "go",
-  "rust",
-]);
-
-/**
- * Builds the import graph for a repo: merges chunks per file, extracts imports,
- * resolves paths, deduplicates, and persists edges to fileImports table.
- * Synchronous — called from lensFn-wrapped orchestrators.
- */
 export function buildAndPersistImportGraph(db: Db, repoId: string): void {
-  // Clear existing edges before rebuild
-  importQueries.clearForRepo(db, repoId);
+  importQueries.clearForRepo(db, repoId)
 
-  // Get all chunks ordered by path + chunk_index (getAllByRepo guarantees order)
-  const rows = chunkQueries.getAllByRepo(db, repoId);
+  const allMeta = metadataQueries.getAllForRepo(db, repoId)
+  const knownPaths = new Set(allMeta.map((m) => m.path))
 
-  // Merge chunks per file — NEVER extract per-chunk (imports may span chunk boundaries)
-  const files = new Map<string, { content: string; language: string | null }>();
-  for (const row of rows) {
-    const existing = files.get(row.path);
-    if (existing) {
-      existing.content += `\n${row.content}`;
-    } else {
-      files.set(row.path, { content: row.content, language: row.language });
-    }
-  }
+  const edges: Array<{ sourcePath: string; targetPath: string }> = []
+  const seen = new Set<string>()
 
-  // Build known paths set for resolution
-  const knownPaths = new Set(files.keys());
+  for (const meta of allMeta) {
+    const parser = getParser(meta.language)
+    if (!parser) continue
 
-  // Build edges
-  const edges: Array<{ sourcePath: string; targetPath: string }> = [];
-  const seen = new Set<string>();
-
-  for (const [sourcePath, { content, language }] of files) {
-    if (!SUPPORTED_LANGUAGES.has(language ?? "")) continue;
-
-    const specifiers = extractImportSpecifiers(content, language);
+    const specifiers: string[] = JSON.parse(meta.imports ?? "[]")
     for (const spec of specifiers) {
-      const targetPath = resolveImport(spec, sourcePath, knownPaths);
-      if (!targetPath || targetPath === sourcePath) continue;
+      const targetPath = parser.resolveImport(spec, meta.path, knownPaths)
+      if (!targetPath || targetPath === meta.path) continue
 
-      const edgeKey = `${sourcePath}\0${targetPath}`;
+      const edgeKey = `${meta.path}\0${targetPath}`
       if (!seen.has(edgeKey)) {
-        seen.add(edgeKey);
-        edges.push({ sourcePath, targetPath });
+        seen.add(edgeKey)
+        edges.push({ sourcePath: meta.path, targetPath })
       }
     }
   }
 
   if (edges.length > 0) {
-    importQueries.insertEdges(db, repoId, edges);
+    importQueries.insertEdges(db, repoId, edges)
   }
 }

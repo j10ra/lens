@@ -1,19 +1,18 @@
 {
   "name": "lens",
   "private": true,
-  "version": "0.1.0",
-  "description": "LENS — Local-first repo context engine",
+  "version": "2.0.0",
+  "description": "LENS — Structured code query engine with observability",
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
-    "build:publish": "pnpm -r build && rm -rf publish && tsup --config tsup.config.publish.ts && cp -r apps/dashboard/dist publish/dashboard && cp publish.json publish/package.json && cp README.md publish/README.md && cd publish && npm install --omit=dev",
-    "deploy:local": "pnpm -w build:publish && lens daemon stop && lens daemon start",
+    "build:publish": "pnpm -r build && rm -rf publish && tsup --config tsup.config.publish.ts && cp -r packages/core/drizzle publish/drizzle-core && cp -r packages/engine/drizzle publish/drizzle-engine && cp -r apps/dashboard/dist publish/dashboard && cp publish.json publish/package.json && cd publish && npm install --omit=dev",
+    "deploy:local": "pnpm -w build:publish && lens daemon stop; lens daemon start",
+    "dev": "bash scripts/dev.sh",
     "release": "./scripts/release.sh",
     "release:patch": "./scripts/release.sh patch",
     "release:minor": "./scripts/release.sh minor",
     "release:major": "./scripts/release.sh major",
-    "dev:encore": "cd apps/encore && encore run",
-    "build:cli": "pnpm --filter @lens/cli build",
     "format": "biome format --write .",
     "lint": "biome check .",
     "lint:fix": "biome check --fix ."
@@ -24,11 +23,9 @@
       "esbuild"
     ]
   },
-  "dependencies": {
-    "encore.dev": "^1.53.7"
-  },
   "devDependencies": {
     "@biomejs/biome": "^2.3.14",
-    "tsup": "^8.5.0"
+    "tsup": "^8.5.0",
+    "typescript": "^5.7.0"
   }
 }

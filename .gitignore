@@ -1,15 +1,9 @@
-# Encore
-.encore
-encore.gen
-
 # Dependencies
 node_modules
 
 # Build outputs
 dist
 publish
-.output
-.nitro
 *.js
 *.js.map
 *.d.ts
@@ -22,22 +16,9 @@ tsconfig.tsbuildinfo
 .env
 .dev.vars
 
-# Generated
-routeTree.gen.ts
-.tanstack/tmp
-
-# Supabase CLI temp
-supabase/.temp
-
-# Misc
-temp.md
-notes.md
-
-# Private skills (contain API tokens)
+# Private skills
 .claude/skills/benchmark/
 .claude/skills/zlm/
 
 # OS
 .DS_Store
-
-bin
