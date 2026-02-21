@@ -25,7 +25,6 @@ import {
   GitCommit,
   Globe,
   Hash,
-  Layers,
   LayoutDashboard,
   Search,
   Trash2,
@@ -37,7 +36,6 @@ import { api } from "../lib/api.js";
 import { useRepoFileDetail, useRepoFiles } from "../queries/use-repo-files.js";
 import { useRepoStats, useRepos } from "../queries/use-repos.js";
 import { RepoGraphTab } from "./Explore.js";
-import { NavigatorTab } from "./Navigator.js";
 
 const FILE_LIMIT = 100;
 
@@ -52,14 +50,13 @@ function timeAgo(ts: string | null): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-type Section = "overview" | "files" | "grep" | "graph" | "navigator";
+type Section = "overview" | "files" | "grep" | "graph";
 
 const SECTIONS: { id: Section; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "files", label: "Files", icon: Files },
   { id: "grep", label: "Grep", icon: Search },
   { id: "graph", label: "Graph", icon: Globe },
-  { id: "navigator", label: "Navigator", icon: Layers },
 ];
 
 interface FilesTabProps {
@@ -767,8 +764,7 @@ export function RepoDetail() {
     const tab = searchParams.get("tab");
     if (tab === "files") return "files";
     if (tab === "grep") return "grep";
-    if (tab === "graph") return "graph";
-    if (tab === "navigator") return "navigator";
+    if (tab === "graph" || tab === "navigator") return "graph";
     return "overview";
   })();
   const [activeTab, setActiveTab] = useState<Section>(initialTab);
@@ -799,11 +795,9 @@ export function RepoDetail() {
         ? "files"
         : tab === "grep"
           ? "grep"
-          : tab === "graph"
+          : tab === "graph" || tab === "navigator"
             ? "graph"
-            : tab === "navigator"
-              ? "navigator"
-              : "overview";
+            : "overview";
     setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
   }, [searchParams]);
 
@@ -814,7 +808,6 @@ export function RepoDetail() {
     if (section === "files") next.set("tab", "files");
     if (section === "grep") next.set("tab", "grep");
     if (section === "graph") next.set("tab", "graph");
-    if (section === "navigator") next.set("tab", "navigator");
     setSearchParams(next, { replace: true });
   };
 
@@ -903,7 +896,6 @@ export function RepoDetail() {
           {activeTab === "files" && <FilesTab repoId={repoId} onSelectFile={setSelectedFilePath} />}
           {activeTab === "grep" && repo && <GrepTab repoPath={repo.root_path} onSelectFile={setSelectedFilePath} />}
           {activeTab === "graph" && <RepoGraphTab repoId={repoId} />}
-          {activeTab === "navigator" && <NavigatorTab repoId={repoId} />}
         </div>
       </div>
 

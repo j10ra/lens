@@ -1,8 +1,8 @@
-import { Badge, Separator } from "@lens/ui";
-import { ArrowDownLeft, ArrowUpRight, ExternalLink, Search, X } from "lucide-react";
+import { Badge } from "@lens/ui";
+import { Search, X } from "lucide-react";
 import { type WheelEvent as ReactWheelEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "../lib/api.js";
 import { type DagEdge, type DagLayout, type DagNode, layoutDag } from "../lib/dag-layout.js";
+import type { FileNeighborhood, GraphOverview } from "../lib/graph-types.js";
 import { languageColor } from "../lib/language-colors.js";
 import { useGraphNeighbors, useGraphOverview } from "../queries/use-repo-graph.js";
 import { useRepos } from "../queries/use-repos.js";
@@ -302,281 +302,25 @@ function Tooltip({ node, x, y }: { node: DagNode; x: number; y: number }) {
   );
 }
 
-// ── Detail Panel ─────────────────────────────────────────────────────────────
+// ── DagView — reusable, props-driven DAG visualization ──────────────────────
 
-function DetailPanel({
-  repoId,
-  neighbors,
-  loading,
-  onNavigate,
-  onClose,
-}: {
-  repoId: string;
-  neighbors:
-    | {
-        file: {
-          path: string;
-          language: string | null;
-          hubScore: number;
-          isHub: boolean;
-          exports: string[];
-          symbols: { name: string; kind: string; line: number; exported: boolean }[];
-          commits: number;
-          recent90d: number;
-        };
-        imports: string[];
-        importers: string[];
-        cochanges: { path: string; weight: number }[];
-      }
-    | undefined;
-  loading: boolean;
-  onNavigate: (path: string) => void;
-  onClose: () => void;
-}) {
-  const shortPath = (p: string) => p.split("/").pop() ?? p;
-  const openInEditor = async (path: string, line?: number) => {
-    try {
-      await api.openFile(repoId, path, line);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      window.alert(`Failed to open editor: ${msg}`);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="w-80 shrink-0 border-l border-border bg-background overflow-y-auto flex items-center justify-center">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (!neighbors) return null;
-  const file = neighbors.file;
-  const color = languageColor(file.language);
-
-  return (
-    <div className="w-80 shrink-0 border-l border-border bg-background overflow-y-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="shrink-0 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-          <span className="font-mono font-semibold text-xs truncate">{shortPath(file.path)}</span>
-        </div>
-        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground ml-2">
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <div className="px-3 py-2.5 space-y-3 text-xs">
-        <div className="font-mono text-[10px] text-muted-foreground break-all">{file.path}</div>
-        <button
-          type="button"
-          onClick={() => void openInEditor(file.path)}
-          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        >
-          <ExternalLink className="h-3 w-3" />
-          Open in editor
-        </button>
-
-        {/* Badges */}
-        <div className="flex gap-1.5 flex-wrap">
-          {file.language && (
-            <Badge variant="secondary" className="text-[10px]">
-              {file.language}
-            </Badge>
-          )}
-          {file.isHub && (
-            <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-400">
-              hub
-            </Badge>
-          )}
-          <Badge variant="outline" className="text-[10px]">
-            score {file.hubScore.toFixed(2)}
-          </Badge>
-        </div>
-
-        {/* Git stats */}
-        <div className="grid grid-cols-3 gap-1.5">
-          <div className="rounded bg-muted/50 px-2 py-1 text-center">
-            <div className="font-semibold text-sm">{file.commits}</div>
-            <div className="text-[9px] text-muted-foreground">commits</div>
-          </div>
-          <div className="rounded bg-muted/50 px-2 py-1 text-center">
-            <div className="font-semibold text-sm">{file.recent90d}</div>
-            <div className="text-[9px] text-muted-foreground">90d</div>
-          </div>
-          <div className="rounded bg-muted/50 px-2 py-1 text-center">
-            <div className="font-semibold text-sm">{neighbors.imports.length + neighbors.importers.length}</div>
-            <div className="text-[9px] text-muted-foreground">edges</div>
-          </div>
-        </div>
-
-        {/* Exports */}
-        {file.exports.length > 0 && (
-          <>
-            <Separator />
-            <div>
-              <div className="text-muted-foreground font-medium mb-1">Exports ({file.exports.length})</div>
-              <div className="flex flex-wrap gap-1">
-                {file.exports.slice(0, 12).map((e) => (
-                  <span key={e} className="font-mono text-[10px] bg-muted/60 px-1.5 py-0.5 rounded">
-                    {e}
-                  </span>
-                ))}
-                {file.exports.length > 12 && (
-                  <span className="text-[10px] text-muted-foreground">+{file.exports.length - 12}</span>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Symbols */}
-        {file.symbols.length > 0 && (
-          <>
-            <Separator />
-            <div>
-              <div className="text-muted-foreground font-medium mb-1">Symbols ({file.symbols.length})</div>
-              <div className="space-y-0.5">
-                {file.symbols.slice(0, 12).map((sym) => (
-                  <button
-                    key={`${sym.kind}:${sym.name}:${sym.line}`}
-                    type="button"
-                    onClick={() => void openInEditor(file.path, sym.line)}
-                    className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-[10px] hover:bg-muted/50"
-                  >
-                    <Badge variant="outline" className="h-4 px-1 font-mono text-[9px] lowercase">
-                      {sym.kind}
-                    </Badge>
-                    <span className="flex-1 truncate font-mono">{sym.name}</span>
-                    <span className="shrink-0 font-mono text-muted-foreground">L{sym.line}</span>
-                  </button>
-                ))}
-                {file.symbols.length > 12 && (
-                  <span className="text-[10px] text-muted-foreground">+{file.symbols.length - 12} more</span>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Importers */}
-        {neighbors.importers.length > 0 && (
-          <>
-            <Separator />
-            <div>
-              <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
-                <ArrowDownLeft className="h-3 w-3 text-green-400" />
-                Imported by ({neighbors.importers.length})
-              </div>
-              <div className="space-y-0.5">
-                {neighbors.importers.slice(0, 10).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => onNavigate(p)}
-                    className="block w-full truncate text-left font-mono text-[10px] text-foreground/80 hover:text-primary pl-4"
-                  >
-                    {p}
-                  </button>
-                ))}
-                {neighbors.importers.length > 10 && (
-                  <div className="text-[10px] text-muted-foreground pl-4">+{neighbors.importers.length - 10} more</div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Imports */}
-        {neighbors.imports.length > 0 && (
-          <>
-            <Separator />
-            <div>
-              <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
-                <ArrowUpRight className="h-3 w-3 text-blue-400" />
-                Imports ({neighbors.imports.length})
-              </div>
-              <div className="space-y-0.5">
-                {neighbors.imports.slice(0, 10).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => onNavigate(p)}
-                    className="block w-full truncate text-left font-mono text-[10px] text-foreground/80 hover:text-primary pl-4"
-                  >
-                    {p}
-                  </button>
-                ))}
-                {neighbors.imports.length > 10 && (
-                  <div className="text-[10px] text-muted-foreground pl-4">+{neighbors.imports.length - 10} more</div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Cochanges */}
-        {neighbors.cochanges.length > 0 && (
-          <>
-            <Separator />
-            <div>
-              <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400" />
-                Co-changes ({neighbors.cochanges.length})
-              </div>
-              <div className="space-y-0.5">
-                {neighbors.cochanges.slice(0, 10).map((c) => (
-                  <button
-                    key={c.path}
-                    type="button"
-                    onClick={() => onNavigate(c.path)}
-                    className="flex w-full items-center gap-1 truncate text-left font-mono text-[10px] text-foreground/80 hover:text-primary pl-4"
-                  >
-                    <span className="truncate">{shortPath(c.path)}</span>
-                    <span className="text-amber-400/70 shrink-0">x{c.weight}</span>
-                  </button>
-                ))}
-                {neighbors.cochanges.length > 10 && (
-                  <div className="text-[10px] text-muted-foreground pl-4">+{neighbors.cochanges.length - 10} more</div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Legend */}
-        <Separator />
-        <div className="flex gap-3 text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-0.5 bg-blue-400" />
-            imports
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-0.5 bg-green-400" />
-            importers
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-0.5 bg-amber-400 border-dashed" />
-            cochange
-          </span>
-        </div>
-      </div>
-    </div>
-  );
+export interface DagViewProps {
+  overview: GraphOverview;
+  selectedFile: string | null;
+  neighbors: FileNeighborhood | undefined;
+  neighborsLoading: boolean;
+  onSelectFile: (path: string) => void;
+  onClearSelection: () => void;
 }
 
-// ── Main Component ───────────────────────────────────────────────────────────
-
-export function NavigatorTab({ repoId }: { repoId: string }) {
-  const { data: repos } = useRepos();
-  const repo = repos?.find((r) => r.id === repoId);
-  const { data: overview, isLoading } = useGraphOverview(repo?.root_path, "", 2000);
-
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const { data: neighbors, isLoading: neighborsLoading } = useGraphNeighbors(repo?.root_path, selectedFile);
-
+export function DagView({
+  overview,
+  selectedFile,
+  neighbors,
+  neighborsLoading,
+  onSelectFile,
+  onClearSelection,
+}: DagViewProps) {
   const [search, setSearch] = useState("");
   const [hoveredNode, setHoveredNode] = useState<DagNode | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -699,13 +443,25 @@ export function NavigatorTab({ repoId }: { repoId: string }) {
     });
   }, [layout, bounds]);
 
-  // Zoom to fit on initial load
+  // Zoom to fit on initial load / when overview changes
   const initializedRef = useRef(false);
   useEffect(() => {
-    if (!layout || !svgRef.current || initializedRef.current) return;
-    initializedRef.current = true;
-    zoomToFit();
+    if (!layout || !svgRef.current) return;
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      zoomToFit();
+    }
   }, [layout, zoomToFit]);
+
+  // Re-fit when overview data changes (e.g. filter toggle)
+  const prevOverviewRef = useRef(overview);
+  useEffect(() => {
+    if (overview !== prevOverviewRef.current) {
+      prevOverviewRef.current = overview;
+      // Delay to let layout recompute
+      requestAnimationFrame(() => zoomToFit());
+    }
+  }, [overview, zoomToFit]);
 
   // Pan to selected node
   useEffect(() => {
@@ -716,22 +472,10 @@ export function NavigatorTab({ repoId }: { repoId: string }) {
     const rect = svg.getBoundingClientRect();
 
     setPan({
-      x: rect.width / 2 - node.x * zoom - 160, // offset for detail panel
+      x: rect.width / 2 - node.x * zoom - 160,
       y: rect.height / 2 - node.y * zoom,
     });
   }, [selectedFile, nodeMap, zoom]);
-
-  // Escape to deselect
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setSelectedFile(null);
-        setSearch("");
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
 
   // Pan handlers
   const handleMouseDown = useCallback(
@@ -781,149 +525,174 @@ export function NavigatorTab({ repoId }: { repoId: string }) {
 
   const handleDoubleClick = useCallback(() => {
     zoomToFit();
-    setSelectedFile(null);
-  }, [zoomToFit]);
+    onClearSelection();
+  }, [zoomToFit, onClearSelection]);
 
-  const handleNodeSelect = useCallback((id: string) => {
-    setSelectedFile(id);
-    setSearch("");
-  }, []);
+  const handleNodeSelect = useCallback(
+    (id: string) => {
+      onSelectFile(id);
+      setSearch("");
+    },
+    [onSelectFile],
+  );
 
-  const handleNavigate = useCallback((path: string) => {
-    setSelectedFile(path);
+  if (!layout) {
+    return (
+      <div className="flex h-full items-center justify-center px-8 text-center">
+        <div className="text-xs text-muted-foreground">No import graph data available.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Search bar */}
+      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
+        <div className="flex items-center gap-1.5 rounded-md border border-border bg-background/95 backdrop-blur-sm px-2 shadow-sm">
+          <Search className="h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search files..."
+            className="h-7 w-52 bg-transparent text-xs focus:outline-none"
+          />
+          {search && (
+            <button type="button" onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+        {search && searchResults.length > 0 && (
+          <div className="rounded-md border border-border bg-background/95 backdrop-blur-sm shadow-lg max-h-64 overflow-y-auto">
+            {searchResults.map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => handleNodeSelect(n.id)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent/50"
+              >
+                <span
+                  className="shrink-0 w-2 h-2 rounded-full"
+                  style={{ backgroundColor: languageColor(n.language) }}
+                />
+                <span className="font-mono truncate">{n.id}</span>
+                {n.isHub && (
+                  <Badge variant="outline" className="text-[9px] border-amber-500/50 text-amber-400 ml-auto">
+                    hub
+                  </Badge>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Stats + controls */}
+      <div className="absolute bottom-3 left-44 z-10 flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+        <span>{layout.nodes.length} files</span>
+        <span>{layout.edges.length} edges</span>
+        <span>{layout.layerCount} layers</span>
+        <button
+          type="button"
+          onClick={handleDoubleClick}
+          className="ml-1 rounded border border-border bg-background/90 px-2 py-0.5 hover:bg-accent hover:text-foreground"
+        >
+          Fit all
+        </button>
+      </div>
+
+      <svg
+        ref={svgRef}
+        className="h-full w-full"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
+        onDoubleClick={handleDoubleClick}
+        style={{ cursor: isPanning.current ? "grabbing" : "grab" }}
+      >
+        <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
+          <LayerBands
+            nodes={layout.nodes}
+            layerCount={layout.layerCount}
+            layerSizes={layout.layerSizes}
+            minX={bounds.minX}
+            maxX={bounds.maxX}
+          />
+          <DagEdges
+            edges={layout.edges}
+            nodeMap={nodeMap}
+            selectedId={selectedFile}
+            highlightImports={highlightImports}
+            highlightImporters={highlightImporters}
+          />
+          {selectedFile && cochangePaths.length > 0 && (
+            <CochangeEdges selectedId={selectedFile} cochangePaths={cochangePaths} nodeMap={nodeMap} />
+          )}
+          <DagNodes
+            nodes={layout.nodes}
+            selectedId={selectedFile}
+            connectedIds={connectedIds}
+            onSelect={handleNodeSelect}
+            onHover={setHoveredNode}
+          />
+        </g>
+      </svg>
+
+      {/* Hover tooltip */}
+      {hoveredNode && !selectedFile && <Tooltip node={hoveredNode} x={mousePos.x} y={mousePos.y} />}
+    </div>
+  );
+}
+
+// ── Standalone wrapper (for testing / direct use) ───────────────────────────
+
+export function NavigatorTab({ repoId }: { repoId: string }) {
+  const { data: repos } = useRepos();
+  const repo = repos?.find((r) => r.id === repoId);
+  const { data: overview, isLoading } = useGraphOverview(repo?.root_path, "", 2000);
+
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const { data: neighbors, isLoading: neighborsLoading } = useGraphNeighbors(repo?.root_path, selectedFile);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedFile(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   if (!repoId) return null;
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 min-h-0 items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!overview || overview.files.length === 0) {
+    return (
+      <div className="flex flex-1 min-h-0 items-center justify-center px-8 text-center">
+        <div className="text-xs text-muted-foreground">No import graph data available.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 min-h-0">
-      {/* Main SVG area */}
-      <div className="relative flex-1 min-h-0 overflow-hidden bg-background">
-        {/* Search bar */}
-        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
-          <div className="flex items-center gap-1.5 rounded-md border border-border bg-background/95 backdrop-blur-sm px-2 shadow-sm">
-            <Search className="h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search files..."
-              className="h-7 w-52 bg-transparent text-xs focus:outline-none"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          {search && searchResults.length > 0 && (
-            <div className="rounded-md border border-border bg-background/95 backdrop-blur-sm shadow-lg max-h-64 overflow-y-auto">
-              {searchResults.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => handleNodeSelect(n.id)}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent/50"
-                >
-                  <span
-                    className="shrink-0 w-2 h-2 rounded-full"
-                    style={{ backgroundColor: languageColor(n.language) }}
-                  />
-                  <span className="font-mono truncate">{n.id}</span>
-                  {n.isHub && (
-                    <Badge variant="outline" className="text-[9px] border-amber-500/50 text-amber-400 ml-auto">
-                      hub
-                    </Badge>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Stats + controls */}
-        {layout && (
-          <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
-            <span>{layout.nodes.length} files</span>
-            <span>{layout.edges.length} edges</span>
-            <span>{layout.layerCount} layers</span>
-            <button
-              type="button"
-              onClick={handleDoubleClick}
-              className="ml-1 rounded border border-border bg-background/90 px-2 py-0.5 hover:bg-accent hover:text-foreground"
-            >
-              Fit all
-            </button>
-          </div>
-        )}
-
-        {isLoading ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        ) : !layout ? (
-          <div className="flex h-full items-center justify-center px-8 text-center">
-            <div className="text-xs text-muted-foreground">No import graph data available.</div>
-          </div>
-        ) : (
-          <svg
-            ref={svgRef}
-            className="h-full w-full"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onWheel={handleWheel}
-            onDoubleClick={handleDoubleClick}
-            style={{ cursor: isPanning.current ? "grabbing" : "grab" }}
-          >
-            <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-              <LayerBands
-                nodes={layout.nodes}
-                layerCount={layout.layerCount}
-                layerSizes={layout.layerSizes}
-                minX={bounds.minX}
-                maxX={bounds.maxX}
-              />
-              <DagEdges
-                edges={layout.edges}
-                nodeMap={nodeMap}
-                selectedId={selectedFile}
-                highlightImports={highlightImports}
-                highlightImporters={highlightImporters}
-              />
-              {selectedFile && cochangePaths.length > 0 && (
-                <CochangeEdges selectedId={selectedFile} cochangePaths={cochangePaths} nodeMap={nodeMap} />
-              )}
-              <DagNodes
-                nodes={layout.nodes}
-                selectedId={selectedFile}
-                connectedIds={connectedIds}
-                onSelect={handleNodeSelect}
-                onHover={setHoveredNode}
-              />
-            </g>
-          </svg>
-        )}
-
-        {/* Hover tooltip */}
-        {hoveredNode && !selectedFile && <Tooltip node={hoveredNode} x={mousePos.x} y={mousePos.y} />}
-      </div>
-
-      {/* Right detail panel */}
-      {selectedFile && (
-        <DetailPanel
-          repoId={repoId}
-          neighbors={neighbors}
-          loading={neighborsLoading}
-          onNavigate={handleNavigate}
-          onClose={() => setSelectedFile(null)}
-        />
-      )}
+      <DagView
+        overview={overview}
+        selectedFile={selectedFile}
+        neighbors={neighbors}
+        neighborsLoading={neighborsLoading}
+        onSelectFile={setSelectedFile}
+        onClearSelection={() => setSelectedFile(null)}
+      />
     </div>
   );
 }

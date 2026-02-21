@@ -1,7 +1,7 @@
 import { Badge, cn, FileTypeFilter, type FileTypeFilterOption } from "@lens/ui";
 import { Line, OrbitControls, PointMaterial } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { ArrowDownLeft, ArrowUpRight, ExternalLink } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ExternalLink, Globe, Layers } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useParams, useSearchParams } from "react-router";
 import { CameraController } from "../components/explore/CameraController.js";
@@ -15,6 +15,7 @@ import type { FileNeighborhood, GraphCochange, GraphOverview } from "../lib/grap
 import { languageColor } from "../lib/language-colors.js";
 import { useGraphNeighbors, useGraphOverview } from "../queries/use-repo-graph.js";
 import { useRepos } from "../queries/use-repos.js";
+import { DagView } from "./Navigator.js";
 
 // ── 3D Components ────────────────────────────────────────────────────────────
 
@@ -563,6 +564,43 @@ function areSetsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>): bo
   return true;
 }
 
+// ── View Toggle ─────────────────────────────────────────────────────────────
+
+type ViewMode = "galaxy" | "dag";
+
+function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
+  return (
+    <div className="absolute bottom-3 left-3 z-10 flex rounded-md border border-border bg-background/90 backdrop-blur-sm shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => onChange("galaxy")}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium transition-colors",
+          mode === "galaxy"
+            ? "bg-accent text-accent-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+        )}
+      >
+        <Globe className="h-3.5 w-3.5" />
+        Galaxy
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("dag")}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium transition-colors border-l border-border",
+          mode === "dag"
+            ? "bg-accent text-accent-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+        )}
+      >
+        <Layers className="h-3.5 w-3.5" />
+        DAG
+      </button>
+    </div>
+  );
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export function RepoGraphTab({ repoId }: { repoId: string }) {
@@ -573,6 +611,9 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
   const activeDir = activeDirParam.trim();
   const { data: repos } = useRepos();
   const repo = repos?.find((r) => r.id === repoId);
+
+  // View mode toggle
+  const [viewMode, setViewMode] = useState<ViewMode>("galaxy");
 
   // Overview data (lightweight — no symbols/exports)
   const { data: overview, isLoading } = useGraphOverview(repo?.root_path, activeDir);
@@ -814,10 +855,12 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
   const handleFileSelect = useCallback(
     (path: string) => {
       setSelectedFile(path);
-      const pos = findNodePos(path);
-      if (pos) setCameraTarget(pos);
+      if (viewMode === "galaxy") {
+        const pos = findNodePos(path);
+        if (pos) setCameraTarget(pos);
+      }
     },
-    [findNodePos],
+    [findNodePos, viewMode],
   );
 
   const handleSceneNodeSelect = useCallback(
@@ -875,6 +918,7 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
 
   const showFileTypeFilter = !isLoading && !!overview;
   const showCanvas = !isLoading && !!layout && layout.nodes.length > 0;
+  const hasFilteredFiles = !isLoading && !!filteredOverview && filteredOverview.files.length > 0;
   const overviewDistance = useMemo(() => {
     if (!layout || layout.nodes.length === 0) return 8;
     const maxRadius = layout.nodes.reduce((max, n) => Math.max(max, Math.hypot(n.x, n.y, n.z)), 0);
@@ -908,86 +952,105 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
       )}
 
       <div className={cn("relative flex-1 min-h-0 overflow-hidden", sceneTheme.shellBgClass)}>
-        <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.dotsTextureClass)} />
-        <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.linesTextureClass)} />
+        {viewMode === "galaxy" && (
+          <>
+            <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.dotsTextureClass)} />
+            <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.linesTextureClass)} />
+          </>
+        )}
         {isLoading ? (
           <div className="relative z-[3] flex h-full items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
-        ) : !showCanvas ? (
+        ) : viewMode === "galaxy" ? (
+          !showCanvas ? (
+            <div className="relative z-[3] flex h-full items-center justify-center px-8 text-center">
+              <div className="text-xs text-muted-foreground">No files match the selected file types.</div>
+            </div>
+          ) : (
+            <Canvas
+              className="relative z-[1]"
+              camera={{ position: [0, 0, overviewDistance], fov: 55 }}
+              gl={{
+                antialias: true,
+                powerPreference: "high-performance",
+                alpha: true,
+              }}
+              dpr={[1, 1.5]}
+              onClick={() => {
+                if (sceneNodeClickRef.current) {
+                  sceneNodeClickRef.current = false;
+                  suppressCanvasClickRef.current = false;
+                  return;
+                }
+                if (suppressCanvasClickRef.current) {
+                  suppressCanvasClickRef.current = false;
+                  return;
+                }
+                if (selectedFile) clearFocus();
+              }}
+            >
+              <SceneBackdrop sceneTheme={sceneTheme} />
+
+              <FileCloud
+                nodes={sceneNodes}
+                selectedId={selectedFile}
+                connectedIds={connectedIds}
+                importIds={importIds}
+                cochangeIds={cochangeIds}
+                cochangeEdgeColor={sceneTheme.cochangeEdge}
+                onSelect={handleSceneNodeSelect}
+              />
+              <LODLabels
+                nodes={sceneNodes}
+                selectedId={selectedFile}
+                connectedIds={connectedIds}
+                sceneTheme={sceneTheme}
+              />
+              <ImportEdges nodes={sceneNodes} edges={layout.edges} selectedId={selectedFile} sceneTheme={sceneTheme} />
+              <CochangeEdges
+                nodes={sceneNodes}
+                cochanges={validCochanges}
+                selectedId={selectedFile}
+                sceneTheme={sceneTheme}
+              />
+              <CameraController
+                target={cameraTarget}
+                distance={focusDistance}
+                homeDistance={overviewDistance}
+                targetScreenOffsetPx={focusPanelCompensationPx}
+              />
+              <OrbitControls
+                ref={orbitRef}
+                makeDefault
+                enableDamping
+                dampingFactor={0.03}
+                rotateSpeed={0.62}
+                panSpeed={0.75}
+                zoomSpeed={0.9}
+                autoRotate
+                autoRotateSpeed={0.1 * autoRotateDirection}
+                onStart={handleOrbitStart}
+                onChange={handleOrbitChange}
+                onEnd={handleOrbitEnd}
+                minDistance={2}
+                maxDistance={overviewDistance * 2.5}
+              />
+            </Canvas>
+          )
+        ) : hasFilteredFiles && filteredOverview ? (
+          <DagView
+            overview={filteredOverview}
+            selectedFile={selectedFile}
+            neighbors={neighbors}
+            neighborsLoading={neighborsLoading}
+            onSelectFile={handleFileSelect}
+            onClearSelection={clearFocus}
+          />
+        ) : (
           <div className="relative z-[3] flex h-full items-center justify-center px-8 text-center">
             <div className="text-xs text-muted-foreground">No files match the selected file types.</div>
           </div>
-        ) : (
-          <Canvas
-            className="relative z-[1]"
-            camera={{ position: [0, 0, overviewDistance], fov: 55 }}
-            gl={{
-              antialias: true,
-              powerPreference: "high-performance",
-              alpha: true,
-            }}
-            dpr={[1, 1.5]}
-            onClick={() => {
-              if (sceneNodeClickRef.current) {
-                sceneNodeClickRef.current = false;
-                suppressCanvasClickRef.current = false;
-                return;
-              }
-              if (suppressCanvasClickRef.current) {
-                suppressCanvasClickRef.current = false;
-                return;
-              }
-              if (selectedFile) clearFocus();
-            }}
-          >
-            <SceneBackdrop sceneTheme={sceneTheme} />
-
-            <FileCloud
-              nodes={sceneNodes}
-              selectedId={selectedFile}
-              connectedIds={connectedIds}
-              importIds={importIds}
-              cochangeIds={cochangeIds}
-              cochangeEdgeColor={sceneTheme.cochangeEdge}
-              onSelect={handleSceneNodeSelect}
-            />
-            <LODLabels
-              nodes={sceneNodes}
-              selectedId={selectedFile}
-              connectedIds={connectedIds}
-              sceneTheme={sceneTheme}
-            />
-            <ImportEdges nodes={sceneNodes} edges={layout.edges} selectedId={selectedFile} sceneTheme={sceneTheme} />
-            <CochangeEdges
-              nodes={sceneNodes}
-              cochanges={validCochanges}
-              selectedId={selectedFile}
-              sceneTheme={sceneTheme}
-            />
-            <CameraController
-              target={cameraTarget}
-              distance={focusDistance}
-              homeDistance={overviewDistance}
-              targetScreenOffsetPx={focusPanelCompensationPx}
-            />
-            <OrbitControls
-              ref={orbitRef}
-              makeDefault
-              enableDamping
-              dampingFactor={0.03}
-              rotateSpeed={0.62}
-              panSpeed={0.75}
-              zoomSpeed={0.9}
-              autoRotate
-              autoRotateSpeed={0.1 * autoRotateDirection}
-              onStart={handleOrbitStart}
-              onChange={handleOrbitChange}
-              onEnd={handleOrbitEnd}
-              minDistance={2}
-              maxDistance={overviewDistance * 2.5}
-            />
-          </Canvas>
         )}
 
         {selectedFile && (
@@ -1003,6 +1066,9 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
         )}
 
         {repo && <CommandPalette repoPath={repo.root_path} open mode="pinned" onSelect={handleFileSelect} />}
+
+        {/* View mode toggle */}
+        {!isLoading && <ViewToggle mode={viewMode} onChange={setViewMode} />}
       </div>
     </div>
   );
