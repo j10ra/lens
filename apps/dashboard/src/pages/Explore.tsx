@@ -1,7 +1,7 @@
 import { Badge, cn, FileTypeFilter, type FileTypeFilterOption } from "@lens/ui";
 import { Line, OrbitControls, PointMaterial } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { ExternalLink } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useParams, useSearchParams } from "react-router";
 import { CameraController } from "../components/explore/CameraController.js";
@@ -49,6 +49,7 @@ interface ExploreSceneTheme {
   labelCold: string;
   labelOutline: string;
   importEdge: string;
+  exportEdge: string;
   importEdgeMuted: string;
   cochangeEdge: string;
 }
@@ -76,7 +77,8 @@ const DARK_SCENE_THEME: ExploreSceneTheme = {
   labelMid: "#cbd5e1",
   labelCold: "#94a3b8",
   labelOutline: "#020617",
-  importEdge: "#60a5fa",
+  importEdge: "#22c55e",
+  exportEdge: "#3b82f6",
   importEdgeMuted: "#334155",
   cochangeEdge: "#f59e0b",
 };
@@ -104,7 +106,8 @@ const LIGHT_SCENE_THEME: ExploreSceneTheme = {
   labelMid: "#1e293b",
   labelCold: "#334155",
   labelOutline: "#ffffff",
-  importEdge: "#2563eb",
+  importEdge: "#16a34a",
+  exportEdge: "#2563eb",
   importEdgeMuted: "#94a3b8",
   cochangeEdge: "#d97706",
 };
@@ -159,6 +162,12 @@ function ImportEdges({
 
         const isHighlighted = selectedId && (e.source === selectedId || e.target === selectedId);
         if (selectedId && !isHighlighted) return null;
+        const edgeColor =
+          selectedId == null
+            ? sceneTheme.importEdgeMuted
+            : e.target === selectedId
+              ? sceneTheme.importEdge
+              : sceneTheme.exportEdge;
 
         return (
           <Line
@@ -167,7 +176,7 @@ function ImportEdges({
               [s.x, s.y, s.z],
               [t.x, t.y, t.z],
             ]}
-            color={isHighlighted ? sceneTheme.importEdge : sceneTheme.importEdgeMuted}
+            color={edgeColor}
             lineWidth={isHighlighted ? 1.5 : 0.5}
             opacity={isHighlighted ? 0.7 : 0.12}
             transparent
@@ -422,7 +431,7 @@ function FileInfoPanel({
         {neighbors.importers.length > 0 && (
           <div>
             <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-400" />
+              <ArrowDownLeft className="h-3 w-3 text-green-500" />
               Imported by ({neighbors.importers.length})
             </div>
             <div className="space-y-0.5">
@@ -448,7 +457,7 @@ function FileInfoPanel({
         {neighbors.imports.length > 0 && (
           <div>
             <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-400" />
+              <ArrowUpRight className="h-3 w-3 text-blue-500" />
               Imports ({neighbors.imports.length})
             </div>
             <div className="space-y-0.5">
@@ -501,8 +510,12 @@ function FileInfoPanel({
       {/* Legend */}
       <div className="flex gap-4 border-t border-border px-4 py-2 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-0.5 bg-blue-400" />
+          <span className="inline-block w-3 h-0.5 bg-green-500" />
           import
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-0.5 bg-blue-500" />
+          export
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-0.5 bg-amber-400 border-dashed" />

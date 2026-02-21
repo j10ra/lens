@@ -18,13 +18,14 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Code,
+  ExternalLink,
   FileCode,
   Files,
   FolderGit2,
-  ExternalLink,
   GitCommit,
   Globe,
   Hash,
+  Layers,
   LayoutDashboard,
   Search,
   Trash2,
@@ -36,6 +37,7 @@ import { api } from "../lib/api.js";
 import { useRepoFileDetail, useRepoFiles } from "../queries/use-repo-files.js";
 import { useRepoStats, useRepos } from "../queries/use-repos.js";
 import { RepoGraphTab } from "./Explore.js";
+import { NavigatorTab } from "./Navigator.js";
 
 const FILE_LIMIT = 100;
 
@@ -50,15 +52,15 @@ function timeAgo(ts: string | null): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-type Section = "overview" | "files" | "grep" | "graph";
+type Section = "overview" | "files" | "grep" | "graph" | "navigator";
 
-const SECTIONS: { id: Section; label: string; icon: typeof LayoutDashboard }[] =
-  [
-    { id: "overview", label: "Overview", icon: LayoutDashboard },
-    { id: "files", label: "Files", icon: Files },
-    { id: "grep", label: "Grep", icon: Search },
-    { id: "graph", label: "Graph", icon: Globe },
-  ];
+const SECTIONS: { id: Section; label: string; icon: typeof LayoutDashboard }[] = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "files", label: "Files", icon: Files },
+  { id: "grep", label: "Grep", icon: Search },
+  { id: "graph", label: "Graph", icon: Globe },
+  { id: "navigator", label: "Navigator", icon: Layers },
+];
 
 interface FilesTabProps {
   repoId: string;
@@ -141,15 +143,9 @@ function FilesTab({ repoId, onSelectFile }: FilesTabProps) {
                 <th className="w-12 border-b border-r border-border px-3 py-1.5 text-center font-mono text-[10px] text-muted-foreground">
                   #
                 </th>
-                <th className="border-b border-r border-border px-3 py-1.5 text-left font-medium">
-                  Path
-                </th>
-                <th className="w-16 border-b border-r border-border px-3 py-1.5 text-left font-medium">
-                  Lang
-                </th>
-                <th className="w-16 border-b border-border px-3 py-1.5 text-right font-medium">
-                  Exports
-                </th>
+                <th className="border-b border-r border-border px-3 py-1.5 text-left font-medium">Path</th>
+                <th className="w-16 border-b border-r border-border px-3 py-1.5 text-left font-medium">Lang</th>
+                <th className="w-16 border-b border-border px-3 py-1.5 text-right font-medium">Exports</th>
               </tr>
             </thead>
             <tbody>
@@ -177,10 +173,7 @@ function FilesTab({ repoId, onSelectFile }: FilesTabProps) {
               ))}
               {files.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="px-3 py-8 text-center text-muted-foreground"
-                  >
+                  <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
                     No files found.
                   </td>
                 </tr>
@@ -245,8 +238,7 @@ function GrepTab({ repoPath, onSelectFile }: GrepTabProps) {
   };
 
   const result = grep.data;
-  const totalResults =
-    result?.terms.reduce((sum, term) => sum + (result.results[term]?.length ?? 0), 0) ?? 0;
+  const totalResults = result?.terms.reduce((sum, term) => sum + (result.results[term]?.length ?? 0), 0) ?? 0;
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
@@ -344,7 +336,10 @@ function GrepTab({ repoPath, onSelectFile }: GrepTabProps) {
                               {match.language ?? "unknown"}
                             </Badge>
                             {match.isHub && (
-                              <Badge variant="outline" className="font-mono text-[9px] border-amber-500/50 text-amber-500">
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[9px] border-amber-500/50 text-amber-500"
+                              >
                                 hub
                               </Badge>
                             )}
@@ -400,12 +395,7 @@ interface FileDetailSheetProps {
   onNavigate: (path: string) => void;
 }
 
-function FileDetailSheet({
-  repoId,
-  filePath,
-  onClose,
-  onNavigate,
-}: FileDetailSheetProps) {
+function FileDetailSheet({ repoId, filePath, onClose, onNavigate }: FileDetailSheetProps) {
   const { data: detail } = useRepoFileDetail(repoId, filePath);
   const openInEditor = async (line?: number) => {
     if (!filePath) return;
@@ -423,12 +413,8 @@ function FileDetailSheet({
         {detail ? (
           <>
             <SheetHeader>
-              <SheetTitle className="break-all select-all font-mono text-sm">
-                {detail.path}
-              </SheetTitle>
-              <SheetDescription>
-                {detail.language ?? "unknown"}
-              </SheetDescription>
+              <SheetTitle className="break-all select-all font-mono text-sm">{detail.path}</SheetTitle>
+              <SheetDescription>{detail.language ?? "unknown"}</SheetDescription>
             </SheetHeader>
 
             <div className="mt-4 space-y-4">
@@ -449,11 +435,7 @@ function FileDetailSheet({
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {detail.exports.map((e: string) => (
-                      <Badge
-                        key={e}
-                        variant="secondary"
-                        className="font-mono text-[10px]"
-                      >
+                      <Badge key={e} variant="secondary" className="font-mono text-[10px]">
                         {e}
                       </Badge>
                     ))}
@@ -477,33 +459,23 @@ function FileDetailSheet({
                           onClick={() => void openInEditor(symbol.line)}
                           className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-accent/40"
                         >
-                          <Badge
-                            variant="outline"
-                            className="h-4 px-1.5 font-mono text-[9px] lowercase"
-                          >
+                          <Badge variant="outline" className="h-4 px-1.5 font-mono text-[9px] lowercase">
                             {symbol.kind}
                           </Badge>
                           <span className="flex-1 break-all font-mono text-[11px] text-foreground/90">
                             {symbol.name}
                           </span>
-                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                            L{symbol.line}
-                          </span>
+                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">L{symbol.line}</span>
                           <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/80" />
                           {symbol.exported && (
-                            <Badge
-                              variant="secondary"
-                              className="h-4 px-1.5 font-mono text-[9px]"
-                            >
+                            <Badge variant="secondary" className="h-4 px-1.5 font-mono text-[9px]">
                               export
                             </Badge>
                           )}
                         </button>
                       ))}
                       {detail.symbols.length > 80 && (
-                        <p className="text-[10px] text-muted-foreground">
-                          +{detail.symbols.length - 80} more
-                        </p>
+                        <p className="text-[10px] text-muted-foreground">+{detail.symbols.length - 80} more</p>
                       )}
                     </div>
                   </section>
@@ -520,11 +492,7 @@ function FileDetailSheet({
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {detail.sections.map((s: string) => (
-                        <Badge
-                          key={s}
-                          variant="outline"
-                          className="font-mono text-[10px]"
-                        >
+                        <Badge key={s} variant="outline" className="font-mono text-[10px]">
                           {s}
                         </Badge>
                       ))}
@@ -543,11 +511,7 @@ function FileDetailSheet({
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {detail.internals.map((s: string) => (
-                        <Badge
-                          key={s}
-                          variant="secondary"
-                          className="bg-muted/50 font-mono text-[10px]"
-                        >
+                        <Badge key={s} variant="secondary" className="bg-muted/50 font-mono text-[10px]">
                           {s}
                         </Badge>
                       ))}
@@ -617,28 +581,18 @@ function FileDetailSheet({
                     </p>
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div>
-                        <p className="font-mono text-xs font-semibold tabular-nums">
-                          {detail.git_stats.commits}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Commits
-                        </p>
+                        <p className="font-mono text-xs font-semibold tabular-nums">{detail.git_stats.commits}</p>
+                        <p className="text-[10px] text-muted-foreground">Commits</p>
                       </div>
                       <div>
-                        <p className="font-mono text-xs font-semibold tabular-nums">
-                          {detail.git_stats.recent_90d}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Recent (90d)
-                        </p>
+                        <p className="font-mono text-xs font-semibold tabular-nums">{detail.git_stats.recent_90d}</p>
+                        <p className="text-[10px] text-muted-foreground">Recent (90d)</p>
                       </div>
                       <div>
                         <p className="font-mono text-xs font-semibold tabular-nums">
                           {timeAgo(detail.git_stats.last_modified)}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Last modified
-                        </p>
+                        <p className="text-[10px] text-muted-foreground">Last modified</p>
                       </div>
                     </div>
                   </section>
@@ -655,25 +609,18 @@ function FileDetailSheet({
                       Co-changes
                     </p>
                     <div className="flex flex-col gap-0.5">
-                      {detail.cochanges.map(
-                        ({ path, count }: { path: string; count: number }) => (
-                          <div
-                            key={path}
-                            className="flex items-center justify-between gap-2"
+                      {detail.cochanges.map(({ path, count }: { path: string; count: number }) => (
+                        <div key={path} className="flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onNavigate(path)}
+                            className="flex-1 break-all text-left font-mono text-[11px] text-primary hover:underline"
                           >
-                            <button
-                              type="button"
-                              onClick={() => onNavigate(path)}
-                              className="flex-1 break-all text-left font-mono text-[11px] text-primary hover:underline"
-                            >
-                              {path}
-                            </button>
-                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                              {count}x
-                            </span>
-                          </div>
-                        ),
-                      )}
+                            {path}
+                          </button>
+                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{count}x</span>
+                        </div>
+                      ))}
                     </div>
                   </section>
                 </>
@@ -716,28 +663,20 @@ function OverviewTab({ repoId }: { repoId: string }) {
           <CardContent className="space-y-1.5">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Files</span>
-              <span className="font-mono tabular-nums">
-                {files?.total?.toLocaleString() ?? "—"}
-              </span>
+              <span className="font-mono tabular-nums">{files?.total?.toLocaleString() ?? "—"}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Import edges</span>
-              <span className="font-mono tabular-nums">
-                {stats?.import_edges?.toLocaleString() ?? "—"}
-              </span>
+              <span className="font-mono tabular-nums">{stats?.import_edges?.toLocaleString() ?? "—"}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Last indexed</span>
-              <span className="font-mono tabular-nums">
-                {timeAgo(repo?.last_indexed_at ?? null)}
-              </span>
+              <span className="font-mono tabular-nums">{timeAgo(repo?.last_indexed_at ?? null)}</span>
             </div>
             {repo?.last_indexed_commit && (
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Commit</span>
-                <span className="font-mono tabular-nums">
-                  {repo.last_indexed_commit.slice(0, 7)}
-                </span>
+                <span className="font-mono tabular-nums">{repo.last_indexed_commit.slice(0, 7)}</span>
               </div>
             )}
           </CardContent>
@@ -754,20 +693,14 @@ function OverviewTab({ repoId }: { repoId: string }) {
           <CardContent className="space-y-1.5">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Path</span>
-              <span
-                className="max-w-[60%] truncate font-mono text-[11px]"
-                title={repo?.root_path}
-              >
+              <span className="max-w-[60%] truncate font-mono text-[11px]" title={repo?.root_path}>
                 {repo?.root_path ?? "—"}
               </span>
             </div>
             {repo?.remote_url && (
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Remote</span>
-                <span
-                  className="max-w-[60%] truncate font-mono text-[11px]"
-                  title={repo.remote_url}
-                >
+                <span className="max-w-[60%] truncate font-mono text-[11px]" title={repo.remote_url}>
                   {repo.remote_url}
                 </span>
               </div>
@@ -775,9 +708,7 @@ function OverviewTab({ repoId }: { repoId: string }) {
             {repo?.created_at && (
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Registered</span>
-                <span className="font-mono tabular-nums">
-                  {timeAgo(repo.created_at)}
-                </span>
+                <span className="font-mono tabular-nums">{timeAgo(repo.created_at)}</span>
               </div>
             )}
           </CardContent>
@@ -799,35 +730,21 @@ function OverviewTab({ repoId }: { repoId: string }) {
             </CardHeader>
             <CardContent className="space-y-1.5">
               {topLangs.map((lang) => {
-                const pct = files?.total
-                  ? Math.round((lang.count / files.total) * 100)
-                  : 0;
+                const pct = files?.total ? Math.round((lang.count / files.total) * 100) : 0;
                 return (
-                  <div
-                    key={lang.language}
-                    className="flex items-center justify-between text-xs"
-                  >
-                    <span className="text-muted-foreground">
-                      {lang.language}
-                    </span>
+                  <div key={lang.language} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{lang.language}</span>
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary/60"
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className="h-full rounded-full bg-primary/60" style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="w-12 text-right font-mono tabular-nums">
-                        {lang.count.toLocaleString()}
-                      </span>
+                      <span className="w-12 text-right font-mono tabular-nums">{lang.count.toLocaleString()}</span>
                     </div>
                   </div>
                 );
               })}
               {languages.length > 6 && (
-                <p className="text-[10px] text-muted-foreground">
-                  +{languages.length - 6} more
-                </p>
+                <p className="text-[10px] text-muted-foreground">+{languages.length - 6} more</p>
               )}
             </CardContent>
           </Card>
@@ -851,6 +768,7 @@ export function RepoDetail() {
     if (tab === "files") return "files";
     if (tab === "grep") return "grep";
     if (tab === "graph") return "graph";
+    if (tab === "navigator") return "navigator";
     return "overview";
   })();
   const [activeTab, setActiveTab] = useState<Section>(initialTab);
@@ -883,7 +801,9 @@ export function RepoDetail() {
           ? "grep"
           : tab === "graph"
             ? "graph"
-            : "overview";
+            : tab === "navigator"
+              ? "navigator"
+              : "overview";
     setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
   }, [searchParams]);
 
@@ -894,6 +814,7 @@ export function RepoDetail() {
     if (section === "files") next.set("tab", "files");
     if (section === "grep") next.set("tab", "grep");
     if (section === "graph") next.set("tab", "graph");
+    if (section === "navigator") next.set("tab", "navigator");
     setSearchParams(next, { replace: true });
   };
 
@@ -910,9 +831,7 @@ export function RepoDetail() {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <span className="text-sm font-medium truncate">
-          {repo?.name ?? repoId}
-        </span>
+        <span className="text-sm font-medium truncate">{repo?.name ?? repoId}</span>
         {repo && <StatusBadge status={repo.index_status} className="ml-1" />}
         <div className="ml-auto flex items-center gap-1.5">
           <button
@@ -981,13 +900,10 @@ export function RepoDetail() {
         {/* Right content */}
         <div className="flex min-w-0 min-h-0 flex-1 flex-col">
           {activeTab === "overview" && <OverviewTab repoId={repoId} />}
-          {activeTab === "files" && (
-            <FilesTab repoId={repoId} onSelectFile={setSelectedFilePath} />
-          )}
-          {activeTab === "grep" && repo && (
-            <GrepTab repoPath={repo.root_path} onSelectFile={setSelectedFilePath} />
-          )}
+          {activeTab === "files" && <FilesTab repoId={repoId} onSelectFile={setSelectedFilePath} />}
+          {activeTab === "grep" && repo && <GrepTab repoPath={repo.root_path} onSelectFile={setSelectedFilePath} />}
           {activeTab === "graph" && <RepoGraphTab repoId={repoId} />}
+          {activeTab === "navigator" && <NavigatorTab repoId={repoId} />}
         </div>
       </div>
 
