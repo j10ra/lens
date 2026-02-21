@@ -66,6 +66,26 @@ export const api = {
     }).then((r) => r.json());
   },
 
+  repoGraphOverview: (repoPath: string, dir?: string, limit?: number, minCochangeWeight?: number) => {
+    const body: Record<string, unknown> = { repoPath, mode: "overview" };
+    if (dir !== undefined) body.dir = dir;
+    if (limit !== undefined) body.limit = limit;
+    if (minCochangeWeight !== undefined) body.minCochangeWeight = minCochangeWeight;
+
+    return fetchOk(`${API}/graph`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+  },
+
+  graphNeighbors: (repoPath: string, filePath: string, cochangeLimit?: number) =>
+    fetchOk(`${API}/graph/neighbors`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repoPath, path: filePath, cochangeLimit }),
+    }).then((r) => r.json()),
+
   grep: (repoPath: string, query: string, limit = 20) =>
     fetchOk(`${API}/grep`, {
       method: "POST",

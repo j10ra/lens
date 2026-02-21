@@ -1,31 +1,24 @@
-import { Badge, cn } from "@lens/ui";
-import { Billboard, Line, OrbitControls, Text } from "@react-three/drei";
+import { Badge, cn, FileTypeFilter, type FileTypeFilterOption } from "@lens/ui";
+import { Line, OrbitControls, PointMaterial } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-// biome-ignore lint/performance/noBarrelFile: need all icons
-import {
-  ChevronRight,
-  ExternalLink,
-  Folder,
-} from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useParams, useSearchParams } from "react-router";
 import { CameraController } from "../components/explore/CameraController.js";
 import { CommandPalette } from "../components/explore/CommandPalette.js";
+import { FileCloud } from "../components/explore/FileCloud.js";
+import { LODLabels } from "../components/explore/LODLabels.js";
 import { api } from "../lib/api.js";
 import type { FileLayoutEdge, FileLayoutNode } from "../lib/graph-layout.js";
 import { layoutFiles } from "../lib/graph-layout.js";
-import type { GraphCochange, GraphDetail } from "../lib/graph-types.js";
+import type { FileNeighborhood, GraphCochange, GraphOverview } from "../lib/graph-types.js";
 import { languageColor } from "../lib/language-colors.js";
-import { useGraphDetail } from "../queries/use-repo-graph.js";
+import { useGraphNeighbors, useGraphOverview } from "../queries/use-repo-graph.js";
 import { useRepos } from "../queries/use-repos.js";
 
 // ── 3D Components ────────────────────────────────────────────────────────────
 
-function spherePoint(
-  index: number,
-  total: number,
-  radius: number,
-): [number, number, number] {
+function spherePoint(index: number, total: number, radius: number): [number, number, number] {
   if (total <= 1) return [radius, 0, 0];
   const golden = Math.PI * (3 - Math.sqrt(5));
   const y = 1 - (index / (total - 1)) * 2;
@@ -144,88 +137,6 @@ function useIsDarkTheme(): boolean {
   return isDark;
 }
 
-function FileNode({
-  node,
-  selected,
-  dimmed,
-  cochangeHighlighted = false,
-  showLabel = false,
-  sceneTheme,
-  onSelect,
-}: {
-  node: FileLayoutNode;
-  selected: boolean;
-  dimmed: boolean;
-  cochangeHighlighted?: boolean;
-  showLabel?: boolean;
-  sceneTheme: ExploreSceneTheme;
-  onSelect: (id: string) => void;
-}) {
-  const color = languageColor(node.language);
-  const fileName = node.id.split("/").pop() ?? node.id;
-  const label = fileName.length > 22 ? `${fileName.slice(0, 21)}…` : fileName;
-
-  // Scale by heat (hubScore 0–1) — sqrt for better spread across low values
-  const heat = Math.sqrt(Math.min(1, Math.max(0, node.hubScore)));
-  const dotRadius = selected ? 0.022 + heat * 0.1 : 0.016 + heat * 0.075;
-  const fontSize = selected ? 0.085 + heat * 0.09 : 0.055 + heat * 0.065;
-  const textOpacity = dimmed ? 0.25 : selected ? 0.98 : 0.7 + heat * 0.24;
-  const dotColor = selected
-    ? "#ffffff"
-    : cochangeHighlighted
-      ? sceneTheme.cochangeEdge
-      : color;
-  const dotOpacity = dimmed
-    ? 0.16
-    : cochangeHighlighted
-      ? 0.55 + heat * 0.35
-      : 0.32 + heat * 0.62;
-
-  return (
-    <Billboard
-      position={[node.x, node.y, node.z]}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect(node.id);
-      }}
-    >
-      {/* Language color dot — size scales with heat */}
-      <mesh position={[0, 0, 0.01]}>
-        <circleGeometry args={[dotRadius, 32]} />
-        <meshBasicMaterial color={dotColor} transparent opacity={dotOpacity} />
-      </mesh>
-      {/* Filename — size and brightness scale with heat */}
-      {showLabel && (
-        <Text
-          position={[dotRadius + 0.04, 0, 0]}
-          fontSize={fontSize}
-          anchorX="left"
-          anchorY="middle"
-          maxWidth={2.8}
-          color={
-            dimmed
-              ? sceneTheme.labelDim
-              : selected
-                ? sceneTheme.labelSelected
-                : heat > 0.35
-                  ? sceneTheme.labelHot
-                  : heat > 0.12
-                    ? sceneTheme.labelMid
-                    : sceneTheme.labelCold
-          }
-          outlineWidth={dimmed ? 0.003 : selected ? 0.016 : 0.01}
-          outlineColor={sceneTheme.labelOutline}
-          outlineBlur={selected ? 0.15 : 0.06}
-          fontWeight={heat > 0.22 || selected ? "bold" : "normal"}
-        >
-          {label}
-          <meshBasicMaterial transparent opacity={textOpacity} />
-        </Text>
-      )}
-    </Billboard>
-  );
-}
-
 function ImportEdges({
   nodes,
   edges,
@@ -246,9 +157,8 @@ function ImportEdges({
         const t = nodeMap.get(e.target);
         if (!s || !t) return null;
 
-        const isHighlighted =
-          selectedId && (e.source === selectedId || e.target === selectedId);
-        if (selectedId && !isHighlighted) return null; // hide unrelated edges when file selected
+        const isHighlighted = selectedId && (e.source === selectedId || e.target === selectedId);
+        if (selectedId && !isHighlighted) return null;
 
         return (
           <Line
@@ -257,9 +167,7 @@ function ImportEdges({
               [s.x, s.y, s.z],
               [t.x, t.y, t.z],
             ]}
-            color={
-              isHighlighted ? sceneTheme.importEdge : sceneTheme.importEdgeMuted
-            }
+            color={isHighlighted ? sceneTheme.importEdge : sceneTheme.importEdgeMuted}
             lineWidth={isHighlighted ? 1.5 : 0.5}
             opacity={isHighlighted ? 0.7 : 0.12}
             transparent
@@ -283,7 +191,7 @@ function CochangeEdges({
 }) {
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
-  if (!selectedId) return null; // only show cochange edges when a file is selected
+  if (!selectedId) return null;
 
   return (
     <group>
@@ -334,16 +242,9 @@ function SceneBackdrop({ sceneTheme }: { sceneTheme: ExploreSceneTheme }) {
 
   return (
     <>
-      <fog
-        attach="fog"
-        args={[sceneTheme.fogColor, sceneTheme.fogNear, sceneTheme.fogFar]}
-      />
+      <fog attach="fog" args={[sceneTheme.fogColor, sceneTheme.fogNear, sceneTheme.fogFar]} />
       <ambientLight intensity={sceneTheme.ambientIntensity} />
-      <pointLight
-        position={[8, 5, 6]}
-        intensity={sceneTheme.keyLightIntensity}
-        color={sceneTheme.keyLightColor}
-      />
+      <pointLight position={[8, 5, 6]} intensity={sceneTheme.keyLightIntensity} color={sceneTheme.keyLightColor} />
       <pointLight
         position={[-10, -6, -8]}
         intensity={sceneTheme.fillLightIntensity}
@@ -354,7 +255,7 @@ function SceneBackdrop({ sceneTheme }: { sceneTheme: ExploreSceneTheme }) {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[stars, 3]} />
         </bufferGeometry>
-        <pointsMaterial
+        <PointMaterial
           color={sceneTheme.starColor}
           size={0.03}
           sizeAttenuation
@@ -371,57 +272,46 @@ function SceneBackdrop({ sceneTheme }: { sceneTheme: ExploreSceneTheme }) {
 
 function FileInfoPanel({
   repoId,
-  fileId,
-  detail,
+  neighbors,
+  neighborsLoading,
   onClose,
   onNavigate,
 }: {
   repoId: string;
-  fileId: string;
-  detail: GraphDetail;
+  neighbors: FileNeighborhood | undefined;
+  neighborsLoading: boolean;
   onClose: () => void;
   onNavigate: (path: string) => void;
 }) {
-  const file = detail.files.find((f) => f.path === fileId);
-  if (!file) return null;
-
-  const color = languageColor(file.language);
-  const importers = detail.edges
-    .filter((e) => e.target === fileId)
-    .map((e) => e.source);
-  const imports = detail.edges
-    .filter((e) => e.source === fileId)
-    .map((e) => e.target);
-  const cochanges = detail.cochanges
-    .filter((c) => c.source === fileId || c.target === fileId)
-    .map((c) => ({
-      path: c.source === fileId ? c.target : c.source,
-      weight: c.weight,
-    }))
-    .sort((a, b) => b.weight - a.weight);
-
   const shortPath = (p: string) => p.split("/").pop() ?? p;
-  const openInEditor = async (line?: number) => {
+  const openInEditor = async (path: string, line?: number) => {
     try {
-      await api.openFile(repoId, file.path, line);
+      await api.openFile(repoId, path, line);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       window.alert(`Failed to open editor: ${message}`);
     }
   };
 
+  if (neighborsLoading) {
+    return (
+      <div className="absolute left-auto right-3 top-3 bottom-3 z-10 w-96 rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-xl text-xs overflow-y-auto flex items-center justify-center">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!neighbors) return null;
+  const file = neighbors.file;
+  const color = languageColor(file.language);
+
   return (
     <div className="absolute left-auto right-3 top-3 bottom-3 z-10 w-96 rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-xl text-xs overflow-y-auto">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2 min-w-0">
-          <span
-            className="shrink-0 w-3 h-3 rounded-full"
-            style={{ backgroundColor: color }}
-          />
-          <span className="font-mono font-semibold text-sm truncate">
-            {shortPath(file.path)}
-          </span>
+          <span className="shrink-0 w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+          <span className="font-mono font-semibold text-sm truncate">{shortPath(file.path)}</span>
         </div>
         <button
           type="button"
@@ -434,12 +324,10 @@ function FileInfoPanel({
 
       <div className="px-4 py-3 space-y-3">
         {/* Full path */}
-        <div className="text-muted-foreground font-mono text-[11px] break-all">
-          {file.path}
-        </div>
+        <div className="text-muted-foreground font-mono text-[11px] break-all">{file.path}</div>
         <button
           type="button"
-          onClick={() => void openInEditor()}
+          onClick={() => void openInEditor(file.path)}
           className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/50"
         >
           <ExternalLink className="h-3 w-3" />
@@ -454,10 +342,7 @@ function FileInfoPanel({
             </Badge>
           )}
           {file.isHub && (
-            <Badge
-              variant="outline"
-              className="text-[10px] border-amber-500/50 text-amber-400"
-            >
+            <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-400">
               hub
             </Badge>
           )}
@@ -469,20 +354,16 @@ function FileInfoPanel({
         {/* Git activity */}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-center">
-            <div className="text-foreground font-semibold text-sm">
-              {file.commits}
-            </div>
+            <div className="text-foreground font-semibold text-sm">{file.commits}</div>
             <div className="text-muted-foreground text-[9px]">commits</div>
           </div>
           <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-center">
-            <div className="text-foreground font-semibold text-sm">
-              {file.recent90d}
-            </div>
+            <div className="text-foreground font-semibold text-sm">{file.recent90d}</div>
             <div className="text-muted-foreground text-[9px]">last 90d</div>
           </div>
           <div className="rounded-md bg-muted/50 px-2.5 py-1.5 text-center">
             <div className="text-foreground font-semibold text-sm">
-              {importers.length + imports.length}
+              {neighbors.imports.length + neighbors.importers.length}
             </div>
             <div className="text-muted-foreground text-[9px]">connections</div>
           </div>
@@ -491,22 +372,15 @@ function FileInfoPanel({
         {/* Exports */}
         {file.exports.length > 0 && (
           <div>
-            <div className="text-muted-foreground font-medium mb-1">
-              Exports ({file.exports.length})
-            </div>
+            <div className="text-muted-foreground font-medium mb-1">Exports ({file.exports.length})</div>
             <div className="flex flex-wrap gap-1">
               {file.exports.slice(0, 12).map((e) => (
-                <span
-                  key={e}
-                  className="font-mono text-[10px] bg-muted/60 px-1.5 py-0.5 rounded text-foreground/80"
-                >
+                <span key={e} className="font-mono text-[10px] bg-muted/60 px-1.5 py-0.5 rounded text-foreground/80">
                   {e}
                 </span>
               ))}
               {file.exports.length > 12 && (
-                <span className="text-[10px] text-muted-foreground">
-                  +{file.exports.length - 12}
-                </span>
+                <span className="text-[10px] text-muted-foreground">+{file.exports.length - 12}</span>
               )}
             </div>
           </div>
@@ -515,58 +389,44 @@ function FileInfoPanel({
         {/* Symbols */}
         {file.symbols.length > 0 && (
           <div>
-            <div className="text-muted-foreground font-medium mb-1">
-              Symbols ({file.symbols.length})
-            </div>
+            <div className="text-muted-foreground font-medium mb-1">Symbols ({file.symbols.length})</div>
             <div className="space-y-1">
               {file.symbols.slice(0, 12).map((symbol) => (
                 <button
                   key={`${symbol.kind}:${symbol.name}:${symbol.line}`}
                   type="button"
-                  onClick={() => void openInEditor(symbol.line)}
+                  onClick={() => void openInEditor(file.path, symbol.line)}
                   className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-[10px] hover:bg-muted/50"
                 >
-                  <Badge
-                    variant="outline"
-                    className="h-4 px-1.5 font-mono text-[9px] lowercase"
-                  >
+                  <Badge variant="outline" className="h-4 px-1.5 font-mono text-[9px] lowercase">
                     {symbol.kind}
                   </Badge>
-                  <span className="flex-1 truncate font-mono text-foreground/85">
-                    {symbol.name}
-                  </span>
-                  <span className="shrink-0 font-mono text-muted-foreground">
-                    L{symbol.line}
-                  </span>
+                  <span className="flex-1 truncate font-mono text-foreground/85">{symbol.name}</span>
+                  <span className="shrink-0 font-mono text-muted-foreground">L{symbol.line}</span>
                   <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/80" />
                   {symbol.exported && (
-                    <Badge
-                      variant="secondary"
-                      className="h-4 px-1.5 font-mono text-[9px]"
-                    >
+                    <Badge variant="secondary" className="h-4 px-1.5 font-mono text-[9px]">
                       export
                     </Badge>
                   )}
                 </button>
               ))}
               {file.symbols.length > 12 && (
-                <span className="text-[10px] text-muted-foreground">
-                  +{file.symbols.length - 12} more
-                </span>
+                <span className="text-[10px] text-muted-foreground">+{file.symbols.length - 12} more</span>
               )}
             </div>
           </div>
         )}
 
         {/* Imported by */}
-        {importers.length > 0 && (
+        {neighbors.importers.length > 0 && (
           <div>
             <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-400" />
-              Imported by ({importers.length})
+              Imported by ({neighbors.importers.length})
             </div>
             <div className="space-y-0.5">
-              {importers.slice(0, 8).map((p) => (
+              {neighbors.importers.slice(0, 8).map((p) => (
                 <button
                   key={p}
                   type="button"
@@ -574,29 +434,25 @@ function FileInfoPanel({
                   className="flex w-full items-center gap-1 truncate pl-4 text-left font-mono text-[10px] text-foreground/80 hover:text-primary"
                 >
                   <span className="truncate">{shortPath(p)}</span>
-                  <span className="truncate text-muted-foreground/50">
-                    {p.split("/").slice(0, -1).join("/")}
-                  </span>
+                  <span className="truncate text-muted-foreground/50">{p.split("/").slice(0, -1).join("/")}</span>
                 </button>
               ))}
-              {importers.length > 8 && (
-                <div className="text-[10px] text-muted-foreground pl-4">
-                  +{importers.length - 8} more
-                </div>
+              {neighbors.importers.length > 8 && (
+                <div className="text-[10px] text-muted-foreground pl-4">+{neighbors.importers.length - 8} more</div>
               )}
             </div>
           </div>
         )}
 
         {/* Imports */}
-        {imports.length > 0 && (
+        {neighbors.imports.length > 0 && (
           <div>
             <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-400" />
-              Imports ({imports.length})
+              Imports ({neighbors.imports.length})
             </div>
             <div className="space-y-0.5">
-              {imports.slice(0, 8).map((p) => (
+              {neighbors.imports.slice(0, 8).map((p) => (
                 <button
                   key={p}
                   type="button"
@@ -604,29 +460,25 @@ function FileInfoPanel({
                   className="flex w-full items-center gap-1 truncate pl-4 text-left font-mono text-[10px] text-foreground/80 hover:text-primary"
                 >
                   <span className="truncate">{shortPath(p)}</span>
-                  <span className="truncate text-muted-foreground/50">
-                    {p.split("/").slice(0, -1).join("/")}
-                  </span>
+                  <span className="truncate text-muted-foreground/50">{p.split("/").slice(0, -1).join("/")}</span>
                 </button>
               ))}
-              {imports.length > 8 && (
-                <div className="text-[10px] text-muted-foreground pl-4">
-                  +{imports.length - 8} more
-                </div>
+              {neighbors.imports.length > 8 && (
+                <div className="text-[10px] text-muted-foreground pl-4">+{neighbors.imports.length - 8} more</div>
               )}
             </div>
           </div>
         )}
 
         {/* Co-changes */}
-        {cochanges.length > 0 && (
+        {neighbors.cochanges.length > 0 && (
           <div>
             <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400" />
-              Co-changed with ({cochanges.length})
+              Co-changed with ({neighbors.cochanges.length})
             </div>
             <div className="space-y-0.5">
-              {cochanges.slice(0, 8).map((c) => (
+              {neighbors.cochanges.slice(0, 8).map((c) => (
                 <button
                   key={c.path}
                   type="button"
@@ -634,18 +486,12 @@ function FileInfoPanel({
                   className="flex w-full items-center gap-1 truncate pl-4 text-left font-mono text-[10px] text-foreground/80 hover:text-primary"
                 >
                   <span className="truncate">{shortPath(c.path)}</span>
-                  <span className="text-amber-400/70 shrink-0">
-                    ×{c.weight}
-                  </span>
-                  <span className="truncate text-muted-foreground/50">
-                    {c.path.split("/").slice(0, -1).join("/")}
-                  </span>
+                  <span className="text-amber-400/70 shrink-0">×{c.weight}</span>
+                  <span className="truncate text-muted-foreground/50">{c.path.split("/").slice(0, -1).join("/")}</span>
                 </button>
               ))}
-              {cochanges.length > 8 && (
-                <div className="text-[10px] text-muted-foreground pl-4">
-                  +{cochanges.length - 8} more
-                </div>
+              {neighbors.cochanges.length > 8 && (
+                <div className="text-[10px] text-muted-foreground pl-4">+{neighbors.cochanges.length - 8} more</div>
               )}
             </div>
           </div>
@@ -667,151 +513,41 @@ function FileInfoPanel({
   );
 }
 
-// ── File Tree ────────────────────────────────────────────────────────────────
+// ── File Type Filters ────────────────────────────────────────────────────────
 
-interface TreeNode {
-  name: string;
-  path: string;
-  children: Map<string, TreeNode>;
-  isFile: boolean;
-  language: string | null;
-  isHub: boolean;
+const FILE_EXTENSION_REGEX = /(\.[a-z0-9_-]+)$/i;
+const DOTFILE_REGEX = /^\.[a-z0-9_-]+$/i;
+
+function fileTypeFromPath(path: string): string {
+  const fileName = path.split("/").pop() ?? path;
+  const extension = fileName.match(FILE_EXTENSION_REGEX)?.[1];
+  if (extension) return extension.toLowerCase();
+  if (DOTFILE_REGEX.test(fileName)) return fileName.toLowerCase();
+  return "(no ext)";
 }
 
-function buildTree(files: FileLayoutNode[]): TreeNode {
-  const root: TreeNode = {
-    name: "",
-    path: "",
-    children: new Map(),
-    isFile: false,
-    language: null,
-    isHub: false,
-  };
-  for (const f of files) {
-    const parts = f.id.split("/");
-    let current = root;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      if (!current.children.has(part)) {
-        current.children.set(part, {
-          name: part,
-          path: parts.slice(0, i + 1).join("/"),
-          children: new Map(),
-          isFile: i === parts.length - 1,
-          language: i === parts.length - 1 ? f.language : null,
-          isHub: i === parts.length - 1 ? f.isHub : false,
-        });
-      }
-      current = current.children.get(part)!;
-    }
-  }
-  return root;
-}
-
-function TreeEntry({
-  node,
-  depth,
-  selectedFile,
-  onSelect,
-  defaultOpen,
-}: {
-  node: TreeNode;
-  depth: number;
-  selectedFile: string | null;
-  onSelect: (path: string) => void;
-  defaultOpen: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  const isSelected = node.isFile && node.path === selectedFile;
-  const children = Array.from(node.children.values()).sort((a, b) => {
-    if (a.isFile !== b.isFile) return a.isFile ? 1 : -1;
-    return a.name.localeCompare(b.name);
-  });
-
-  if (node.isFile) {
-    const color = languageColor(node.language);
-    return (
-      <button
-        type="button"
-        onClick={() => onSelect(node.path)}
-        className={`flex items-center gap-1.5 w-full text-left py-0.5 px-1 rounded text-[11px] font-mono truncate hover:bg-muted/50 ${
-          isSelected ? "bg-muted text-foreground" : "text-muted-foreground"
-        }`}
-        style={{ paddingLeft: `${depth * 12 + 4}px` }}
-      >
-        <span
-          className="shrink-0 w-2 h-2 rounded-full"
-          style={{ backgroundColor: color }}
-        />
-        <span className="truncate">{node.name}</span>
-        {node.isHub && (
-          <span className="text-[8px] text-amber-400 shrink-0">hub</span>
-        )}
-      </button>
-    );
+function buildFileTypeOptions(files: GraphOverview["files"]): FileTypeFilterOption[] {
+  const counts = new Map<string, number>();
+  for (const file of files) {
+    const type = fileTypeFromPath(file.path);
+    counts.set(type, (counts.get(type) ?? 0) + 1);
   }
 
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 w-full text-left py-0.5 px-1 rounded text-[11px] font-mono text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-        style={{ paddingLeft: `${depth * 12 + 4}px` }}
-      >
-        <ChevronRight
-          className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
-        />
-        <Folder className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-        <span className="truncate">{node.name}</span>
-        <span className="text-[9px] text-muted-foreground/40 ml-auto shrink-0">
-          {node.children.size}
-        </span>
-      </button>
-      {open &&
-        children.map((child) => (
-          <TreeEntry
-            key={child.path}
-            node={child}
-            depth={depth + 1}
-            selectedFile={selectedFile}
-            onSelect={onSelect}
-            defaultOpen={depth < 1}
-          />
-        ))}
-    </div>
-  );
+  return Array.from(counts.entries())
+    .map(([type, count]) => ({
+      value: type,
+      label: type,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-function FileTree({
-  nodes,
-  selectedFile,
-  onSelect,
-}: {
-  nodes: FileLayoutNode[];
-  selectedFile: string | null;
-  onSelect: (path: string) => void;
-}) {
-  const tree = useMemo(() => buildTree(nodes), [nodes]);
-  const topChildren = Array.from(tree.children.values()).sort((a, b) => {
-    if (a.isFile !== b.isFile) return a.isFile ? 1 : -1;
-    return a.name.localeCompare(b.name);
-  });
-
-  return (
-    <div className="h-full overflow-y-auto overflow-x-hidden py-1 scrollbar-thin">
-      {topChildren.map((child) => (
-        <TreeEntry
-          key={child.path}
-          node={child}
-          depth={0}
-          selectedFile={selectedFile}
-          onSelect={onSelect}
-          defaultOpen
-        />
-      ))}
-    </div>
-  );
+function areSetsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  if (left.size !== right.size) return false;
+  for (const value of left) {
+    if (!right.has(value)) return false;
+  }
+  return true;
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -825,24 +561,21 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
   const { data: repos } = useRepos();
   const repo = repos?.find((r) => r.id === repoId);
 
-  // Empty string means "all files detail". Non-empty uses backend dir filtering.
-  const { data: detail, isLoading } = useGraphDetail(
-    repo?.root_path,
-    activeDir,
-  );
+  // Overview data (lightweight — no symbols/exports)
+  const { data: overview, isLoading } = useGraphOverview(repo?.root_path, activeDir);
 
-  const layout = useMemo<{
-    nodes: FileLayoutNode[];
-    edges: FileLayoutEdge[];
-  } | null>(() => {
-    if (!detail || detail.files.length === 0) return null;
-    return layoutFiles(detail);
-  }, [detail]);
-
+  // Neighbors data (on-demand — full detail for selected file)
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [cameraTarget, setCameraTarget] = useState<
-    [number, number, number] | null
-  >(null);
+  const { data: neighbors, isLoading: neighborsLoading } = useGraphNeighbors(repo?.root_path, selectedFile);
+
+  const fileTypeOptions = useMemo<FileTypeFilterOption[]>(() => {
+    if (!overview) return [];
+    return buildFileTypeOptions(overview.files);
+  }, [overview]);
+  const allFileTypeValues = useMemo(() => fileTypeOptions.map((option) => option.value), [fileTypeOptions]);
+
+  const [selectedFileTypes, setSelectedFileTypes] = useState<Set<string> | null>(null);
+  const [cameraTarget, setCameraTarget] = useState<[number, number, number] | null>(null);
   const [autoRotateDirection, setAutoRotateDirection] = useState(1);
   const orbitRef = useRef<any>(null);
   const draggingRef = useRef(false);
@@ -853,14 +586,98 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
   const hadOrbitInteractionRef = useRef(false);
   const suppressCanvasClickRef = useRef(false);
 
-  // Cochanges with valid endpoints
-  const validCochanges = useMemo(() => {
-    if (!detail || !layout) return [];
-    const nodeSet = new Set(layout.nodes.map((n) => n.id));
-    return detail.cochanges.filter(
-      (c) => nodeSet.has(c.source) && nodeSet.has(c.target),
+  useEffect(() => {
+    const availableTypes = new Set(allFileTypeValues);
+    setSelectedFileTypes((prev) => {
+      if (availableTypes.size === 0) return prev;
+      if (prev == null) return availableTypes;
+
+      const next = new Set<string>();
+      for (const type of prev) {
+        if (availableTypes.has(type)) next.add(type);
+      }
+      if (next.size === 0 && prev.size > 0) return availableTypes;
+      return areSetsEqual(prev, next) ? prev : next;
+    });
+  }, [allFileTypeValues]);
+
+  const selectedFileTypeSet = useMemo(
+    () => selectedFileTypes ?? new Set(allFileTypeValues),
+    [selectedFileTypes, allFileTypeValues],
+  );
+
+  const toggleFileType = useCallback(
+    (type: string) => {
+      setSelectedFileTypes((prev) => {
+        const next = new Set(prev ?? allFileTypeValues);
+        if (next.has(type)) next.delete(type);
+        else next.add(type);
+        return next;
+      });
+    },
+    [allFileTypeValues],
+  );
+
+  const toggleAllFileTypes = useCallback(() => {
+    setSelectedFileTypes((prev) => {
+      const base = prev ?? new Set(allFileTypeValues);
+      if (base.size === allFileTypeValues.length) return new Set<string>();
+      return new Set(allFileTypeValues);
+    });
+  }, [allFileTypeValues]);
+
+  // Filter overview data by selected file types
+  const filteredOverview = useMemo<GraphOverview | null>(() => {
+    if (!overview) return null;
+    if (selectedFileTypeSet.size === 0) {
+      return { files: [], edges: [], cochanges: [], totalFiles: overview.totalFiles };
+    }
+
+    const files = overview.files.filter((file) => selectedFileTypeSet.has(fileTypeFromPath(file.path)));
+    const visiblePathSet = new Set(files.map((file) => file.path));
+    const edges = overview.edges.filter((edge) => visiblePathSet.has(edge.source) && visiblePathSet.has(edge.target));
+    const cochanges = overview.cochanges.filter(
+      (cochange) => visiblePathSet.has(cochange.source) && visiblePathSet.has(cochange.target),
     );
-  }, [detail, layout]);
+
+    return { files, edges, cochanges, totalFiles: overview.totalFiles };
+  }, [overview, selectedFileTypeSet]);
+
+  const selectedFileCount = filteredOverview?.files.length ?? 0;
+
+  const layout = useMemo<{
+    nodes: FileLayoutNode[];
+    edges: FileLayoutEdge[];
+  } | null>(() => {
+    if (!filteredOverview || filteredOverview.files.length === 0) return null;
+    return layoutFiles(filteredOverview);
+  }, [filteredOverview]);
+
+  // Filtered cochanges with valid endpoints — merge overview + neighbors data
+  const validCochanges = useMemo(() => {
+    if (!layout) return [];
+    const nodeSet = new Set(layout.nodes.map((n) => n.id));
+
+    // Start with overview cochanges
+    const overviewCochanges = filteredOverview
+      ? filteredOverview.cochanges.filter((c) => nodeSet.has(c.source) && nodeSet.has(c.target))
+      : [];
+
+    // When neighbors loaded, supplement with neighbor cochanges (for edges the overview may have pruned)
+    if (!selectedFile || !neighbors) return overviewCochanges;
+
+    const existing = new Set(overviewCochanges.map((c) => `${c.source}\0${c.target}`));
+    const extra = neighbors.cochanges
+      .filter(
+        (c) =>
+          nodeSet.has(c.path) &&
+          !existing.has(`${selectedFile}\0${c.path}`) &&
+          !existing.has(`${c.path}\0${selectedFile}`),
+      )
+      .map((c) => ({ source: selectedFile, target: c.path, weight: c.weight }));
+
+    return [...overviewCochanges, ...extra];
+  }, [filteredOverview, layout, selectedFile, neighbors]);
 
   const findNodePos = useCallback(
     (id: string): [number, number, number] | null => {
@@ -872,38 +689,56 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
     [layout],
   );
 
-  // Connected node IDs (imports + cochanges) for dimming
+  // Connected node IDs from neighbors data (when available) or overview edges
   const connectedIds = useMemo(() => {
-    if (!selectedFile || !detail) return null;
+    if (!selectedFile) return null;
     const ids = new Set<string>([selectedFile]);
-    for (const e of detail.edges) {
-      if (e.source === selectedFile) ids.add(e.target);
-      if (e.target === selectedFile) ids.add(e.source);
-    }
-    for (const c of detail.cochanges) {
-      if (c.source === selectedFile) ids.add(c.target);
-      if (c.target === selectedFile) ids.add(c.source);
+
+    if (neighbors) {
+      for (const p of neighbors.imports) ids.add(p);
+      for (const p of neighbors.importers) ids.add(p);
+      for (const c of neighbors.cochanges) ids.add(c.path);
+    } else if (filteredOverview) {
+      for (const e of filteredOverview.edges) {
+        if (e.source === selectedFile) ids.add(e.target);
+        if (e.target === selectedFile) ids.add(e.source);
+      }
+      for (const c of filteredOverview.cochanges) {
+        if (c.source === selectedFile) ids.add(c.target);
+        if (c.target === selectedFile) ids.add(c.source);
+      }
     }
     return ids;
-  }, [selectedFile, detail]);
+  }, [selectedFile, neighbors, filteredOverview]);
+
   const importIds = useMemo(() => {
-    if (!selectedFile || !detail) return null;
+    if (!selectedFile) return null;
     const ids = new Set<string>();
-    for (const e of detail.edges) {
-      if (e.source === selectedFile) ids.add(e.target);
-      if (e.target === selectedFile) ids.add(e.source);
+    if (neighbors) {
+      for (const p of neighbors.imports) ids.add(p);
+      for (const p of neighbors.importers) ids.add(p);
+    } else if (filteredOverview) {
+      for (const e of filteredOverview.edges) {
+        if (e.source === selectedFile) ids.add(e.target);
+        if (e.target === selectedFile) ids.add(e.source);
+      }
     }
     return ids;
-  }, [selectedFile, detail]);
+  }, [selectedFile, neighbors, filteredOverview]);
+
   const cochangeIds = useMemo(() => {
     if (!selectedFile) return null;
     const ids = new Set<string>();
-    for (const c of validCochanges) {
-      if (c.source === selectedFile) ids.add(c.target);
-      if (c.target === selectedFile) ids.add(c.source);
+    if (neighbors) {
+      for (const c of neighbors.cochanges) ids.add(c.path);
+    } else {
+      for (const c of validCochanges) {
+        if (c.source === selectedFile) ids.add(c.target);
+        if (c.target === selectedFile) ids.add(c.source);
+      }
     }
     return ids;
-  }, [selectedFile, validCochanges]);
+  }, [selectedFile, neighbors, validCochanges]);
 
   const sceneNodes = useMemo(() => {
     if (!layout) return [] as FileLayoutNode[];
@@ -912,15 +747,10 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
     const selected = layout.nodes.find((n) => n.id === selectedFile);
     if (!selected) return layout.nodes;
 
-    const connectedNodes = layout.nodes.filter(
-      (n) => n.id !== selectedFile && connectedIds.has(n.id),
-    );
+    const connectedNodes = layout.nodes.filter((n) => n.id !== selectedFile && connectedIds.has(n.id));
     if (connectedNodes.length === 0) return layout.nodes;
 
-    const spreadRadius = Math.min(
-      4.8,
-      Math.max(1.8, 1.2 + Math.sqrt(connectedNodes.length) * 0.42),
-    );
+    const spreadRadius = Math.min(4.8, Math.max(1.8, 1.2 + Math.sqrt(connectedNodes.length) * 0.42));
     const ordered = [...connectedNodes].sort((a, b) => {
       if (a.hubScore !== b.hubScore) return b.hubScore - a.hubScore;
       return a.id.localeCompare(b.id);
@@ -929,11 +759,7 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
     const repositioned = new Map<string, [number, number, number]>();
     for (let i = 0; i < ordered.length; i++) {
       const [ox, oy, oz] = spherePoint(i, ordered.length, spreadRadius);
-      repositioned.set(ordered[i].id, [
-        selected.x + ox,
-        selected.y + oy,
-        selected.z + oz,
-      ]);
+      repositioned.set(ordered[i].id, [selected.x + ox, selected.y + oy, selected.z + oz]);
     }
 
     return layout.nodes.map((n) => {
@@ -949,15 +775,18 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
     return Math.min(10, Math.max(6, 4.6 + Math.sqrt(count) * 0.9));
   }, [selectedFile, connectedIds]);
 
-  const labelIds = useMemo(
-    () => new Set(sceneNodes.map((n) => n.id)),
-    [sceneNodes],
-  );
-
   const clearFocus = useCallback(() => {
     setSelectedFile(null);
     setCameraTarget(null);
   }, []);
+
+  useEffect(() => {
+    if (!selectedFile) return;
+    const selectedFileVisible = filteredOverview?.files.some((file) => file.path === selectedFile) ?? false;
+    if (!selectedFileVisible) {
+      // File not in overview — keep selected for neighbors panel but don't try to find its position
+    }
+  }, [selectedFile, filteredOverview]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1003,8 +832,7 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
     if (prevAzimuth != null && prevPolar != null) {
       const azimuthDelta = currentAzimuth - prevAzimuth;
       const polarDelta = currentPolar - prevPolar;
-      const moved =
-        Math.abs(azimuthDelta) > 2e-3 || Math.abs(polarDelta) > 2e-3;
+      const moved = Math.abs(azimuthDelta) > 2e-3 || Math.abs(polarDelta) > 2e-3;
       if (moved) {
         hadOrbitInteractionRef.current = true;
         if (Math.abs(azimuthDelta) > 1e-4) {
@@ -1026,60 +854,56 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
     }
     const delta = lastDragDeltaRef.current;
     if (Math.abs(delta) > 1e-4) {
-      // OrbitControls auto-rotate sign is opposite drag theta delta.
       setAutoRotateDirection(delta < 0 ? 1 : -1);
     }
   }, []);
 
   if (!repoId) return null;
 
-  const showCanvas = !isLoading && layout && layout.nodes.length > 0;
+  const showFileTypeFilter = !isLoading && !!overview;
+  const showCanvas = !isLoading && !!layout && layout.nodes.length > 0;
   const overviewDistance = useMemo(() => {
     if (!layout || layout.nodes.length === 0) return 8;
-    const maxRadius = layout.nodes.reduce(
-      (max, n) => Math.max(max, Math.hypot(n.x, n.y, n.z)),
-      0,
-    );
+    const maxRadius = layout.nodes.reduce((max, n) => Math.max(max, Math.hypot(n.x, n.y, n.z)), 0);
     return Math.min(10, Math.max(5.2, maxRadius * 2.05));
   }, [layout]);
   const focusPanelCompensationPx = selectedFile ? 200 : 0;
 
   return (
     <div className="flex flex-1 min-h-0">
-      {showCanvas && layout && (
+      {showFileTypeFilter && (
         <div className="w-56 shrink-0 border-r border-border bg-background overflow-hidden flex flex-col">
           <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground border-b border-border uppercase tracking-wider">
-            Files
+            Filters
           </div>
-          <FileTree
-            nodes={layout.nodes}
-            selectedFile={selectedFile}
-            onSelect={handleFileSelect}
+          <FileTypeFilter
+            options={fileTypeOptions}
+            selected={selectedFileTypeSet}
+            onToggleOption={toggleFileType}
+            onToggleAll={toggleAllFileTypes}
+            className="min-h-0 flex-1"
           />
+          <div className="px-3 py-2 text-[10px] text-muted-foreground border-t border-border">
+            <div>
+              {selectedFileCount.toLocaleString()} files
+              {overview && overview.totalFiles > overview.files.length && (
+                <span className="text-muted-foreground/60"> of {overview.totalFiles.toLocaleString()} total</span>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      <div
-        className={cn(
-          "relative flex-1 min-h-0 overflow-hidden",
-          sceneTheme.shellBgClass,
-        )}
-      >
-        <div
-          className={cn(
-            "pointer-events-none absolute inset-0 z-0",
-            sceneTheme.dotsTextureClass,
-          )}
-        />
-        <div
-          className={cn(
-            "pointer-events-none absolute inset-0 z-0",
-            sceneTheme.linesTextureClass,
-          )}
-        />
-        {!showCanvas ? (
+      <div className={cn("relative flex-1 min-h-0 overflow-hidden", sceneTheme.shellBgClass)}>
+        <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.dotsTextureClass)} />
+        <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.linesTextureClass)} />
+        {isLoading ? (
           <div className="relative z-[3] flex h-full items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : !showCanvas ? (
+          <div className="relative z-[3] flex h-full items-center justify-center px-8 text-center">
+            <div className="text-xs text-muted-foreground">No files match the selected file types.</div>
           </div>
         ) : (
           <Canvas
@@ -1106,26 +930,22 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
           >
             <SceneBackdrop sceneTheme={sceneTheme} />
 
-            {sceneNodes.map((n) => (
-              <FileNode
-                key={n.id}
-                node={n}
-                selected={n.id === selectedFile}
-                dimmed={!!connectedIds && !connectedIds.has(n.id)}
-                cochangeHighlighted={
-                  !!cochangeIds?.has(n.id) && !importIds?.has(n.id)
-                }
-                showLabel={labelIds.has(n.id)}
-                sceneTheme={sceneTheme}
-                onSelect={handleSceneNodeSelect}
-              />
-            ))}
-            <ImportEdges
+            <FileCloud
               nodes={sceneNodes}
-              edges={layout.edges}
               selectedId={selectedFile}
+              connectedIds={connectedIds}
+              importIds={importIds}
+              cochangeIds={cochangeIds}
+              cochangeEdgeColor={sceneTheme.cochangeEdge}
+              onSelect={handleSceneNodeSelect}
+            />
+            <LODLabels
+              nodes={sceneNodes}
+              selectedId={selectedFile}
+              connectedIds={connectedIds}
               sceneTheme={sceneTheme}
             />
+            <ImportEdges nodes={sceneNodes} edges={layout.edges} selectedId={selectedFile} sceneTheme={sceneTheme} />
             <CochangeEdges
               nodes={sceneNodes}
               cochanges={validCochanges}
@@ -1157,11 +977,11 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
           </Canvas>
         )}
 
-        {selectedFile && detail && (
+        {selectedFile && (
           <FileInfoPanel
             repoId={repoId}
-            fileId={selectedFile}
-            detail={detail}
+            neighbors={neighbors}
+            neighborsLoading={neighborsLoading}
             onNavigate={handleFileSelect}
             onClose={() => {
               clearFocus();
@@ -1169,14 +989,7 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
           />
         )}
 
-        {repo && (
-          <CommandPalette
-            repoPath={repo.root_path}
-            open
-            mode="pinned"
-            onSelect={handleFileSelect}
-          />
-        )}
+        {repo && <CommandPalette repoPath={repo.root_path} open mode="pinned" onSelect={handleFileSelect} />}
       </div>
     </div>
   );

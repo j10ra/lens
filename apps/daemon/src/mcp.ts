@@ -97,6 +97,36 @@ function registerTools(server: McpServer): void {
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     },
   );
+
+  server.registerTool(
+    "lens_graph_neighbors",
+    {
+      title: "LENS Graph Neighbors",
+      description:
+        "Get full detail for a single file and its neighborhood: symbols, exports, imports, importers, and co-change partners.",
+      inputSchema: {
+        repoPath: z.string().describe("Absolute path to the repository root"),
+        path: z.string().describe("File path relative to repo root (e.g. 'packages/engine/src/index.ts')"),
+        cochangeLimit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .default(30)
+          .describe("Max co-change partners to return. Default 30."),
+      },
+    },
+    async ({ repoPath, path, cochangeLimit }) => {
+      const res = await fetch(`${API}/graph/neighbors`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoPath, path, cochangeLimit }),
+      });
+      const data = await res.json();
+      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+    },
+  );
 }
 
 function createSession(): { transport: WebStandardStreamableHTTPServerTransport; server: McpServer } {

@@ -1,5 +1,20 @@
 import { forceCenter, forceLink, forceManyBody, forceSimulation } from "d3-force-3d";
-import type { GraphCluster, GraphClusterEdge, GraphDetail, GraphFileEdge } from "./graph-types.js";
+import type { GraphCluster, GraphClusterEdge, GraphFileEdge } from "./graph-types.js";
+
+/** Minimal file shape needed for layout — no symbols/exports required */
+export interface LayoutFileInput {
+  path: string;
+  language: string | null;
+  hubScore: number;
+  isHub: boolean;
+}
+
+/** Minimal graph shape needed for layout */
+export interface LayoutGraphInput {
+  files: LayoutFileInput[];
+  edges: GraphFileEdge[];
+  cochanges: { source: string; target: string; weight: number }[];
+}
 
 export interface LayoutNode {
   id: string;
@@ -30,12 +45,6 @@ export interface FileLayoutNode {
 export interface FileLayoutEdge {
   source: string;
   target: string;
-}
-
-/** Derive cluster key from file path — first 2 segments */
-function clusterKey(path: string): string {
-  const parts = path.split("/");
-  return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : parts[0];
 }
 
 /** Finer grouping for file view so initial sphere has many visible clusters. */
@@ -176,7 +185,7 @@ function forceClusterAnchor(strength: number) {
 }
 
 /** File-level layout — all files, grouped into spherical directory clusters. */
-export function layoutFiles(detail: GraphDetail): { nodes: FileLayoutNode[]; edges: FileLayoutEdge[] } {
+export function layoutFiles(detail: LayoutGraphInput): { nodes: FileLayoutNode[]; edges: FileLayoutEdge[] } {
   const files = detail.files;
   if (files.length === 0) return { nodes: [], edges: [] };
 

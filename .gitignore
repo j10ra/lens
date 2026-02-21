@@ -16,9 +16,5 @@ tsconfig.tsbuildinfo
 .env
 .dev.vars
 
-# Private skills
-.claude/skills/benchmark/
-.claude/skills/zlm/
-
 # OS
 .DS_Store

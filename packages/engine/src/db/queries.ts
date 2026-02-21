@@ -1,7 +1,7 @@
 import { and, count, eq, like, or, sql } from "drizzle-orm";
+import type { ParsedSymbol } from "../parsers/types.js";
 import type { Db } from "./connection.js";
 import { chunks, fileCochanges, fileImports, fileMetadata, fileStats, repos } from "./schema.js";
-import type { ParsedSymbol } from "../parsers/types.js";
 
 // ── Aggregate queries ────────────────────────────────────────────────────────
 
@@ -480,6 +480,23 @@ export const graphQueries = {
       })
       .from(fileCochanges)
       .where(eq(fileCochanges.repo_id, repoId))
+      .all();
+  },
+
+  /** Cochanges filtered by minimum weight */
+  filteredCochanges(
+    db: Db,
+    repoId: string,
+    minWeight: number,
+  ): { path_a: string; path_b: string; cochange_count: number }[] {
+    return db
+      .select({
+        path_a: fileCochanges.path_a,
+        path_b: fileCochanges.path_b,
+        cochange_count: fileCochanges.cochange_count,
+      })
+      .from(fileCochanges)
+      .where(and(eq(fileCochanges.repo_id, repoId), sql`${fileCochanges.cochange_count} >= ${minWeight}`))
       .all();
   },
 

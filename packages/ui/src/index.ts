@@ -2,6 +2,7 @@
 
 // Layout components
 export { AppSidebar, type NavGroup, type NavItem } from "./components/AppSidebar";
+export { FileTypeFilter, type FileTypeFilterOption } from "./components/FileTypeFilter";
 export { Logo } from "./components/Logo";
 export { ModeToggle } from "./components/ModeToggle";
 export { NavUser } from "./components/NavUser";

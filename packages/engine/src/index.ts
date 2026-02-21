@@ -1,6 +1,11 @@
 import { lensFn } from "@lens/core";
 import type { Db } from "./db/connection.js";
-import { buildGraphDetail as _buildGraphDetail, buildGraphSummary as _buildGraphSummary } from "./graph/graph.js";
+import {
+  buildFileNeighbors as _buildFileNeighbors,
+  buildGraphDetail as _buildGraphDetail,
+  buildGraphOverview as _buildGraphOverview,
+  buildGraphSummary as _buildGraphSummary,
+} from "./graph/graph.js";
 import { grepRepoImpl } from "./grep/grep.js";
 import { getRepoStatus as _getRepoStatus, listRepos as _listRepos, removeRepo as _removeRepo } from "./repo/repo.js";
 
@@ -44,6 +49,18 @@ export const buildGraphDetail = lensFn("engine.buildGraphDetail", async (db: Db,
   _buildGraphDetail(db, repoId, dir),
 );
 
+export const buildGraphOverview = lensFn(
+  "engine.buildGraphOverview",
+  async (db: Db, repoId: string, dir: string, opts?: { limit?: number; minCochangeWeight?: number }) =>
+    _buildGraphOverview(db, repoId, dir, opts),
+);
+
+export const buildFileNeighbors = lensFn(
+  "engine.buildFileNeighbors",
+  async (db: Db, repoId: string, filePath: string, opts?: { cochangeLimit?: number }) =>
+    _buildFileNeighbors(db, repoId, filePath, opts),
+);
+
 // ── Query modules — typed drizzle access for daemon routes ───────────────────
 
 export {
@@ -58,14 +75,17 @@ export {
 // ── Type exports ──────────────────────────────────────────────────────────────
 
 export type {
+  FileNeighborhood,
   GraphCluster,
   GraphClusterEdge,
   GraphCochange,
   GraphDetail,
   GraphFileEdge,
   GraphFileNode,
-  GraphSymbol,
+  GraphOverview,
+  GraphOverviewNode,
   GraphSummary,
+  GraphSymbol,
 } from "./graph/graph.js";
 export type { EnrichedMatch, GrepResult } from "./grep/grep.js";
 export type { IndexResult } from "./index/engine.js";

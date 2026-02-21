@@ -49,3 +49,26 @@ export interface GraphDetail {
   edges: GraphFileEdge[];
   cochanges: GraphCochange[];
 }
+
+export interface GraphOverviewNode {
+  path: string;
+  language: string | null;
+  hubScore: number;
+  isHub: boolean;
+  commits: number;
+  recent90d: number;
+}
+
+export interface GraphOverview {
+  files: GraphOverviewNode[];
+  edges: GraphFileEdge[];
+  cochanges: GraphCochange[];
+  totalFiles: number;
+}
+
+export interface FileNeighborhood {
+  file: GraphFileNode;
+  imports: string[];
+  importers: string[];
+  cochanges: { path: string; weight: number }[];
+}
