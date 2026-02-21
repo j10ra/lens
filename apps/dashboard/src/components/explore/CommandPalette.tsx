@@ -13,13 +13,14 @@ interface CommandPaletteProps {
   repoPath: string;
   onSelect: (path: string) => void;
   onClose?: () => void;
+  onClear?: () => void;
   open: boolean;
   mode?: "modal" | "pinned";
 }
 
 const API = "http://localhost:4111/api/dashboard";
 
-export function CommandPalette({ repoPath, onSelect, onClose, open, mode = "modal" }: CommandPaletteProps) {
+export function CommandPalette({ repoPath, onSelect, onClose, onClear, open, mode = "modal" }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [committedQuery, setCommittedQuery] = useState("");
@@ -123,7 +124,9 @@ export function CommandPalette({ repoPath, onSelect, onClose, open, mode = "moda
   if (isPinned) {
     return (
       <div className="absolute left-3 top-3 z-30 w-[min(34rem,calc(100%-1.5rem))]">
-        <div className={`relative w-full rounded-2xl border border-border bg-background transition-shadow ${showPanel ? "shadow-2xl" : "shadow-lg"}`}>
+        <div
+          className={`relative w-full rounded-2xl border border-border bg-background transition-shadow ${showPanel ? "shadow-2xl" : "shadow-lg"}`}
+        >
           <div className={`flex items-center gap-2 px-3 ${showPanel ? "border-b border-border" : ""}`}>
             <Search className="h-4 w-4 text-muted-foreground" />
             <input
@@ -151,6 +154,7 @@ export function CommandPalette({ repoPath, onSelect, onClose, open, mode = "moda
                 setCommittedQuery("");
                 setResults([]);
                 setSelectedIdx(0);
+                onClear?.();
               }}
               className="text-muted-foreground hover:text-foreground"
               aria-label="Clear search"
@@ -186,9 +190,7 @@ export function CommandPalette({ repoPath, onSelect, onClose, open, mode = "moda
             </div>
           )}
 
-          {showNoResults && (
-            <div className="px-3 py-4 text-center text-xs text-muted-foreground">No results</div>
-          )}
+          {showNoResults && <div className="px-3 py-4 text-center text-xs text-muted-foreground">No results</div>}
         </div>
       </div>
     );
@@ -197,7 +199,9 @@ export function CommandPalette({ repoPath, onSelect, onClose, open, mode = "moda
   return (
     <div className="absolute inset-0 z-50 flex items-start justify-center pt-[20vh]">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={`relative w-full max-w-lg rounded-2xl border border-border bg-background transition-shadow ${showPanel ? "shadow-2xl" : "shadow-lg"}`}>
+      <div
+        className={`relative w-full max-w-lg rounded-2xl border border-border bg-background transition-shadow ${showPanel ? "shadow-2xl" : "shadow-lg"}`}
+      >
         <div className={`flex items-center gap-2 px-3 ${showPanel ? "border-b border-border" : ""}`}>
           <Search className="h-4 w-4 text-muted-foreground" />
           <input
@@ -250,9 +254,7 @@ export function CommandPalette({ repoPath, onSelect, onClose, open, mode = "moda
           </div>
         )}
 
-        {showNoResults && (
-          <div className="px-3 py-4 text-center text-xs text-muted-foreground">No results</div>
-        )}
+        {showNoResults && <div className="px-3 py-4 text-center text-xs text-muted-foreground">No results</div>}
       </div>
     </div>
   );

@@ -1,5 +1,3 @@
-import { Badge } from "@lens/ui";
-import { Search, X } from "lucide-react";
 import { type WheelEvent as ReactWheelEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DagEdge, type DagLayout, type DagNode, layoutDag } from "../lib/dag-layout.js";
 import type { FileNeighborhood, GraphOverview } from "../lib/graph-types.js";
@@ -321,7 +319,6 @@ export function DagView({
   onSelectFile,
   onClearSelection,
 }: DagViewProps) {
-  const [search, setSearch] = useState("");
   const [hoveredNode, setHoveredNode] = useState<DagNode | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
@@ -410,16 +407,6 @@ export function DagView({
     if (!selectedFile || !neighbors) return [];
     return neighbors.cochanges.map((c) => c.path);
   }, [selectedFile, neighbors]);
-
-  // Search results
-  const searchResults = useMemo(() => {
-    if (!search || !layout) return [];
-    const q = search.toLowerCase();
-    return layout.nodes
-      .filter((n) => n.id.toLowerCase().includes(q))
-      .sort((a, b) => b.hubScore - a.hubScore)
-      .slice(0, 20);
-  }, [search, layout]);
 
   // Zoom to fit all
   const zoomToFit = useCallback(() => {
@@ -531,7 +518,6 @@ export function DagView({
   const handleNodeSelect = useCallback(
     (id: string) => {
       onSelectFile(id);
-      setSearch("");
     },
     [onSelectFile],
   );
@@ -546,48 +532,6 @@ export function DagView({
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      {/* Search bar */}
-      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
-        <div className="flex items-center gap-1.5 rounded-md border border-border bg-background/95 backdrop-blur-sm px-2 shadow-sm">
-          <Search className="h-3.5 w-3.5 text-muted-foreground" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search files..."
-            className="h-7 w-52 bg-transparent text-xs focus:outline-none"
-          />
-          {search && (
-            <button type="button" onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground">
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-        {search && searchResults.length > 0 && (
-          <div className="rounded-md border border-border bg-background/95 backdrop-blur-sm shadow-lg max-h-64 overflow-y-auto">
-            {searchResults.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => handleNodeSelect(n.id)}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent/50"
-              >
-                <span
-                  className="shrink-0 w-2 h-2 rounded-full"
-                  style={{ backgroundColor: languageColor(n.language) }}
-                />
-                <span className="font-mono truncate">{n.id}</span>
-                {n.isHub && (
-                  <Badge variant="outline" className="text-[9px] border-amber-500/50 text-amber-400 ml-auto">
-                    hub
-                  </Badge>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Stats + controls */}
       <div className="absolute bottom-3 left-44 z-10 flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
         <span>{layout.nodes.length} files</span>

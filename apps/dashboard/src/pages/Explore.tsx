@@ -952,12 +952,8 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
       )}
 
       <div className={cn("relative flex-1 min-h-0 overflow-hidden", sceneTheme.shellBgClass)}>
-        {viewMode === "galaxy" && (
-          <>
-            <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.dotsTextureClass)} />
-            <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.linesTextureClass)} />
-          </>
-        )}
+        <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.dotsTextureClass)} />
+        <div className={cn("pointer-events-none absolute inset-0 z-0", sceneTheme.linesTextureClass)} />
         {isLoading ? (
           <div className="relative z-[3] flex h-full items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -1065,7 +1061,15 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
           />
         )}
 
-        {repo && <CommandPalette repoPath={repo.root_path} open mode="pinned" onSelect={handleFileSelect} />}
+        {repo && (
+          <CommandPalette
+            repoPath={repo.root_path}
+            open
+            mode="pinned"
+            onSelect={handleFileSelect}
+            onClear={clearFocus}
+          />
+        )}
 
         {/* View mode toggle */}
         {!isLoading && <ViewToggle mode={viewMode} onChange={setViewMode} />}
