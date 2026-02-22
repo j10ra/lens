@@ -1,5 +1,6 @@
 import { defineCommand, runMain } from "citty";
 import { daemon } from "./commands/daemon.js";
+import { dashboard } from "./commands/dashboard.js";
 import { graph } from "./commands/graph.js";
 import { grep } from "./commands/grep.js";
 import { list } from "./commands/list.js";
@@ -15,6 +16,7 @@ const main = defineCommand({
   },
   subCommands: {
     daemon,
+    dashboard,
     status,
     register,
     remove,

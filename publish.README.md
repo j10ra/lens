@@ -63,6 +63,7 @@ LENS exposes MCP tools via HTTP Streamable transport. `lens register` automatica
 |---------|-------------|
 | `lens daemon start` | Start the HTTP daemon on :4111 |
 | `lens daemon stop` | Stop the running daemon |
+| `lens dashboard` | Open the dashboard in your browser |
 | `lens status` | Show daemon version, status, uptime |
 | `lens register <path>` | Register a repo and trigger full index |
 | `lens list` | List all registered repos |

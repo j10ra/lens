@@ -174,6 +174,7 @@ const cliCommands = [
   { command: "lens daemon start", description: "Start the HTTP daemon on :4111" },
   { command: "lens daemon start -f", description: "Start daemon in foreground (no detach)" },
   { command: "lens daemon stop", description: "Stop the running daemon" },
+  { command: "lens dashboard", description: "Open the dashboard in your browser" },
   { command: "lens status", description: "Show daemon version, status, uptime" },
   { command: "lens register <path>", description: "Register a repo and trigger full index" },
   { command: "lens list", description: "List all registered repos with index status" },
@@ -271,7 +272,9 @@ function DocsIndex() {
         <p className="mt-4 max-w-3xl leading-relaxed text-muted-foreground">
           LENS is an open-source code intelligence engine. It indexes your
           codebase locally and serves structural context to AI agents via MCP
-          or CLI. No API keys, no cloud, fully deterministic.
+          or CLI. No API keys, no cloud, fully deterministic. Currently
+          supports TypeScript/JavaScript with a pluggable parser architecture
+          for adding more languages.
         </p>
       </section>
 
@@ -348,6 +351,88 @@ $ lens grep "auth|middleware|session"
             </li>
           ))}
         </ol>
+      </section>
+
+      <section
+        id="languages"
+        className="scroll-mt-28 border-b border-border/70 pb-10"
+      >
+        <h2 className="text-xl font-semibold tracking-tight">
+          Language Support
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          LENS uses a pluggable parser registry. Each language parser extracts
+          imports, exports, symbols, and call sites to build the structural
+          graph.
+        </p>
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead>
+              <tr className="border-b border-border/70">
+                <th className="px-4 py-2.5 text-left font-medium text-foreground">Language</th>
+                <th className="px-4 py-2.5 text-left font-medium text-foreground">Extensions</th>
+                <th className="px-4 py-2.5 text-left font-medium text-foreground">Status</th>
+                <th className="px-4 py-2.5 text-left font-medium text-foreground">Features</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-border/60">
+                <td className="px-4 py-2.5 font-medium text-foreground">TypeScript / JavaScript</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">.ts .tsx .js .jsx .mjs .cjs</td>
+                <td className="px-4 py-2.5">
+                  <span className="inline-flex items-center rounded-md border border-success/30 bg-success/12 px-2 py-0.5 text-[11px] font-medium text-success">
+                    Full support
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-muted-foreground">
+                  Imports, exports, symbols, call sites, JSX, path aliases, barrel re-exports
+                </td>
+              </tr>
+              <tr className="border-b border-border/60">
+                <td className="px-4 py-2.5 font-medium text-muted-foreground">Python</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">.py</td>
+                <td className="px-4 py-2.5">
+                  <span className="inline-flex items-center rounded-md border border-border/80 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Planned
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-muted-foreground">—</td>
+              </tr>
+              <tr className="border-b border-border/60">
+                <td className="px-4 py-2.5 font-medium text-muted-foreground">Go</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">.go</td>
+                <td className="px-4 py-2.5">
+                  <span className="inline-flex items-center rounded-md border border-border/80 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Planned
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-muted-foreground">—</td>
+              </tr>
+              <tr className="border-b border-border/60 last:border-0">
+                <td className="px-4 py-2.5 font-medium text-muted-foreground">Rust</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">.rs</td>
+                <td className="px-4 py-2.5">
+                  <span className="inline-flex items-center rounded-md border border-border/80 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Planned
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-muted-foreground">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-5 rounded-lg border border-border/70 bg-muted/30 px-4 py-3">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            The parser architecture is pluggable — each language registers
+            an <InlineCode>imports()</InlineCode>, <InlineCode>exports()</InlineCode>,
+            and <InlineCode>symbols()</InlineCode> extractor. TF-IDF scoring,
+            import graph, co-change analysis, and hub detection work across
+            all languages. Non-parsed files still benefit from TF-IDF and
+            git co-change signals.
+          </p>
+        </div>
       </section>
 
       <section
@@ -546,13 +631,13 @@ $ lens grep "auth|middleware|session"
           <Code lang="bash">{`$ lens daemon start
 LENS daemon running on http://localhost:4111
 
+$ lens dashboard
+Opening http://localhost:4111
+
 $ lens status
 LENS v2.0.0 — running
 Uptime: 3h 42m
-URL: http://localhost:4111
-
-# Dashboard is served at the daemon URL
-# Open http://localhost:4111 in your browser`}</Code>
+URL: http://localhost:4111`}</Code>
         </div>
       </section>
 

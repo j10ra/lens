@@ -73,6 +73,7 @@ Every search query runs through a multi-stage pipeline:
 | `lens daemon start` | Start the HTTP daemon on :4111 |
 | `lens daemon start -f` | Start daemon in foreground |
 | `lens daemon stop` | Stop the running daemon |
+| `lens dashboard` | Open the dashboard in your browser |
 | `lens status` | Show daemon version, status, uptime |
 | `lens register <path>` | Register a repo and trigger full index |
 | `lens register <path> --no-inject` | Register without injecting agent instructions |
