@@ -15,6 +15,7 @@ const sectionLinks = [
   { label: "Install", hash: "#install" },
   { label: "Quick Start", hash: "#quick-start" },
   { label: "What It Does", hash: "#what-it-does" },
+  { label: "Languages", hash: "#languages" },
   { label: "Benchmarks", hash: "#benchmarks" },
   { label: "MCP Integration", hash: "#mcp-integration" },
   { label: "Daemon Mode", hash: "#daemon-mode" },
