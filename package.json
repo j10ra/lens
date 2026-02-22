@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
-    "build:publish": "pnpm -r build && rm -rf publish && tsup --config tsup.config.publish.ts && cp -r packages/core/drizzle publish/drizzle-core && cp -r packages/engine/drizzle publish/drizzle-engine && cp -r apps/dashboard/dist publish/dashboard && cp publish.json publish/package.json && cd publish && npm install --omit=dev",
+    "build:publish": "pnpm -r build && rm -rf publish && tsup --config tsup.config.publish.ts && cp -r packages/core/drizzle publish/drizzle-core && cp -r packages/engine/drizzle publish/drizzle-engine && cp -r apps/dashboard/dist publish/dashboard && cp publish.json publish/package.json && cp publish.README.md publish/README.md && cd publish && npm install --omit=dev",
     "deploy:local": "pnpm -w build:publish && lens daemon stop; lens daemon start",
     "dev": "bash scripts/dev.sh",
     "release": "./scripts/release.sh",
