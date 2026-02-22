@@ -315,7 +315,7 @@ export function DagView({
   overview,
   selectedFile,
   neighbors,
-  neighborsLoading,
+  neighborsLoading: _neighborsLoading,
   onSelectFile,
   onClearSelection,
 }: DagViewProps) {

@@ -16,21 +16,13 @@ interface FileTypeFilterProps {
   className?: string;
 }
 
-export function FileTypeFilter({
-  options,
-  selected,
-  onToggleOption,
-  onToggleAll,
-  className,
-}: FileTypeFilterProps) {
+export function FileTypeFilter({ options, selected, onToggleOption, onToggleAll, className }: FileTypeFilterProps) {
   const allSelected = options.length > 0 && selected.size === options.length;
 
   return (
     <div className={cn("min-h-0 flex flex-1 flex-col border-b border-border px-2 py-2", className)}>
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          File Types
-        </div>
+        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">File Types</div>
         <Button
           type="button"
           variant="ghost"
@@ -44,11 +36,7 @@ export function FileTypeFilter({
       </div>
 
       <div className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
-        {options.length === 0 && (
-          <div className="px-1 text-[10px] text-muted-foreground">
-            No file types found.
-          </div>
-        )}
+        {options.length === 0 && <div className="px-1 text-[10px] text-muted-foreground">No file types found.</div>}
 
         {options.map((option) => {
           const checked = selected.has(option.value);
@@ -65,15 +53,9 @@ export function FileTypeFilter({
                 checked ? "text-foreground" : "text-muted-foreground",
               )}
             >
-              <Checkbox
-                checked={checked}
-                className="pointer-events-none size-3.5"
-                aria-hidden
-              />
+              <Checkbox checked={checked} className="pointer-events-none size-3.5" aria-hidden />
               <span className="truncate">{option.label}</span>
-              <span className="ml-auto text-[10px] text-muted-foreground/70">
-                {option.count}
-              </span>
+              <span className="ml-auto text-[10px] text-muted-foreground/70">{option.count}</span>
             </Button>
           );
         })}

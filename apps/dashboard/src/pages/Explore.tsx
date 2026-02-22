@@ -914,16 +914,17 @@ export function RepoGraphTab({ repoId }: { repoId: string }) {
     }
   }, []);
 
-  if (!repoId) return null;
-
-  const showFileTypeFilter = !isLoading && !!overview;
-  const showCanvas = !isLoading && !!layout && layout.nodes.length > 0;
-  const hasFilteredFiles = !isLoading && !!filteredOverview && filteredOverview.files.length > 0;
   const overviewDistance = useMemo(() => {
     if (!layout || layout.nodes.length === 0) return 8;
     const maxRadius = layout.nodes.reduce((max, n) => Math.max(max, Math.hypot(n.x, n.y, n.z)), 0);
     return Math.min(10, Math.max(5.2, maxRadius * 2.05));
   }, [layout]);
+
+  if (!repoId) return null;
+
+  const showFileTypeFilter = !isLoading && !!overview;
+  const showCanvas = !isLoading && !!layout && layout.nodes.length > 0;
+  const hasFilteredFiles = !isLoading && !!filteredOverview && filteredOverview.files.length > 0;
   const focusPanelCompensationPx = selectedFile ? 200 : 0;
 
   return (

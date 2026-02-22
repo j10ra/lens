@@ -1,3 +1,13 @@
+<!-- lens-context -->
+## LENS — Structural Code Search
+
+This repo is indexed by LENS. **Prefer LENS MCP tools over built-in Grep/Glob** for code search:
+- `lens_grep` — Ranked search with import graph, co-change, hub scores. One call replaces multiple Grep+Read cycles.
+- `lens_graph` — Dependency map. Architecture, module relationships, change impact.
+- `lens_graph_neighbors` — Blast radius for a file. Importers, co-change partners, what breaks.
+
+Load tools via `ToolSearch` before first use.
+
 # CLAUDE.md
 
 ## LENS v2 — Structured Code Query Engine

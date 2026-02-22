@@ -1,6 +1,8 @@
 import { resolve } from "node:path";
 import { defineCommand } from "citty";
 import { daemonFetch } from "../lib/daemon.js";
+import { injectInstructions } from "../lib/inject-instructions.js";
+import { injectMcp } from "../lib/inject-mcp.js";
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
@@ -36,6 +38,11 @@ export const register = defineCommand({
       type: "string",
       alias: "n",
       description: "Human-readable name (defaults to directory name)",
+    },
+    "no-inject": {
+      type: "boolean",
+      default: false,
+      description: "Skip injecting LENS instructions into agent files",
     },
   },
   async run({ args }) {
@@ -82,6 +89,22 @@ export const register = defineCommand({
     }
 
     console.log(`  ${green("✓")} Duration         ${dim(`${idx.duration_ms}ms`)}`);
+
+    // 4. Inject MCP config + agent instructions
+    if (!args["no-inject"]) {
+      const mcpResult = injectMcp(absPath);
+      if (mcpResult !== "exists") {
+        console.log(`  ${green("✓")} MCP config       ${dim(`.mcp.json ${mcpResult}`)}`);
+      }
+
+      const injected = injectInstructions(absPath);
+      for (const { file, action } of injected) {
+        if (action !== "skipped") {
+          console.log(`  ${green("✓")} Instructions     ${dim(`${file} ${action}`)}`);
+        }
+      }
+    }
+
     console.log();
     console.log(`  ${green("✓")} ${bold("Ready")} — ${cyan(`lens grep "<query>"`)} ${dim(`--repo ${absPath}`)}`);
     console.log();

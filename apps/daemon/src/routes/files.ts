@@ -52,7 +52,7 @@ function spawnDetached(command: string, args: string[]): boolean {
 }
 
 function shellQuote(input: string): string {
-  return `'${input.replace(/'/g, `'\"'\"'`)}'`;
+  return `'${input.replace(/'/g, `'"'"'`)}'`;
 }
 
 function openExternal(target: string): boolean {

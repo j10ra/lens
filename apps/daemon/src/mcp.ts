@@ -13,9 +13,9 @@ function registerTools(server: McpServer): void {
   server.registerTool(
     "lens_grep",
     {
-      title: "LENS Grep",
+      title: "LENS Grep — Ranked Code Search",
       description:
-        "Grep a codebase with structural ranking. Returns matched files per search term with structural evidence (symbols/functions/classes), ranked by graph centrality, co-change frequency, and hub score.",
+        "PREFER THIS over Grep/Glob when exploring a codebase. One call replaces multiple Grep+Read cycles. For each matching file returns: relevance score, exported symbols, import graph position (who imports it, hub score), co-change partners (files that historically change together in git), and docstrings. Results ranked by structural importance — hub files and highly-connected modules surface first. Use for: finding where functionality lives, understanding which files matter most, tracing how a symbol flows through the codebase.",
       inputSchema: {
         repoPath: z.string().describe("Absolute path to the repository root (e.g. /Users/dev/myproject)"),
         query: z
@@ -76,15 +76,15 @@ function registerTools(server: McpServer): void {
   server.registerTool(
     "lens_graph",
     {
-      title: "LENS Graph",
+      title: "LENS Graph — Dependency Map",
       description:
-        "Get the dependency graph of a codebase. Without dir: returns directory clusters and inter-cluster import edges. With dir: returns individual files, import edges, and co-change pairs within that directory.",
+        "Get the architecture of a codebase in one call. USE THIS FIRST when asked about project structure, module relationships, or change impact. Without dir: returns high-level directory clusters with import edges between them — instantly shows which modules depend on which. With dir: returns individual files within that directory, their import edges, co-change pairs, and hub files. Use for: 'how is this project structured?', 'what modules exist?', 'what depends on X?', 'what files would be affected by changing Y?'",
       inputSchema: {
         repoPath: z.string().describe("Absolute path to the repository root"),
         dir: z
           .string()
           .optional()
-          .describe("Directory prefix to drill into (e.g. 'packages/engine/src'). Omit for cluster-level summary."),
+          .describe("Directory prefix to drill into (e.g. 'packages/engine/src'). Omit for cluster-level overview."),
       },
     },
     async ({ repoPath, dir }) => {
@@ -101,9 +101,9 @@ function registerTools(server: McpServer): void {
   server.registerTool(
     "lens_graph_neighbors",
     {
-      title: "LENS Graph Neighbors",
+      title: "LENS File Neighborhood",
       description:
-        "Get full detail for a single file and its neighborhood: symbols, exports, imports, importers, and co-change partners.",
+        "Deep-dive into a single file's relationships. Returns: all exported symbols, all files that import it (importers), all files it imports, and co-change partners (files that change together in git history). Use AFTER lens_grep or lens_graph identifies a key file. Use for: 'who calls this?', 'what would break if I changed this file?', 'what files are tightly coupled to this one?', understanding blast radius of a change.",
       inputSchema: {
         repoPath: z.string().describe("Absolute path to the repository root"),
         path: z.string().describe("File path relative to repo root (e.g. 'packages/engine/src/index.ts')"),
