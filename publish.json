@@ -1,6 +1,6 @@
 {
 	"name": "lens-engine",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"description": "LENS — Structured code query engine for AI agents",
 	"type": "module",
 	"bin": {
