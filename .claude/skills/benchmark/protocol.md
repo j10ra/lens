@@ -26,9 +26,10 @@ cc zlm -p --model sonnet --dangerously-skip-permissions
 **LENS MCP Tools (v2):**
 - `mcp__lens__lens_grep` — Structural code search with TF-IDF ranking, symbol extraction, hub scores
 - `mcp__lens__lens_graph` — Dependency graph (clusters or file-level), import edges, co-change pairs
+- `mcp__lens__lens_graph_neighbors` — File neighborhood: symbols, exports, imports, importers, co-change partners
 - `mcp__lens__lens_reindex` — Trigger repo reindex (rarely needed in benchmarks)
 
-**WITHOUT must have zero LENS artifacts.** No MCP tools, no injected context. The `--disallowed-tools` flag blocks all 3 LENS MCP tools (`lens_grep`, `lens_graph`, `lens_reindex`). The prompt contains only the task text + report suffix.
+**WITHOUT must have zero LENS artifacts.** No MCP tools, no injected context. The `--disallowed-tools` flag blocks all 4 LENS MCP tools (`lens_grep`, `lens_graph`, `lens_graph_neighbors`, `lens_reindex`). The prompt contains only the task text + report suffix.
 
 **WITH has LENS MCP tools available on-demand.** The agent receives the same raw prompt as WITHOUT. LENS tools are made available via `--mcp-config lens-mcp.json`. The agent decides when/if to call LENS — no pre-injected context, no forced usage. This tests the product-realistic mode where agents pull context when needed.
 
@@ -66,9 +67,10 @@ Self-report is the **primary and only** source for these counts.
 **LENS adoption** is detected during scoring by checking tool usage:
 - `lens_grep` adopted: `mcp__lens__lens_grep` in "Tools used"
 - `lens_graph` adopted: `mcp__lens__lens_graph` in "Tools used"
-- Any LENS: either tool used
+- `lens_graph_neighbors` adopted: `mcp__lens__lens_graph_neighbors` in "Tools used"
+- Any LENS: any of the above tools used
 
-Not prompted explicitly — avoids priming the agent toward LENS.
+The prompt suffix instructs the agent to check ToolSearch for available MCP tools before starting — this is fair because both conditions receive the same instruction. The WITHOUT condition has LENS tools disallowed, so ToolSearch won't return them. The WITH condition will discover and load them. This addresses deferred tool loading without naming LENS specifically.
 
 ### Duration
 
@@ -82,7 +84,8 @@ After scoring, compute per-task causal metrics by comparing outputs:
 |--------|-----|---------|
 | **lens_grep adopted** | `mcp__lens__lens_grep` in self-report | Agent used structural search |
 | **lens_graph adopted** | `mcp__lens__lens_graph` in self-report | Agent used dependency graph |
-| **Any LENS** | Either tool used | Agent chose LENS |
+| **lens_graph_neighbors adopted** | `mcp__lens__lens_graph_neighbors` in self-report | Agent used file neighborhood |
+| **Any LENS** | Any LENS tool used | Agent chose LENS |
 | **Score delta** | score(WITH) - score(WITHOUT) | Net outcome |
 | **File divergence** | WITH cited ≠ WITHOUT cited | Agent took a different path |
 | **Misdirection** | WITH cited different files AND score(WITH) < score(WITHOUT) | LENS steered agent wrong |

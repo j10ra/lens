@@ -37,10 +37,15 @@ Generate a Bash command using the `cc zlm` wrapper pattern (from `rerun-pinnacle
 
 ```bash
 # Z.AI provider setup — cc() wraps everything in a subshell
+# Reads GLOBAL_GLM_KEY from env (set in ~/.zshrc)
 _cc_setup_zlm() {
+  if [ -z "${GLOBAL_GLM_KEY:-}" ] && [ -f "$HOME/.zshrc" ]; then
+    GLOBAL_GLM_KEY=$(grep -m1 'GLOBAL_GLM_KEY=' "$HOME/.zshrc" | sed 's/.*="\(.*\)"/\1/')
+    export GLOBAL_GLM_KEY
+  fi
   unset ANTHROPIC_API_KEY
   export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
-  export ANTHROPIC_AUTH_TOKEN="83b57f32012d47168694c726ab7ce29c.yxXw25IaIoZ3L33v"
+  export ANTHROPIC_AUTH_TOKEN="$GLOBAL_GLM_KEY"
   export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-5"
   export ANTHROPIC_DEFAULT_SONNET_MODEL="glm-5"
 }

@@ -102,12 +102,12 @@ Categories (distribute evenly):
 
 **LENS tool fit by category:**
 
-| Category | `lens_grep` | `lens_graph` | Why |
-|----------|-------------|--------------|-----|
-| Exploratory | Medium | **High** | Architecture = dependency graph |
-| Debug | **High** | Medium | Find symbols, trace code paths |
-| Change-Impact | Medium | **High** | Who imports this file? |
-| Targeted | **High** | Low | Find specific symbol/export |
+| Category | `lens_grep` | `lens_graph` | `lens_graph_neighbors` | Why |
+|----------|-------------|--------------|------------------------|-----|
+| Exploratory | Medium | **High** | **High** | Architecture = dependency graph + file neighborhoods |
+| Debug | **High** | Medium | **High** | Find symbols, trace imports/importers |
+| Change-Impact | Medium | **High** | **High** | Who imports this file? Co-change partners? |
+| Targeted | **High** | Low | Medium | Find specific symbol/export |
 
 For each scenario, generate:
 - A realistic prompt an engineer would ask
@@ -209,14 +209,15 @@ Score = (points / total criteria) x 100%, rounded to nearest 5%.
 
 Extract from the agent's `## Report` section at the end of each output:
 - **Tool calls** — total tool calls made
-- **Tools used** — list of tool names (e.g. Read, Grep, Glob, Bash, mcp__lens__get_context)
+- **Tools used** — list of tool names (e.g. Read, Grep, Glob, Bash, mcp__lens__lens_grep)
 - **Files read** — number of files read
 - **Files used** — comma-separated list of file paths
 
 **LENS adoption** detected during scoring:
 - `lens_grep` adopted: `mcp__lens__lens_grep` in "Tools used"
 - `lens_graph` adopted: `mcp__lens__lens_graph` in "Tools used"
-- Any LENS: either tool used
+- `lens_graph_neighbors` adopted: `mcp__lens__lens_graph_neighbors` in "Tools used"
+- Any LENS: any of the above tools used
 
 Not prompted explicitly — avoids priming the agent.
 
@@ -231,7 +232,8 @@ For each task, compare WITH vs WITHOUT outputs:
 |--------|-----|
 | lens_grep adopted | `mcp__lens__lens_grep` in self-report (yes/no) |
 | lens_graph adopted | `mcp__lens__lens_graph` in self-report (yes/no) |
-| Any LENS | Either tool used (yes/no) |
+| lens_graph_neighbors adopted | `mcp__lens__lens_graph_neighbors` in self-report (yes/no) |
+| Any LENS | Any LENS tool used (yes/no) |
 | Score delta | `score(WITH) - score(WITHOUT)` |
 | File divergence | WITH cited files vs WITHOUT cited files |
 | Misdirection | WITH cited different files AND `score(WITH) < score(WITHOUT)` |
@@ -324,7 +326,7 @@ No scoring or judge criteria — just raw comparison for quick iteration.
 ### Critical Rules
 
 1. **`( ... )` subshell** — all Z.AI env vars isolated. No leakage.
-2. **`--disallowed-tools`** — WITHOUT disallows `Task` + all 3 LENS MCP tools (`lens_grep`, `lens_graph`, `lens_reindex`). WITH disallows only `Task` (LENS MCP tools available via `--mcp-config lens-mcp.json`).
+2. **`--disallowed-tools`** — WITHOUT disallows `Task` + all 4 LENS MCP tools (`lens_grep`, `lens_graph`, `lens_graph_neighbors`, `lens_reindex`). WITH disallows only `Task` (LENS MCP tools available via `--mcp-config lens-mcp.json`).
 3. **`nohup` detached scripts** — `claude -p` pipe mode can take 2-15+ min. Bash tool has 10-min hard cap. ALWAYS use `run.sh` via `nohup`. NEVER run `claude -p` directly in Bash tool.
 4. **Parallel conditions** — within each task, both conditions run in parallel. Multiple tasks get separate `nohup` calls, all launched simultaneously. See `protocol.md` (sibling file).
 5. **Identical prompts** — both conditions receive the exact same prompt. The ONLY variable is whether LENS MCP tools are available. No pre-injection, no context packs in prompts.

@@ -47,7 +47,7 @@ TF="$RUNS/timing.csv"
 echo "model_mapping,sonnet=glm-5,opus=glm-5" >> "$TF"
 
 # WITHOUT: disallow Task + all LENS MCP tools (agent works cold)
-DISALLOW_WITHOUT="Task,mcp__lens__lens_grep,mcp__lens__lens_graph,mcp__lens__lens_reindex"
+DISALLOW_WITHOUT="Task,mcp__lens__lens_grep,mcp__lens__lens_graph,mcp__lens__lens_graph_neighbors,mcp__lens__lens_reindex"
 
 # WITH: only disallow Task (LENS MCP tools available for on-demand use)
 DISALLOW_WITH="Task"
@@ -55,12 +55,19 @@ DISALLOW_WITH="Task"
 # MCP config that makes LENS tools available (even in foreign repos without .mcp.json)
 LENS_MCP="/Volumes/Drive/__x/RLM/.claude/skills/benchmark/lens-mcp.json"
 
-SUFFIX=$'IMPORTANT: Do NOT use the Task tool or delegate to sub-agents. Do all file reading and analysis directly.\n\nWhen done, end your response with this EXACT format:\n\n## Report\n\n- **Tool calls**: <total number of tool calls made>\n- **Tools used**: <list ALL tool names used, e.g. Read, Grep, Glob, Bash, mcp__*>\n- **Files read**: <number of files read>\n- **Files used**: <comma-separated list of file paths that informed your answer>\n- **Key findings**:\n  - <finding 1>\n  - <finding 2>\n  - <finding 3>'
+SUFFIX=$'IMPORTANT: Do NOT use the Task tool or delegate to sub-agents. Do all file reading and analysis directly.\n\nBefore you begin, use ToolSearch to check for any available MCP tools that could help with code search or dependency analysis. Load and use any relevant tools you find — they may be faster and more informative than built-in tools.\n\nWhen done, end your response with this EXACT format:\n\n## Report\n\n- **Tool calls**: <total number of tool calls made>\n- **Tools used**: <list ALL tool names used, e.g. Read, Grep, Glob, Bash, mcp__*>\n- **Files read**: <number of files read>\n- **Files used**: <comma-separated list of file paths that informed your answer>\n- **Key findings**:\n  - <finding 1>\n  - <finding 2>\n  - <finding 3>'
+
+# Minimum bytes for valid output (rejects newline-only / error-only responses)
+MIN_BYTES=200
+
+has_content() {
+  [ -f "$1" ] && [ "$(wc -c < "$1")" -ge "$MIN_BYTES" ]
+}
 
 run_task() {
   local task_id="$1" condition="$2" full_prompt="$3"
   local outfile="$RUNS/${task_id}-${condition}.md"
-  [ -s "$outfile" ] && echo "SKIP $task_id $condition (exists)" && return 0
+  has_content "$outfile" && echo "SKIP $task_id $condition (exists)" && return 0
 
   # Condition-specific config
   local disallow mcp_flags
@@ -79,12 +86,12 @@ run_task() {
       $mcp_flags \
       -- "$full_prompt") > "$outfile" 2>&1 || true
     local et=$(date +%s)
-    if [ -s "$outfile" ]; then
+    if has_content "$outfile"; then
       echo "$task_id,$condition,$((et - st)),attempt=$attempt" >> "$TF"
-      echo "DONE $task_id $condition in $((et - st))s (attempt $attempt)"
+      echo "DONE $task_id $condition in $((et - st))s (attempt $attempt, $(wc -c < "$outfile") bytes)"
       return 0
     fi
-    echo "RETRY $task_id $condition (attempt $attempt empty)"
+    echo "RETRY $task_id $condition (attempt $attempt, $(wc -c < "$outfile" 2>/dev/null || echo 0) bytes < ${MIN_BYTES} min)"
     rm -f "$outfile"
   done
   echo "FAIL $task_id $condition (3 attempts)"

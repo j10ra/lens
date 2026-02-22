@@ -67,7 +67,10 @@
       "Bash(gh issue list:*)",
       "Bash(gh issue comment:*)",
       "WebFetch(domain:localhost)",
-      "mcp__lens__get_context"
+      "mcp__lens__lens_grep",
+      "mcp__lens__lens_graph",
+      "mcp__lens__lens_graph_neighbors",
+      "mcp__lens__lens_reindex"
     ]
   }
 }
