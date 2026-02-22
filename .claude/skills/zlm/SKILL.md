@@ -5,85 +5,53 @@ description: Spawn a claude -p subprocess via Z.AI (glm-5) in an isolated subshe
 
 # /zlm — Spawn Claude via Z.AI
 
-Runs `claude -p` through Z.AI (`glm-5`) in an isolated `( ... )` subshell. The main Claude uses this to delegate research, code analysis, or any work to a separate instance and get results back.
+Runs `claude -p` through Z.AI (`glm-5`) using the Task tool with a Bash agent. Offloads research to a cheaper model while keeping your context clean.
 
 ## Usage
 
 ```
 /zlm <prompt or description of what to do>
-/zlm [--repo <path>] [--bg] [--out <file>] <prompt>
+/zlm [--repo <path>] [--out <file>] <prompt>
 ```
-
-Examples:
-- `/zlm analyze the auth middleware in this repo`
-- `/zlm --repo /path/to/project find all API endpoints and list them`
-- `/zlm --bg --out results.md trace the billing pipeline end-to-end`
 
 ## Instructions
 
 ### Step 1: Parse Arguments
 
-Extract from the user's `/zlm` invocation:
-- `prompt` — the task/question to send to the subprocess (required)
-- `--repo <path>` — working directory for the subprocess (default: current working directory)
-- `--bg` — run in background (`run_in_background: true`); default is foreground (wait for result)
-- `--out <file>` — save output to file instead of capturing inline
+- `prompt` — task/question for the subprocess (required)
+- `--repo <path>` — working directory (default: current working directory)
+- `--out <file>` — output path (default: `/tmp/zlm-<timestamp>-out.md`)
 
-If no flags given, everything after `/zlm` is the prompt.
+### Step 2: Launch via Task Tool
 
-### Step 2: Build the Command
+Use the **Task tool** with `subagent_type: "Bash"` and `run_in_background: true`.
 
-Generate a Bash command using the `cc zlm` wrapper pattern (from `rerun-pinnacle-zlm.sh`):
+The runner script is `.claude/skills/zlm/run.sh` — it handles key loading, Z.AI env setup, output validation, and the `ZLM_DONE`/`ZLM_FAIL` sentinel.
 
-```bash
-# Z.AI provider setup — cc() wraps everything in a subshell
-# Reads GLOBAL_GLM_KEY from env (set in ~/.zshrc)
-_cc_setup_zlm() {
-  if [ -z "${GLOBAL_GLM_KEY:-}" ] && [ -f "$HOME/.zshrc" ]; then
-    GLOBAL_GLM_KEY=$(grep -m1 'GLOBAL_GLM_KEY=' "$HOME/.zshrc" | sed 's/.*="\(.*\)"/\1/')
-    export GLOBAL_GLM_KEY
-  fi
-  unset ANTHROPIC_API_KEY
-  export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
-  export ANTHROPIC_AUTH_TOKEN="$GLOBAL_GLM_KEY"
-  export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-5"
-  export ANTHROPIC_DEFAULT_SONNET_MODEL="glm-5"
-}
-cc() {
-  local provider="$1"; shift
-  ( _cc_setup_"$provider"; CLAUDECODE= command claude "$@" )
-}
-
-cd "<repo_path>" && cc zlm -p --model sonnet --dangerously-skip-permissions \
-  --disallowed-tools Task \
-  -- "<prompt>"
+```
+Task(
+  subagent_type: "Bash",
+  run_in_background: true,
+  prompt: "Run this command and wait for it to complete:
+    bash /Volumes/Drive/__x/RLM/.claude/skills/zlm/run.sh '<repo_path>' '<outfile>' '<prompt>'
+    Then read <outfile> and return the contents."
+)
 ```
 
-If `--out <file>` is specified, redirect: `> "<file>" 2>&1`
+For **multiple parallel runs**, launch multiple Task calls in a single message — each with a different outfile.
 
-**Critical rules:**
+### Step 3: Get Results
 
-1. **`cc()` subshell** — `_cc_setup_zlm` + `CLAUDECODE=` + `claude` all run inside `( ... )`. Parent stays clean.
-2. **`--dangerously-skip-permissions`** — Subprocess needs autonomous tool access.
-3. **`--disallowed-tools Task`** — ALWAYS. Pipe mode loses output when the subprocess spawns sub-agents.
-4. **`--model sonnet`** — mapped to `glm-5` via Z.AI. Cost-effective for research.
-
-### Step 3: Execute
-
-- **Foreground** (default): Run via Bash tool, wait for result. Show output to user or use it yourself.
-- **Background** (`--bg`): Run via Bash tool with `run_in_background: true`. Report the task ID so user can check progress.
-- **Long-running** (`--bg` + expected >5 min): Write a shell script with the `cc()` function, then `nohup` it to avoid Bash tool's 10-min timeout cap.
+Use `TaskOutput` to check on the background agent, or wait for notification. The agent reads the output file and returns the contents directly — no manual file reading needed.
 
 ### Step 4: Use the Result
 
-After the subprocess completes:
-- If foreground: the output is directly available. Summarize or use it as needed.
-- If `--out`: tell the user where the file is.
-- If background: read the output file or check task status when needed.
+The Task result contains the glm-5 subprocess output. Summarize or act on it.
 
-### Notes
+## Critical Rules
 
-- The subprocess has full tool access (Read, Grep, Glob, Bash, etc.) — just not Task.
-- It runs against whatever repo `--repo` points to, with all MCP tools available in that context.
-- For long-running tasks, prefer `--bg` so the main session stays responsive.
-- The subprocess model is `sonnet` (mapped to `glm-5` via Z.AI). This is cost-effective for research tasks.
+1. **ALWAYS use Task tool** — not raw Bash. Task handles lifecycle, background, and result retrieval.
+2. **ALWAYS use `run.sh`** — never inline the cc/zlm setup. The script handles key loading, env isolation, output validation.
+3. **`run_in_background: true`** — `claude -p` through Z.AI takes 1-5 min. Never block the main session.
+4. **Parallel runs OK** — each Task gets its own outfile. Launch multiple in one message.
+5. **`ZLM_DONE`/`ZLM_FAIL`** — written by `run.sh`. The Bash agent uses this to confirm completion before reading output.
