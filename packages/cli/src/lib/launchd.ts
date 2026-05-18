@@ -11,6 +11,14 @@ export function isMacOS(): boolean {
   return platform() === "darwin";
 }
 
+function guiDomain(): string {
+  const uid = process.getuid?.();
+  if (typeof uid !== "number") {
+    throw new Error("process.getuid() unavailable — macOS required for launchd commands");
+  }
+  return `gui/${uid}`;
+}
+
 export interface PlistOptions {
   nodePath: string;
   daemonEntry: string;
@@ -71,17 +79,23 @@ export function writePlist(contents: string): void {
 }
 
 export function bootstrapPlist(): void {
-  const domain = `gui/${process.getuid?.() ?? ""}`;
+  const domain = guiDomain();
   try {
     execFileSync("launchctl", ["bootout", domain, PLIST_PATH], { stdio: "ignore" });
   } catch {
     // not loaded — fine
   }
-  execFileSync("launchctl", ["bootstrap", domain, PLIST_PATH], { stdio: "inherit" });
+  try {
+    execFileSync("launchctl", ["bootstrap", domain, PLIST_PATH], { stdio: "inherit" });
+  } catch (e) {
+    throw new Error(
+      `launchctl bootstrap failed. Check Console.app (filter: com.lens.daemon) for details.\n${(e as Error).message}`,
+    );
+  }
 }
 
 export function unloadPlist(): void {
-  const domain = `gui/${process.getuid?.() ?? ""}`;
+  const domain = guiDomain();
   try {
     execFileSync("launchctl", ["bootout", domain, PLIST_PATH], { stdio: "ignore" });
   } catch {
