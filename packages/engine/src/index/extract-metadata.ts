@@ -13,6 +13,7 @@ export interface FileMetadata {
   sections: string[];
   internals: string[];
   symbols: ParsedSymbol[];
+  namespaces: string[];
 }
 
 export function extractFileMetadata(content: string, path: string, language: string | null): FileMetadata {
@@ -28,6 +29,7 @@ export function extractFileMetadata(content: string, path: string, language: str
     sections: parser?.extractSections(content) ?? extractSections(content),
     internals: parser?.extractInternals(content, exports) ?? extractUniversalInternals(content, exports),
     symbols: parser?.extractSymbols?.(content) ?? [],
+    namespaces: parser?.extractNamespaces?.(content) ?? [],
   };
 }
 
@@ -47,6 +49,7 @@ export function extractAndPersistMetadata(
       sections: meta.sections,
       internals: meta.internals,
       symbols: meta.symbols,
+      namespaces: meta.namespaces,
     });
     count++;
   }

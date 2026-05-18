@@ -28,5 +28,7 @@ export interface LanguageParser {
   extractInternals(content: string, exports: string[]): string[];
   /** Optional richer symbol extraction (name + kind + declaration line). */
   extractSymbols?(content: string): ParsedSymbol[];
+  /** Optional: language-specific namespace declarations (C#, F#, VB.NET). Returns flat namespace strings (e.g. ["App.Models", "App.Models.Internal"]). */
+  extractNamespaces?(content: string): string[];
   resolveImport(specifier: string, sourcePath: string, knownPaths: Set<string>): string | null;
 }
