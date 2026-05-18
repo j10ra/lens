@@ -8,11 +8,11 @@ export const patternRoutes = new Hono();
 
 const SUPPORTED: SupportedLanguage[] = ["typescript", "tsx", "javascript", "csharp"];
 
-const LANG_TO_EXT: Record<SupportedLanguage, string[]> = {
-  typescript: ["typescript"],
-  tsx: ["typescript"], // .tsx is detected as "typescript" by discovery.ts
-  javascript: ["javascript"],
-  csharp: ["csharp"],
+const EXT_FILTER: Record<SupportedLanguage, RegExp> = {
+  typescript: /\.(ts|cts|mts)$/i,
+  tsx: /\.tsx$/i,
+  javascript: /\.(js|jsx|cjs|mjs)$/i,
+  csharp: /\.cs$/i,
 };
 
 patternRoutes.post(
@@ -20,6 +20,9 @@ patternRoutes.post(
   lensRoute("pattern.post", async (c) => {
     const { repoPath, pattern, language, limit = 50, format = "json" } = await c.req.json();
 
+    if (!repoPath || typeof repoPath !== "string") {
+      return c.json({ error: "repoPath is required (string)" }, 400);
+    }
     if (!pattern || typeof pattern !== "string") {
       return c.json({ error: "pattern is required (string)" }, 400);
     }
@@ -27,16 +30,18 @@ patternRoutes.post(
       return c.json({ error: `language must be one of: ${SUPPORTED.join(", ")}` }, 400);
     }
 
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 500));
+
     const db = getEngineDb();
     const repos = await listRepos(db);
-    const repo = repos.find((r) => r.root_path === repoPath || r.root_path === repoPath?.replace(/\/$/, ""));
+    const repo = repos.find((r) => r.root_path === repoPath || r.root_path === repoPath.replace(/\/$/, ""));
     if (!repo) {
       return c.json({ error: "Repo not registered", hint: `Run: lens register ${repoPath}` }, 404);
     }
 
-    const targetLangs = LANG_TO_EXT[language as SupportedLanguage];
+    const extPattern = EXT_FILTER[language as SupportedLanguage];
     const allMeta = metadataQueries.getAllForRepo(db, repo.id);
-    const candidates = allMeta.filter((m) => m.language && targetLangs.includes(m.language));
+    const candidates = allMeta.filter((m) => extPattern.test(m.path) && !m.path.endsWith(".d.ts"));
 
     const files = candidates
       .map((m) => {
@@ -53,7 +58,7 @@ patternRoutes.post(
       pattern,
       language: language as SupportedLanguage,
       files,
-      limit,
+      limit: safeLimit,
     });
 
     if (format === "text") {
