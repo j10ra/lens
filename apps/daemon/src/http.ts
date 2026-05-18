@@ -12,6 +12,7 @@ import { filesRoutes } from "./routes/files.js";
 import { graphRoutes } from "./routes/graph.js";
 import { grepRoutes } from "./routes/grep.js";
 import { healthRoutes } from "./routes/health.js";
+import { patternRoutes } from "./routes/pattern.js";
 import { reposRoutes } from "./routes/repos.js";
 import { tracesRoutes } from "./routes/traces.js";
 
@@ -39,6 +40,7 @@ app.onError((err, c) => {
 function mountRoutes(router: Hono): void {
   router.route("/graph", graphRoutes);
   router.route("/grep", grepRoutes);
+  router.route("/pattern", patternRoutes);
   router.route("/repos", reposRoutes);
   router.route("/repos", filesRoutes);
   router.route("/traces", tracesRoutes);
