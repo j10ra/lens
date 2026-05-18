@@ -1,7 +1,7 @@
 {
   "name": "@lens/web",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "LENS website — landing, docs, dashboard preview",
   "type": "module",
   "scripts": {

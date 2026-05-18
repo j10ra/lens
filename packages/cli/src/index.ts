@@ -9,7 +9,7 @@ import { register } from "./commands/register.js";
 import { remove } from "./commands/remove.js";
 import { status } from "./commands/status.js";
 
-const VERSION = "2.1.0";
+const VERSION = "2.1.1";
 
 const main = defineCommand({
   meta: {
