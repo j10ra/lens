@@ -4,6 +4,7 @@ import { dashboard } from "./commands/dashboard.js";
 import { graph } from "./commands/graph.js";
 import { grep } from "./commands/grep.js";
 import { list } from "./commands/list.js";
+import { pattern } from "./commands/pattern.js";
 import { register } from "./commands/register.js";
 import { remove } from "./commands/remove.js";
 import { status } from "./commands/status.js";
@@ -23,6 +24,7 @@ const main = defineCommand({
     list,
     grep,
     graph,
+    pattern,
   },
 });
 
