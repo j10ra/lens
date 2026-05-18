@@ -1,13 +1,5 @@
-import csharpLang from "@ast-grep/lang-csharp";
-import { parse, registerDynamicLanguage } from "@ast-grep/napi";
-
-// Register C# once at module load. Node's module cache ensures this runs exactly once.
-// Guarded: @experimental API — if arch-incompatible or missing, C# becomes unavailable rather than crashing the module.
-try {
-  registerDynamicLanguage({ csharp: csharpLang });
-} catch {
-  // C# support unavailable in this environment; runPatternImpl will throw "Unsupported language: csharp" for csharp requests.
-}
+import { parse } from "@ast-grep/napi";
+import { ensureCsharpRegistered } from "../parsers/csharp/register.js";
 
 export type SupportedLanguage = "typescript" | "tsx" | "javascript" | "csharp";
 
@@ -64,6 +56,8 @@ export async function runPatternImpl(args: RunPatternArgs): Promise<PatternResul
   if (!lang) {
     throw new Error(`Unsupported language: ${language}`);
   }
+
+  if (language === "csharp") ensureCsharpRegistered();
 
   const metaVars = extractMetaVars(pattern);
   const matches: PatternMatch[] = [];
