@@ -4,7 +4,7 @@
 
 LENS is an open-source code intelligence engine that indexes your codebase locally and serves structural context to AI agents via MCP or CLI. Import graph traversal, co-change analysis, hub detection, TF-IDF scoring — ranked results in one call. No API keys, no cloud, fully deterministic.
 
-Currently supports TypeScript/JavaScript with a pluggable parser architecture for adding more languages.
+Currently supports TypeScript, JavaScript, and C# with a pluggable parser architecture for adding more languages.
 
 ## Install
 
@@ -16,8 +16,20 @@ npm install -g lens-engine
 
 ## Quick Start
 
+### macOS (recommended)
+
+`lens daemon install` writes a launchd plist and loads the service. The daemon auto-starts at login, auto-restarts on crash, and survives sleep/wake cycles.
+
 ```bash
-# Start the daemon
+lens daemon install     # one-time install
+lens daemon status      # check loaded / pid
+lens daemon uninstall   # remove the launchd service
+```
+
+### All platforms
+
+```bash
+# Start the daemon (foreground or background)
 lens daemon start
 
 # Register and index a repo
@@ -51,6 +63,7 @@ LENS exposes MCP tools via HTTP Streamable transport. Add to your project's `.mc
 | Tool | Description |
 |------|-------------|
 | `lens_grep` | Ranked code search — pipe-separated terms, per-file relevance score, symbols, importers, co-change partners |
+| `lens_pattern` | Structural AST search via ast-grep. Find code by AST shape (e.g. `class $C : IController { $$$ }`). Languages: TypeScript, TSX, JavaScript, C#. |
 | `lens_graph` | Dependency map — cluster-level overview or directory-level drill-down with import edges and hub files |
 | `lens_graph_neighbors` | File neighborhood — imports, importers, and co-change partners for a single file |
 | `lens_reindex` | Trigger a reindex of a registered repo |
@@ -70,9 +83,12 @@ Every search query runs through a multi-stage pipeline:
 
 | Command | Description |
 |---------|-------------|
+| `lens daemon install` | Install daemon as a launchd service (macOS, auto-start at login) |
+| `lens daemon uninstall` | Remove the launchd service |
 | `lens daemon start` | Start the HTTP daemon on :4111 |
 | `lens daemon start -f` | Start daemon in foreground |
 | `lens daemon stop` | Stop the running daemon |
+| `lens daemon status` | Show loaded state, pid, last exit code |
 | `lens dashboard` | Open the dashboard in your browser |
 | `lens status` | Show daemon version, status, uptime |
 | `lens register <path>` | Register a repo and trigger full index |
@@ -80,6 +96,7 @@ Every search query runs through a multi-stage pipeline:
 | `lens list` | List all registered repos with index status |
 | `lens remove <id>` | Remove a registered repo |
 | `lens grep "<query>"` | Ranked search with pipe-separated terms |
+| `lens pattern "<pattern>"` | AST structural search — matches by code shape, not text |
 | `lens graph` | Cluster-level dependency graph overview |
 | `lens graph <dir>` | Directory-level file graph |
 | `lens graph --file <path>` | Single file neighborhood |
