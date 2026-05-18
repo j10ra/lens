@@ -13,6 +13,8 @@ export function getParser(language: string | null): LanguageParser | null {
 }
 
 // ── Auto-register all parsers ────────────────────────────────────────
+import { csharpParser } from "./csharp/index.js";
 import { typescriptParser } from "./typescript/index.js";
 
 registerParser(typescriptParser);
+registerParser(csharpParser);
