@@ -127,6 +127,37 @@ function registerTools(server: McpServer): void {
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     },
   );
+
+  server.registerTool(
+    "lens_pattern",
+    {
+      title: "LENS Pattern — Structural AST Search",
+      description:
+        "Find code matching an ast-grep pattern (structural AST shape, not text). Use $NAME for a single capture, $$$ for any sequence. Example: 'class $C : IController { $$$ }' finds C# controllers. Use AFTER lens_grep when you know the EXACT structural shape (e.g. every place a specific decorator is applied, every export that wraps a HOF). Returns path:line + captured meta-variables.",
+      inputSchema: {
+        repoPath: z.string().describe("Absolute path to the repository root"),
+        pattern: z
+          .string()
+          .describe('ast-grep pattern. $NAME = capture, $$$ = any sequence. Example: "function $N($$$) { $$$ }"'),
+        language: z.enum(["typescript", "tsx", "javascript", "csharp"]).describe("Source language to parse files as"),
+        limit: z.number().int().min(1).max(200).optional().default(50).describe("Max matches returned"),
+        format: z
+          .enum(["text", "json"])
+          .optional()
+          .default("text")
+          .describe("Output format. text = one line per match. json = full structure with captures."),
+      },
+    },
+    async ({ repoPath, pattern, language, limit, format }) => {
+      const res = await fetch(`${API}/pattern`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoPath, pattern, language, limit, format }),
+      });
+      const body = format === "text" ? await res.text() : JSON.stringify(await res.json(), null, 2);
+      return { content: [{ type: "text" as const, text: body }] };
+    },
+  );
 }
 
 function createSession(): { transport: WebStandardStreamableHTTPServerTransport; server: McpServer } {
