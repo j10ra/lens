@@ -1,6 +1,6 @@
 {
 	"name": "lens-engine",
-	"version": "2.0.1",
+	"version": "2.1.0",
 	"description": "LENS — Structured code query engine for AI agents",
 	"type": "module",
 	"bin": {
@@ -9,7 +9,9 @@
 	},
 	"files": ["cli.js", "daemon.js", "dashboard", "drizzle-core", "drizzle-engine"],
 	"dependencies": {
-		"better-sqlite3": "^12.6.2"
+		"better-sqlite3": "^12.6.2",
+		"@ast-grep/napi": "^0.42.2",
+		"@ast-grep/lang-csharp": "^0.0.6"
 	},
 	"engines": {
 		"node": ">=20"
