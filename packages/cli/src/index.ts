@@ -9,11 +9,25 @@ import { register } from "./commands/register.js";
 import { remove } from "./commands/remove.js";
 import { status } from "./commands/status.js";
 
+const VERSION = "2.1.0";
+
 const main = defineCommand({
   meta: {
     name: "lens",
-    version: "2.0.0",
+    version: VERSION,
     description: "LENS — structured code query engine",
+  },
+  args: {
+    version: {
+      type: "boolean",
+      alias: "v",
+      description: "Show version and exit",
+    },
+  },
+  run({ args }) {
+    if (args.version) {
+      console.log(VERSION);
+    }
   },
   subCommands: {
     daemon,

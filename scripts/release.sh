@@ -20,8 +20,25 @@ esac
 NEW="$MAJOR.$MINOR.$PATCH"
 echo "Bumping $CURRENT → $NEW ($BUMP)"
 
-# 1. Update publish.json version
-sed -i '' "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" "$PUBLISH_JSON"
+# 1. Update all version sources in lockstep.
+#    publish.json is the only one consumed by npm publish, but workspace
+#    package.json files and the CLI's runtime version literal MUST stay in
+#    sync — otherwise `lens --version` reports a stale number.
+VERSION_FILES=(
+  "$PUBLISH_JSON"
+  "$ROOT/package.json"
+  "$ROOT/packages/cli/package.json"
+  "$ROOT/packages/core/package.json"
+  "$ROOT/packages/engine/package.json"
+  "$ROOT/apps/daemon/package.json"
+  "$ROOT/apps/dashboard/package.json"
+  "$ROOT/apps/web/package.json"
+)
+for f in "${VERSION_FILES[@]}"; do
+  sed -i '' "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" "$f"
+done
+# CLI runtime version literal lives in source code, not package.json.
+sed -i '' "s/const VERSION = \"$CURRENT\";/const VERSION = \"$NEW\";/" "$ROOT/packages/cli/src/index.ts"
 
 # 2. Build everything
 echo "Building..."
@@ -42,7 +59,7 @@ echo "Published lens-engine@$NEW"
 
 # 5. Commit + tag + push
 cd "$ROOT"
-git add publish.json
+git add "${VERSION_FILES[@]}" packages/cli/src/index.ts
 git commit -m "release: v$NEW"
 git tag "v$NEW"
 git push && git push --tags
