@@ -5,6 +5,7 @@ This repo is indexed by LENS. **Prefer LENS MCP tools over built-in Grep/Glob** 
 - `lens_grep` — Ranked search with import graph, co-change, hub scores. One call replaces multiple Grep+Read cycles.
 - `lens_graph` — Dependency map. Architecture, module relationships, change impact.
 - `lens_graph_neighbors` — Blast radius for a file. Importers, co-change partners, what breaks.
+- `lens_pattern` — Structural AST search via ast-grep. Pass a pattern with `$NAME` (single capture) or `$$$` (any sequence). Language: typescript | tsx | javascript | csharp. Use AFTER `lens_grep` when you know the exact AST shape. Example: `class $C : IController { $$$ }`.
 
 Load tools via `ToolSearch` before first use.
 
