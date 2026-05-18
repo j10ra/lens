@@ -233,6 +233,7 @@ export const metadataQueries = {
       sections: string[];
       internals: string[];
       symbols: ParsedSymbol[];
+      namespaces?: string[];
     },
   ) {
     const existing = db
@@ -251,6 +252,7 @@ export const metadataQueries = {
           sections: JSON.stringify(metadata.sections),
           internals: JSON.stringify(metadata.internals),
           symbols: JSON.stringify(metadata.symbols),
+          namespaces: JSON.stringify(metadata.namespaces ?? []),
         })
         .where(eq(fileMetadata.id, existing.id))
         .run();
@@ -267,6 +269,7 @@ export const metadataQueries = {
           sections: JSON.stringify(metadata.sections),
           internals: JSON.stringify(metadata.internals),
           symbols: JSON.stringify(metadata.symbols),
+          namespaces: JSON.stringify(metadata.namespaces ?? []),
         })
         .run();
     }

@@ -62,6 +62,7 @@ export const fileMetadata = sqliteTable(
     sections: text("sections").default("[]"),
     internals: text("internals").default("[]"),
     symbols: text("symbols").default("[]"),
+    namespaces: text("namespaces").default("[]"),
   },
   (t) => [uniqueIndex("idx_file_metadata_unique").on(t.repo_id, t.path)],
 );
