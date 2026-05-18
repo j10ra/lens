@@ -217,6 +217,9 @@ importers:
 
   packages/engine:
     dependencies:
+      '@ast-grep/lang-csharp':
+        specifier: ^0.0.6
+        version: 0.0.6
       '@ast-grep/napi':
         specifier: ^0.42.2
         version: 0.42.2
@@ -301,6 +304,14 @@ packages:
     resolution: {integrity: sha512-9q/yCljni37pkMr4sPrI3G4jqdIk074+iukc5aFJl7kmDCCsiJrbZ6zKxnES1Gwg+i9RcDZwvktl23puGslmvA==}
     hasBin: true
 
+  '@ast-grep/lang-csharp@0.0.6':
+    resolution: {integrity: sha512-9Aq0WvJ5wRdJ+iply7H2Aq89o2BOdxFXh3H9tLvf8DryyHgWAQA/CRKUw1HjV8Q4ABUZFl1vLq9Uv3t0gQtZdQ==}
+    peerDependencies:
+      tree-sitter-cli: 0.25.8
+    peerDependenciesMeta:
+      tree-sitter-cli:
+        optional: true
+
   '@ast-grep/napi-darwin-arm64@0.42.2':
     resolution: {integrity: sha512-EKRI0LogIOtT2pk8vGnYzJauXsuunxAb5Q4YdvqZDbE9xpC4c8QLfox50njlYARk9kGlRNA/ZlOLhCwDzkoCgQ==}
     engines: {node: '>= 10'}
@@ -358,6 +369,9 @@ packages:
   '@ast-grep/napi@0.42.2':
     resolution: {integrity: sha512-Iw4YxQi1RpURCENzqYd47m+/lqt6kbl8mhiOHS0kBfHPjcCqrJ3l4ISO2nbEiOcLYAp1ImXFiQHMjt6AdOLGLw==}
     engines: {node: '>= 10'}
+
+  '@ast-grep/setup-lang@0.0.6':
+    resolution: {integrity: sha512-aSYZNF5nGQMxnwiA3Lcc8zi0AtpGlug47ADgqCgP/2n7p922FbnW7vo1rbW4kKjW72B/3mDdN7uvYidv8JnPnw==}
 
   '@babel/code-frame@7.27.1':
     resolution: {integrity: sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg==}
@@ -5113,6 +5127,10 @@ snapshots:
       package-manager-detector: 1.6.0
       tinyexec: 1.0.2
 
+  '@ast-grep/lang-csharp@0.0.6':
+    dependencies:
+      '@ast-grep/setup-lang': 0.0.6
+
   '@ast-grep/napi-darwin-arm64@0.42.2':
     optional: true
 
@@ -5151,6 +5169,8 @@ snapshots:
       '@ast-grep/napi-win32-arm64-msvc': 0.42.2
       '@ast-grep/napi-win32-ia32-msvc': 0.42.2
       '@ast-grep/napi-win32-x64-msvc': 0.42.2
+
+  '@ast-grep/setup-lang@0.0.6': {}
 
   '@babel/code-frame@7.27.1':
     dependencies:

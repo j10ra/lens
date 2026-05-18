@@ -1,6 +1,10 @@
-import { parse } from "@ast-grep/napi";
+import csharpLang from "@ast-grep/lang-csharp";
+import { parse, registerDynamicLanguage } from "@ast-grep/napi";
 
-export type SupportedLanguage = "typescript" | "tsx" | "javascript";
+// Register C# once at module load. Node's module cache ensures this runs exactly once.
+registerDynamicLanguage({ csharp: csharpLang });
+
+export type SupportedLanguage = "typescript" | "tsx" | "javascript" | "csharp";
 
 export interface PatternFile {
   path: string;
@@ -36,6 +40,7 @@ const LANG_MAP: Record<SupportedLanguage, string> = {
   typescript: "TypeScript",
   tsx: "Tsx",
   javascript: "JavaScript",
+  csharp: "csharp",
 };
 
 // Extract bare meta-variable names from a pattern string.

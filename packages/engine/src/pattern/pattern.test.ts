@@ -51,14 +51,29 @@ describe("runPatternImpl", () => {
     expect(result.truncated).toBe(false);
   });
 
-  it("throws for unsupported language", async () => {
-    await expect(
-      runPatternImpl({
-        pattern: "class $C { $$$ }",
-        language: "csharp" as "typescript",
-        files: [{ path: "Foo.cs", content: "class Foo {}" }],
-        limit: 10,
-      }),
-    ).rejects.toThrow("Unsupported language: csharp");
+  it("supports csharp language", async () => {
+    const files = [
+      {
+        path: "Foo.cs",
+        content: `
+          using System;
+          namespace App {
+            public class Foo {
+              public void Bar() {}
+            }
+          }
+        `,
+      },
+    ];
+
+    const result = await runPatternImpl({
+      pattern: "public class $C { $$$ }",
+      language: "csharp",
+      files,
+      limit: 10,
+    });
+
+    expect(result.matches.length).toBeGreaterThan(0);
+    expect(result.matches[0].captures.C).toBe("Foo");
   });
 });
