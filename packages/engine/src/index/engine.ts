@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { lensFn } from "@lens/core";
 import type { Db } from "../db/connection.js";
 import { metadataQueries, repoQueries } from "../db/queries.js";
+import { buildCsharpNamespaceGraphImpl } from "./csharp-namespace-graph.js";
 import { diffScan, fullScan, getHeadCommit } from "./discovery.js";
 import { extractAndPersistMetadata } from "./extract-metadata.js";
 import { analyzeGitHistory } from "./git-analysis.js";
@@ -73,6 +74,7 @@ async function indexImpl(db: Db, repoId: string, force: boolean): Promise<IndexR
 
     extractAndPersistMetadata(db, repoId, fileContents);
     buildAndPersistImportGraph(db, repoId);
+    buildCsharpNamespaceGraphImpl(db, repoId);
     await analyzeGitHistory(db, repoId, repo.root_path, repo.last_git_analysis_commit);
 
     repoQueries.updateIndexState(db, repoId, headCommit, "ready");
