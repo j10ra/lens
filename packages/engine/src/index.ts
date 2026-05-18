@@ -39,6 +39,11 @@ export const getRepoStatus = lensFn("engine.getRepoStatus", async (db: Db, repoI
 
 export const grepRepo = lensFn("engine.grepRepo", grepRepoImpl);
 
+// ── Pattern engine — wrapped in lensFn ────────────────────────────────────────
+import { runPatternImpl } from "./pattern/pattern.js";
+export const runPattern = lensFn("engine.runPattern", runPatternImpl);
+export type { PatternFile, PatternMatch, PatternResult, RunPatternArgs, SupportedLanguage } from "./pattern/pattern.js";
+
 // ── Graph engine — wrapped in lensFn ──────────────────────────────────────────
 
 export const buildGraphSummary = lensFn("engine.buildGraphSummary", async (db: Db, repoId: string) =>
