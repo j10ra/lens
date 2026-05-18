@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineCommand } from "citty";
+import { install, statusCmd, uninstall } from "./daemon-install.js";
 
 const DATA_DIR = join(homedir(), ".lens");
 const PID_FILE = join(DATA_DIR, "daemon.pid");
@@ -127,5 +128,5 @@ const stop = defineCommand({
 
 export const daemon = defineCommand({
   meta: { description: "Manage the LENS daemon process." },
-  subCommands: { start, stop },
+  subCommands: { start, stop, install, uninstall, status: statusCmd },
 });
