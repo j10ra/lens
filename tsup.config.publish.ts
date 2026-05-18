@@ -25,18 +25,37 @@ const stripShebang: Plugin = {
 // Node v24 ESM resolver can't resolve CJS packages without `exports` field.
 // esbuild generates `import X from "better-sqlite3"` which fails.
 // This plugin intercepts the resolve and provides a virtual module that uses require() instead.
+//
+// @ast-grep/napi ships per-platform .node binaries via optionalDependencies;
+// esbuild can't statically analyze its `require('./ast-grep-napi.<platform>.node')`
+// switch and tries to bundle every variant. Same treatment.
 const cjsExternals: Plugin = {
 	name: "cjs-externals",
 	setup(build) {
-		build.onResolve({ filter: /^better-sqlite3$/ }, () => ({
-			path: "better-sqlite3",
-			namespace: "cjs-extern",
-		}));
-		build.onLoad({ filter: /.*/, namespace: "cjs-extern" }, (args) => ({
+		build.onResolve(
+			{ filter: /^(better-sqlite3|@ast-grep\/napi|@ast-grep\/lang-csharp)$/ },
+			(args) => ({
+				path: args.path,
+				namespace: "cjs-extern",
+			}),
+		);
+		build.onLoad({ filter: /.*/, namespace: "cjs-extern" }, (args) => {
 			// Use a variable so esbuild doesn't statically analyze the require() call
-			contents: `const _mod = "${args.path}"; export default require(_mod);`,
-			loader: "js",
-		}));
+			let contents = `const _mod = "${args.path}"; const _impl = require(_mod);\nexport default _impl;\n`;
+			if (args.path === "@ast-grep/napi") {
+				// Re-export named bindings used by engine code (CJS module.exports → ESM named)
+				contents += `export const parse = _impl.parse;
+export const parseAsync = _impl.parseAsync;
+export const parseFiles = _impl.parseFiles;
+export const findInFiles = _impl.findInFiles;
+export const Lang = _impl.Lang;
+export const SgNode = _impl.SgNode;
+export const SgRoot = _impl.SgRoot;
+export const registerDynamicLanguage = _impl.registerDynamicLanguage;
+`;
+			}
+			return { contents, loader: "js" };
+		});
 	},
 };
 
